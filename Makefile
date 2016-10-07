@@ -53,6 +53,9 @@ $(LIBS): $(OBJ)
 clean:
 	@rm -vf ${BASENAME}Lib.{o,d,d.*} lib${BASENAME}.{a,so}
 
+realclean: clean
+	@rm -vf *~
+
 echoarch:
 	@echo "Make for $(ARCH)"
 
