@@ -21,14 +21,22 @@
 
 #include <stdint.h>
 
-struct EventBuilder_Struct
+#ifndef ERROR
+#define ERROR -1
+#endif
+#ifndef OK 
+#define OK 0
+#endif
+
+typedef struct EventBuilder_Struct
 {
   /** 0x0000 */ volatile uint32_t LinkCtrl;
   /** 0x0004 */ volatile uint32_t TiCtrl;
   /** 0x0008 */ volatile uint32_t LinkStatus;
   /** 0x000C */ volatile uint32_t TiStatus;
   /** 0x0010 */ volatile uint32_t EbCtrl;
-};
+  /** 0x0014          */ uint32_t blank_end[(0x10000-0x14)/4];
+} EB_REGS;
 
 #define VTP_EB_LINKCTRL_FIFO_RST    (1<<3)
 #define VTP_EB_LINKCTRL_RX_FIFO_RST (1<<2)
@@ -50,35 +58,17 @@ struct EventBuilder_Struct
 #define VTP_EB_EBCTRL_BUILD_VTP  (1<<1)
 #define VTP_EB_EBCTRL_BUILD_TI   (1<<0)
 
-struct V7Bridge_FPGAConfig_Struct
-{
-  /** 0x0000 */ volatile uint32_t Bridge_space[(0xFFF4-0x0000)/4];
-  /** 0xFFF4 */ volatile uint32_t Status;
-  /** 0xFFF8 */ volatile uint32_t Ctrl;
-  /** 0xFFFC */ volatile uint32_t Cfg;
-};
-
-#define VTP_V7BRIDGE_STATUS_INIT_B (1<<1)
-#define VTP_V7BRIDGE_STATUS_DONE   (1<<0)
-
-#define VTP_V7BRIDGE_CTRL_PROGRAM_B  (1<<4)
-#define VTP_V7BRIDGE_CTRL_RDWR_B     (1<<3)
-#define VTP_V7BRIDGE_CTRL_CSI_B      (1<<2)
-#define VTP_V7BRIDGE_CTRL_RESET_SOFT (1<<1)
-#define VTP_V7BRIDGE_CTRL_RESET      (1<<0)
-
-#define VTP_V7BRIDGE_CFG_DATA_MASK   0xFFFF
-
-struct V7Clk_Struct
+typedef struct V7Clk_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
   /** 0x0004 */ volatile uint32_t Status;
-};
+  /** 0x0014          */ uint32_t blank_end[(0x100-0x14)/4];
+} V7CLK_REGS;
 
 #define VTP_V7CLK_CTRL_GCLK_RESET    (1<<0)
 #define VTP_V7CLK_STATUS_GCLK_LOCKED (1<<0)
 
-struct SD_Struct
+typedef struct SD_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
   /** 0x0004 */ volatile uint32_t Status;
@@ -91,13 +81,14 @@ struct SD_Struct
   /** 0x0020 */ volatile uint32_t SyncSel;
   /** 0x0024          */ uint32_t blank1[(0x40-0x24)/4];
   /** 0x0040 */ volatile uint32_t FPAOVal;
-  /** 0x0044 */ volatile uint32_t FPAOVal;
+  /** 0x0044 */ volatile uint32_t FPBOVal;
   /** 0x0048          */ uint32_t blank2[(0x60-0x48)/4];
   /** 0x0060 */ volatile uint32_t FPBIStatus;
   /** 0x0064 */ volatile uint32_t Trig1Status;
   /** 0x0068 */ volatile uint32_t Trig2Status;
   /** 0x006C */ volatile uint32_t SyncStatus;
-};
+  /** 0x0070          */ uint32_t blank_end[(0x100-0x70)/4];
+} SD_REGS;
 
 #define VTP_SD_CTRL_FPB_OEN  (1<<1)
 #define VTP_SD_CTRL_FPB_SEL  (1<<0)
@@ -118,25 +109,27 @@ struct SD_Struct
 
 #define VTP_SD_SYNC_STATUS  (1<<0)
 
-struct FadcDecoder_Struct
+typedef struct FadcDecoder_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
   /** 0x0004          */ uint32_t blank0[(0x20-0x4)/4];
   /** 0x0020 */ volatile uint32_t Latency[16];
-};
+  /** 0x0060          */ uint32_t blank_end[(0x1000-0x60)/4];
+} FADCDECODER_REGS;
 
 #define VTP_FADCDECODER_CTRL_PP_EN(x)  (1<<(x-1))
 
 #define VTP_FADCDECODER_LATENCY_MASK   0xFFFF
 
 /* Same struct for VXS and QSFP */
-struct Serdes_Struct
+typedef struct Serdes_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
   /** 0x0004 */ volatile uint32_t Status;
   /** 0x0008 */ volatile uint32_t DrpCtrl;
   /** 0x000C */ volatile uint32_t DrpStatus;
-};
+  /** 0x0010          */ uint32_t blank_end[(0x100-0x10)/4];
+} SERDES_REGS;
 
 #define VTP_SERDES_CTRL_ER_CNT_RST    (1<<9)
 #define VTP_SERDES_CTRL_LOOPBACK_MASK 0x01C0
@@ -168,44 +161,89 @@ struct Serdes_Struct
 #define VTP_SERDES_DRP_STATUS_RDY     (1<<16)
 #define VTP_SERDES_DRP_STATUS_DO_MASK 0xFFFF
 
-struct ECTrigger_Struct
+typedef struct ECTrigger_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
-};
+  /** 0x0004          */ uint32_t blank_end[(0x100-0x4)/4];
+} ECTRIGGER_REGS;
 
 #define VTP_ECTRIGGER_CTRL_TCOIL_MASK      0x00F00000
 #define VTP_ECTRIGGER_CTRL_DALITZ_MAX_MASK 0x000FFC00
 #define VTP_ECTRIGGER_CTRL_DALITZ_MIN_MASK 0x000003FF
 
-struct Trigger_Output_Struct
+typedef struct Trigger_Output_Struct
 {
   /** 0x0000 */ volatile uint32_t Latency;
   /** 0x0004 */ volatile uint32_t Width;
-  /** 0x0008          */ uint32_t blank0[(0x10-0x8)/4;
+  /** 0x0008          */ uint32_t blank0[(0x10-0x8)/4];
   /** 0x0010 */ volatile uint32_t BusyScaler;
-};
+  /** 0x0014          */ uint32_t blank_end[(0x100-0x14)/4];
+} TRIGGER_OUTPUT_REGS;
 
 #define VTP_TRIGGER_OUTPUT_LATENCY_MASK 0x07FF
 
 #define VTP_TRIGGER_OUTPUT_WIDTH_MASK   0x000F
 
-struct V7_Event_Builder_Struct
+typedef struct V7_Event_Builder_Struct
 {
   /** 0x0000 */ volatile uint32_t BlockSize;
   /** 0x0004 */ volatile uint32_t TriggerFifoBusyThreshold;
   /** 0x0008 */ volatile uint32_t Lookback;
   /** 0x000C */ volatile uint32_t WindowWidth;
-};
+  /** 0x0010          */ uint32_t blank_end[(0x100-0x10)/4];
+} V7_EB_REGS;
 
 #define VTP_V7_EB_BLOCKSIZE_MASK  0x00FF
-  
+
 #define VTP_V7_EB_BUSYLEVEL_MASK  0x00FF
-  
+
 #define VTP_V7_EB_LOOKBACK_MASK   0x07FF
 
 #define VTP_V7_EB_WINDOW_MASK     0x07FF
 
+typedef struct v7_bridge_struct
+{
+  /** 0x43C10100 */ V7CLK_REGS clk;
 
+  /** 0x43C10200 */ SD_REGS sd;
 
+  /** 0x43C10300 */ FADCDECODER_REGS fadcDec;
 
+  /** 0x43C11000 */ SERDES_REGS vxs[16];
+
+  /** 0x43C12000 */ SERDES_REGS qsfp[4];
+
+  /** 0x43C12500 */ uint32_t blank0[(0x5000 - 0x2500)/4];
+
+  /** 0x43C14100 */ ECTRIGGER_REGS ecTrigger[2];
+
+  /** 0x43C15000 */ TRIGGER_OUTPUT_REGS trigOut;
+
+  /** 0x43C15100 */ V7_EB_REGS eb;
+
+  /** 0x43C15200 */ uint32_t blank1[(0xFFF4 - 0x5200)/4];
+  
+  /** 0x43C1FFF4 */ volatile uint32_t Status;
+  /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
+  /** 0x43C1FFFC */ volatile uint32_t Cfg;
+
+} V7_REGS;
+
+#define VTP_V7BRIDGE_STATUS_INIT_B (1<<1)
+#define VTP_V7BRIDGE_STATUS_DONE   (1<<0)
+
+#define VTP_V7BRIDGE_CTRL_PROGRAM_B  (1<<4)
+#define VTP_V7BRIDGE_CTRL_RDWR_B     (1<<3)
+#define VTP_V7BRIDGE_CTRL_CSI_B      (1<<2)
+#define VTP_V7BRIDGE_CTRL_RESET_SOFT (1<<1)
+#define VTP_V7BRIDGE_CTRL_RESET      (1<<0)
+
+#define VTP_V7BRIDGE_CFG_DATA_MASK   0xFFFF
+
+typedef struct zync_reg_struct
+{
+  /** 0x43C00000 */ EB_REGS eb;
+  /** 0x43C10000 */ V7_REGS v7;
+} ZYNC_REGS;
+  
 #endif /* VTPLIB_H */
