@@ -20,6 +20,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
@@ -160,6 +161,21 @@ vtpCheckAddresses()
 static unsigned int CfgCtrl_Shadow = 0x1F;
 
 int
+vtpV7CtrlInit()
+{
+  CHECKINIT;
+
+  VLOCK;
+  CfgCtrl_Shadow = 0x1F;
+
+  vtp->v7.Ctrl = CfgCtrl_Shadow;
+  VUNLOCK;
+
+  return OK;
+
+}
+
+int
 vtpV7SetReset(int val)
 {
   CHECKINIT;
@@ -274,7 +290,7 @@ vtpV7SetCSI_B(int val)
 }
 
 void
-vtpv7WriteCfgData(unsigned short *buf, int N)
+vtpV7WriteCfgData(unsigned short *buf, int N)
 {
   while(N--)
     vtp->v7.Cfg = *buf++;
@@ -284,30 +300,30 @@ vtpv7WriteCfgData(unsigned short *buf, int N)
 #define V7_CFG_DONE_CNT_MAX	10000000
 
 int
-vtpv7CfgStart()
+vtpV7CfgStart()
 {
   int i, result;
 
-  vtpv7SetCSI_B(1);
-  vtpv7SetProgram_B(1);
-  vtpv7SetRDWR_B(0);	// Write Mode
+  vtpV7SetCSI_B(1);
+  vtpV7SetProgram_B(1);
+  vtpV7SetRDWR_B(0);	// Write Mode
 
-  result = vtpv7GetInit_B();
+  result = vtpV7GetInit_B();
   printf("%s: Init_B = %d, Expected to be 1...%s\r\n",
 	 __func__, result, (result == 0) ? "Failed" : "Okay");
 
-  vtpv7SetProgram_B(0);
+  vtpV7SetProgram_B(0);
 
-  result = vtpv7GetInit_B();
+  result = vtpV7GetInit_B();
   printf("%s: Init_B = %d, Expected to be 0...%s\r\n",
 	 __func__, result, (result == 1) ? "Failed" : "Okay");
 
-  vtpv7SetProgram_B(1);
-  vtpv7SetCSI_B(0);
+  vtpV7SetProgram_B(1);
+  vtpV7SetCSI_B(0);
 
   for(i = 0; i <= V7_CFG_INITB_CNT_MAX; i++)
     {
-      result = vtpv7GetInit_B();
+      result = vtpV7GetInit_B();
 
       if(result)
 	break;
@@ -324,7 +340,7 @@ vtpv7CfgStart()
 }
 
 int
-vtpv7CfgLoad(char *filename)
+vtpV7CfgLoad(char *filename)
 {
   unsigned short buf[256];
   unsigned int bytesRead, i = 0;
@@ -349,7 +365,7 @@ vtpv7CfgLoad(char *filename)
 	  return ERROR;
 	}
 
-      vtpv7WriteCfgData(buf, (bytesRead+1)>>1);
+      vtpV7WriteCfgData(buf, (bytesRead+1)>>1);
       i+= bytesRead;
 
       if(feof(f))
@@ -365,16 +381,16 @@ vtpv7CfgLoad(char *filename)
 }
 
 int
-vtpv7CfgEnd()
+vtpV7CfgEnd()
 {
   unsigned short val = 0;
   int result, i;
 
   for(i = 0; i <= V7_CFG_DONE_CNT_MAX; i++)
     {
-      vtpv7WriteCfgData(&val, 1);
+      vtpV7WriteCfgData(&val, 1);
 
-      result = vtpv7GetDone();
+      result = vtpV7GetDone();
 
       if(result)
 	break;
@@ -385,7 +401,7 @@ vtpv7CfgEnd()
 	}
     }
   for(i = 0; i < 64; i++)
-    vtpv7WriteCfgData(&val, 1);
+    vtpV7WriteCfgData(&val, 1);
 
   printf("%s: end reached.\r\n", __func__);
 

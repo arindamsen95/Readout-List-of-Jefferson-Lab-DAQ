@@ -264,6 +264,7 @@ typedef struct zync_reg_struct
 /* Routine prototypes */
 int  vtpCheckAddresses();
 
+int  vtpV7CtrlInit();
 int  vtpV7SetReset(int val);
 int  vtpV7SetResetSoft(int val);
 int  vtpV7GetDone();
@@ -271,10 +272,10 @@ int  vtpV7GetInit_B();
 int  vtpV7SetProgram_B(int val);
 int  vtpV7SetRDWR_B(int val);
 int  vtpV7SetCSI_B(int val);
-void vtpv7WriteCfgData(unsigned short *buf, int N);
-int  vtpv7CfgStart();
-int  vtpv7CfgLoad(char *filename);
-int  vtpv7CfgEnd();
+void vtpV7WriteCfgData(unsigned short *buf, int N);
+int  vtpV7CfgStart();
+int  vtpV7CfgLoad(char *filename);
+int  vtpV7CfgEnd();
 
 int  vtpOpen();
 int  vtpClose();

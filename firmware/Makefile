@@ -3,36 +3,37 @@
 #    Makefile
 #
 # Description:
-#    Makefile for the VTP test programs
+#    Makefile for the VTP Firmware updating program
 #
 #
-# $Date$
-# $Rev$
-#
+
+FWFILES	= $(shell cat .currentfw)
 
 VTPLIB_PATH		= ../
-ARCH=${shell uname -m}
-KERNEL_VERSION=${shell uname -r}
 
+ifdef BUILD64
 CC			= gcc
+else
+CC			= gcc -m32
+endif
 AR                      = ar
 RANLIB                  = ranlib
 INCS			= -I. -I${VTPLIB_PATH}
-CFLAGS			= -Wall -g ${INCS} \
-			  -L. -L${VTPLIB_PATH} -lrt -lvtp
+CFLAGS			= -Wall -g ${INCS}\
+			  -L. -L${VTPLIB_PATH}
 
-PROGS			= vtpLibTest
+PROGS			= vtpFirmwareLoad
 SRC			= $(PROGS:%=%.c)
 DEPS			= $(SRC:%.c=%.d)
 
 all: $(PROGS)
 
-clean distclean:
-	@rm -f $(PROGS) *~ 
+clean:
+	@rm -vf $(PROGS) $(DEPS) *~
 
 %: %.c
-	@echo "Making $@"
-	$(CC) $(CFLAGS) -o $@ $(@:%=%.c)
+	@echo "Building $@ from $<"
+	$(CC) $(CFLAGS) -o $@ $(@:%=%.c) -lrt -lvtp
 
 %.d: %.c
 	@echo ""
@@ -44,4 +45,4 @@ clean distclean:
 
 -include $(DEPS)
 
-.PHONY: all clean distclean
+.PHONY: all clean

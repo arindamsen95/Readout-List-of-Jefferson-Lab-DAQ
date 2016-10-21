@@ -6,7 +6,7 @@
 #    Makefile for the JLab VTP module running Linux on an ARMv7 processor
 #
 # Uncomment DEBUG line, to include some debugging info ( -g and -Wall)
-#DEBUG=1
+DEBUG=1
 #
 #
 BASENAME=vtp
