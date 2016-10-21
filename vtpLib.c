@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <pthread.h>
+#include <string.h>
 #include "vtpLib.h"
 
 
@@ -418,21 +419,25 @@ vtpOpen()
       return ERROR;
     }
   
-  vtpFD = open(vtpDev, O_RDWR);
+  vtpFD = open(vtpDev, O_RDWR | O_SYNC);
   
   if(vtpFD < 0)
     {
-      perror("vtpOpen: ERROR");
+      printf("%s: ERROR from open: %s (%d)",
+	     __func__, strerror(errno), errno);
       return ERROR;
     }
+
+  printf(" size = %d\n", sizeof(ZYNC_REGS));
   
-  vtp = (volatile ZYNC_REGS *)mmap(NULL, sizeof(ZYNC_REGS),
-				   PROT_READ|PROT_WRITE, MAP_SHARED,
-				   vtpFD, VTP_ZYNC_PHYSMEM_BASE);
+  vtp = (volatile ZYNC_REGS *) mmap(VTP_ZYNC_PHYSMEM_BASE, sizeof(ZYNC_REGS),
+				    PROT_READ|PROT_WRITE, MAP_SHARED,
+				    vtpFD, 0);
 
   if(vtp == MAP_FAILED)
     {
-      perror("mmap");
+      printf("%s: ERROR from mmap: %s (%d)\n",
+	     __func__, strerror(errno), errno);
       return ERROR;
     }
   
@@ -450,7 +455,8 @@ vtpClose()
     }
 
   if(munmap((void *)vtp, sizeof(ZYNC_REGS)) < 0)
-    perror("vtpClose: ERROR: munmap");
+      printf("%s: ERROR from munmap: %s (%d)\n",
+	     __func__, strerror(errno), errno);
   
   close(vtpFD);
   return OK;
