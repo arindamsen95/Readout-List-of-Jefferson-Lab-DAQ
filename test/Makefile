@@ -19,7 +19,7 @@ RANLIB                  = ranlib
 CFLAGS			= -Wall -g -I. -I../ \
 			  -L. -L../ -lrt -lvtp
 
-PROGS			= 
+PROGS			= vtpLibTest
 
 all: $(PROGS)
 
