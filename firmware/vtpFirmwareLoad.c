@@ -56,14 +56,14 @@ main(int argc, char *argv[])
   printf(" with file: \n   %s",bin_filename);
 
  REPEAT2:
-  printf(" Press y and <ENTER> to continue... n or q and <ENTER> to quit without update\n");
+  printf(" Press y and <ENTER> to continue... n or q and <ENTER> to quit without firmware load\n");
 
   scanf("%s",(char *)inputchar);
 
   if((strcmp(inputchar,"q")==0) || (strcmp(inputchar,"Q")==0) ||
      (strcmp(inputchar,"n")==0) || (strcmp(inputchar,"N")==0) )
     {
-      printf(" Exiting without update\n");
+      printf(" Exiting without firmware load\n");
       goto CLOSE;
     }
   else if((strcmp(inputchar,"y")==0) || (strcmp(inputchar,"Y")==0))

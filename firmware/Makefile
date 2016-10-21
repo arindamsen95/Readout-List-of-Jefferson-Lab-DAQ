@@ -7,15 +7,9 @@
 #
 #
 
-FWFILES	= $(shell cat .currentfw)
-
 VTPLIB_PATH		= ../
 
-ifdef BUILD64
 CC			= gcc
-else
-CC			= gcc -m32
-endif
 AR                      = ar
 RANLIB                  = ranlib
 INCS			= -I. -I${VTPLIB_PATH}
