@@ -29,8 +29,15 @@
 #include "vtpLib.h"
 
 
-static int vtpFD;
-const char vtpDev[256] = "/dev/uio0";
+static int vtpFPGAFD = -1;
+const char vtpFPGADev[256] = "/dev/uio0";
+
+static int vtpI2CFD = -1;
+const char vtpI2CDev[256] = "/dev/i2c-4me";
+
+static int vtpSPIFD = -1;
+const char vtpSPIDev[256] = "/dev/spi-on-me";
+
 static volatile ZYNC_REGS *vtp = NULL;
 
 /* Mutex to guard VTP read/writes */
@@ -44,6 +51,12 @@ pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
       return ERROR;						\
     }								\
   }
+
+/* Static Prototypes for read/write routines */
+static unsigned int vtpI2CRead(int dev, unsigned int addr);
+static void vtpI2CWrite(int dev, unsigned int addr, unsigned int val);
+static unsigned int vtpSPIRead(int dev, unsigned int addr);
+static void vtpSPIWrite(int dev, unsigned int addr, unsigned int val);
 
 int
 vtpCheckAddresses()
@@ -409,19 +422,19 @@ vtpV7CfgEnd()
   return OK;
 }
 
-int
-vtpOpen()
+static int
+vtpFPGAOpen()
 {
-  if(vtpFD > 0)
+  if(vtpFPGAFD > 0)
     {
-      printf("%s: ERROR: VTP already opened.\n",
+      printf("%s: ERROR: VTP FPGA already opened.\n",
 	     __func__);
       return ERROR;
     }
   
-  vtpFD = open(vtpDev, O_RDWR | O_SYNC);
+  vtpFPGAFD = open(vtpFPGADev, O_RDWR | O_SYNC);
   
-  if(vtpFD < 0)
+  if(vtpFPGAFD < 0)
     {
       printf("%s: ERROR from open: %s (%d)",
 	     __func__, strerror(errno), errno);
@@ -430,9 +443,9 @@ vtpOpen()
 
   printf(" size = %d\n", sizeof(ZYNC_REGS));
   
-  vtp = (volatile ZYNC_REGS *) mmap(VTP_ZYNC_PHYSMEM_BASE, sizeof(ZYNC_REGS),
+  vtp = (volatile ZYNC_REGS *) mmap((void *)VTP_ZYNC_PHYSMEM_BASE, sizeof(ZYNC_REGS),
 				    PROT_READ|PROT_WRITE, MAP_SHARED,
-				    vtpFD, 0);
+				    vtpFPGAFD, 0);
 
   if(vtp == MAP_FAILED)
     {
@@ -444,12 +457,12 @@ vtpOpen()
   return OK;
 }
 
-int
-vtpClose()
+static int
+vtpFPGAClose()
 {
-  if(vtpFD < 0)
+  if(vtpFPGAFD < 0)
     {
-      printf("%s: ERROR: VTP not opened.\n",
+      printf("%s: ERROR: VTP FPGA not opened.\n",
 	     __func__);
       return ERROR;
     }
@@ -457,7 +470,138 @@ vtpClose()
   if(munmap((void *)vtp, sizeof(ZYNC_REGS)) < 0)
       printf("%s: ERROR from munmap: %s (%d)\n",
 	     __func__, strerror(errno), errno);
+
+  vtp = NULL;
   
-  close(vtpFD);
+  close(vtpFPGAFD);
   return OK;
+}
+
+static int
+vtpI2COpen()
+{
+  if(vtpI2CFD > 0)
+    {
+      printf("%s: ERROR: VTP I2C already opened.\n",
+	     __func__);
+      return ERROR;
+    }
+  
+  vtpI2CFD = open(vtpI2CDev, O_RDWR | O_SYNC);
+  
+  if(vtpI2CFD < 0)
+    {
+      printf("%s: ERROR from open: %s (%d)",
+	     __func__, strerror(errno), errno);
+      return ERROR;
+    }
+
+  return OK;
+}
+
+static int
+vtpI2CClose()
+{
+  if(vtpI2CFD < 0)
+    {
+      printf("%s: ERROR: VTP I2C not opened.\n",
+	     __func__);
+      return ERROR;
+    }
+
+  close(vtpI2CFD);
+  return OK;
+}
+
+static unsigned int
+vtpI2CRead(int dev, unsigned int addr)
+{
+  unsigned int rval = 0;
+
+  return rval;
+}
+
+static void
+vtpI2CWrite(int dev, unsigned int addr, unsigned int val)
+{
+  
+}
+
+static int
+vtpSPIOpen()
+{
+  if(vtpSPIFD > 0)
+    {
+      printf("%s: ERROR: VTP SPI already opened.\n",
+	     __func__);
+      return ERROR;
+    }
+  
+  vtpSPIFD = open(vtpSPIDev, O_RDWR | O_SYNC);
+  
+  if(vtpSPIFD < 0)
+    {
+      printf("%s: ERROR from open: %s (%d)",
+	     __func__, strerror(errno), errno);
+      return ERROR;
+    }
+
+  return OK;
+}
+
+static int
+vtpSPIClose()
+{
+  if(vtpSPIFD < 0)
+    {
+      printf("%s: ERROR: VTP SPI not opened.\n",
+	     __func__);
+      return ERROR;
+    }
+
+  close(vtpSPIFD);
+  return OK;
+}
+
+static unsigned int
+vtpSPIRead(int dev, unsigned int addr)
+{
+  unsigned int rval = 0;
+
+  return rval;
+}
+
+static void
+vtpSPIWrite(int dev, unsigned int addr, unsigned int val)
+{
+  
+}
+
+
+int
+vtpOpen()
+{
+  int rval = OK;
+
+  rval = vtpFPGAOpen();
+
+  rval = vtpI2COpen();
+  
+  rval = vtpSPIOpen();
+  
+  return rval;
+}
+
+int
+vtpClose()
+{
+  int rval = OK;
+
+  rval = vtpSPIClose();
+
+  rval = vtpI2CClose();
+  
+  rval = vtpFPGAClose();
+  
+  return rval;
 }
