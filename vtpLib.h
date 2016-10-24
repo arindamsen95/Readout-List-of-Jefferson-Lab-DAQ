@@ -261,6 +261,11 @@ typedef struct zync_reg_struct
   /** 0x43C10000 */ V7_REGS v7;
 } ZYNC_REGS;
 
+/* Open/Close argument (device mask bits) */
+#define VTP_FPGA_OPEN  (1<<0)					     
+#define VTP_I2C_OPEN   (1<<1)					     
+#define VTP_SPI_OPEN   (1<<2)					     
+					     
 /* Routine prototypes */
 int  vtpCheckAddresses();
 
@@ -276,6 +281,11 @@ void vtpV7WriteCfgData(unsigned short *buf, int N);
 int  vtpV7CfgStart();
 int  vtpV7CfgLoad(char *filename);
 int  vtpV7CfgEnd();
+
+unsigned int vtpI2CRead(int dev, unsigned int addr);
+void vtpI2CWrite(int dev, unsigned int addr, unsigned int val);
+unsigned int vtpSPIRead(int dev, unsigned int addr);
+void vtpSPIWrite(int dev, unsigned int addr, unsigned int val);
 
 int  vtpOpen();
 int  vtpClose();

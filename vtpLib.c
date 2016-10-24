@@ -29,6 +29,7 @@
 #include "vtpLib.h"
 
 
+static int vtpDevOpenMASK = 0;
 static int vtpFPGAFD = -1;
 const char vtpFPGADev[256] = "/dev/uio0";
 
@@ -51,12 +52,6 @@ pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
       return ERROR;						\
     }								\
   }
-
-/* Static Prototypes for read/write routines */
-static unsigned int vtpI2CRead(int dev, unsigned int addr);
-static void vtpI2CWrite(int dev, unsigned int addr, unsigned int val);
-static unsigned int vtpSPIRead(int dev, unsigned int addr);
-static void vtpSPIWrite(int dev, unsigned int addr, unsigned int val);
 
 int
 vtpCheckAddresses()
@@ -513,7 +508,7 @@ vtpI2CClose()
   return OK;
 }
 
-static unsigned int
+unsigned int
 vtpI2CRead(int dev, unsigned int addr)
 {
   unsigned int rval = 0;
@@ -521,7 +516,7 @@ vtpI2CRead(int dev, unsigned int addr)
   return rval;
 }
 
-static void
+void
 vtpI2CWrite(int dev, unsigned int addr, unsigned int val)
 {
   
@@ -563,7 +558,7 @@ vtpSPIClose()
   return OK;
 }
 
-static unsigned int
+unsigned int
 vtpSPIRead(int dev, unsigned int addr)
 {
   unsigned int rval = 0;
@@ -571,7 +566,7 @@ vtpSPIRead(int dev, unsigned int addr)
   return rval;
 }
 
-static void
+void
 vtpSPIWrite(int dev, unsigned int addr, unsigned int val)
 {
   
@@ -579,29 +574,82 @@ vtpSPIWrite(int dev, unsigned int addr, unsigned int val)
 
 
 int
-vtpOpen()
+vtpOpen(int dev_mask)
 {
-  int rval = OK;
+  if(dev_mask & VTP_FPGA_OPEN)
+    {
+      
+      if(vtpFPGAOpen() == OK)
+	{
+	  vtpDevOpenMASK |= VTP_FPGA_OPEN; 
+	}
+      else
+	{
+	  return ERROR;
+	}
+    }
 
-  rval = vtpFPGAOpen();
+  if(dev_mask & VTP_I2C_OPEN)
+    {
+      
+      if(vtpI2COpen() == OK)
+	{
+	  vtpDevOpenMASK |= VTP_I2C_OPEN; 
+	}
+      else
+	{
+	  return ERROR;
+	}
+    }
+  
+  if(dev_mask & VTP_SPI_OPEN)
+    {
+      
+      if(vtpSPIOpen() == OK)
+	{
+	  vtpDevOpenMASK |= VTP_SPI_OPEN; 
+	}
+      else
+	{
+	  return ERROR;
+	}
+    }
 
-  rval = vtpI2COpen();
-  
-  rval = vtpSPIOpen();
-  
-  return rval;
+  return vtpDevOpenMASK;
 }
 
 int
-vtpClose()
+vtpClose(int dev_mask)
 {
-  int rval = OK;
+  if(dev_mask & VTP_SPI_OPEN)
+    {
+      
+      if(vtpSPIClose() == OK)
+	{
+	  vtpDevOpenMASK &= ~VTP_SPI_OPEN;
+	}
 
-  rval = vtpSPIClose();
+    }
+      
+  if(dev_mask & VTP_I2C_OPEN)
+    {
 
-  rval = vtpI2CClose();
+      if(vtpI2CClose() == OK)
+	{
+	  vtpDevOpenMASK &= ~VTP_I2C_OPEN;
+	}
+
+    }
+
+  if(dev_mask & VTP_FPGA_OPEN)
+    {
+
+      if(vtpFPGAClose() == OK)
+	{
+	  vtpDevOpenMASK &= ~VTP_FPGA_OPEN;
+	}
+
+    }
   
-  rval = vtpFPGAClose();
-  
-  return rval;
+  return vtpDevOpenMASK;
 }
