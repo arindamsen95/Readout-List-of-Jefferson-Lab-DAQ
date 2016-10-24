@@ -17,7 +17,7 @@ CC			= gcc
 AR                      = ar
 RANLIB                  = ranlib
 CFLAGS			= -L.
-INCS			= -I.
+INCS			= -I. -I${HOME}/work/vtp/linux-xlnx/include/uapi 
 
 LIBS			= lib${BASENAME}.a
 

@@ -20,6 +20,9 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <linux/types.h>
+#include <linux/spi/spidev.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -482,7 +485,7 @@ vtpI2COpen()
       return ERROR;
     }
   
-  vtpI2CFD = open(vtpI2CDev, O_RDWR | O_SYNC);
+  vtpI2CFD = open(vtpI2CDev, O_RDWR);
   
   if(vtpI2CFD < 0)
     {
@@ -508,24 +511,43 @@ vtpI2CClose()
   return OK;
 }
 
-unsigned int
-vtpI2CRead(int dev, unsigned int addr)
+unsigned short
+vtpI2CRead(int dev, int page, unsigned int addr)
 {
   unsigned int rval = 0;
+  unsigned char buf[2];
 
-  return rval;
+  if((rval = i2c_smbus_read_word_data(vtpI2CFD, cmd)) < 0)
+    exit_error(__func__, 1);	
+  
+  return (unsigned short)(rval & 0xFFFF);
+
 }
 
 void
-vtpI2CWrite(int dev, unsigned int addr, unsigned int val)
+vtpI2CWrite(int dev, int page, unsigned int addr, unsigned int val)
 {
-  
+
+  if(ioctl(vtpI2CFD, I2C_SLAVE, slaveAddr) < 0)
+    exit_error(__func__, 1);
+
+  if(page >= 0)
+    if(i2c_smbus_write_byte_data(vtpI2CFD, LTM4676_CMD_PAGE, page) < 0)
+      exit_error(__func__, 1);
+
 }
+
+static  uint32_t mode;
+static  uint8_t bits = 8;
+static  uint32_t speed = 500000;
+static  uint16_t delay;
 
 static int
 vtpSPIOpen()
 {
-  if(vtpSPIFD > 0)
+  int ret;
+
+ if(vtpSPIFD > 0)
     {
       printf("%s: ERROR: VTP SPI already opened.\n",
 	     __func__);
@@ -541,6 +563,43 @@ vtpSPIOpen()
       return ERROR;
     }
 
+  /*
+   * spi mode
+   */
+  ret = ioctl(vtpSPIFD, SPI_IOC_WR_MODE32, &mode);
+  if (ret == -1)
+    perror("can't set spi mode");
+  
+  ret = ioctl(vtpSPIFD, SPI_IOC_RD_MODE32, &mode);
+  if (ret == -1)
+    perror("can't get spi mode");
+
+  /*
+   * bits per word
+   */
+  ret = ioctl(vtpSPIFD, SPI_IOC_WR_BITS_PER_WORD, &bits);
+  if (ret == -1)
+    perror("can't set bits per word");
+  
+  ret = ioctl(vtpSPIFD, SPI_IOC_RD_BITS_PER_WORD, &bits);
+  if (ret == -1)
+    perror("can't get bits per word");
+  
+  /*
+   * max speed hz
+   */
+  ret = ioctl(vtpSPIFD, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
+  if (ret == -1)
+    perror("can't set max speed hz");
+  
+  ret = ioctl(vtpSPIFD, SPI_IOC_RD_MAX_SPEED_HZ, &speed);
+  if (ret == -1)
+    perror("can't get max speed hz");
+  
+  printf("spi mode: 0x%x\n", mode);
+  printf("bits per word: %d\n", bits);
+  printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
+  
   return OK;
 }
 
@@ -556,6 +615,45 @@ vtpSPIClose()
 
   close(vtpSPIFD);
   return OK;
+}
+/* Routine from Documentation/spi/spidev_test.c */
+
+static void
+transfer(int fd, uint8_t const *tx, uint8_t const *rx, size_t len)
+{
+  int ret;
+  
+  struct spi_ioc_transfer tr = {
+    .tx_buf = (unsigned long)tx,
+    .rx_buf = (unsigned long)rx,
+    .len = len,
+    .delay_usecs = delay,
+    .speed_hz = speed,
+    .bits_per_word = bits,
+  };
+
+  if (mode & SPI_TX_QUAD)
+    tr.tx_nbits = 4;
+  else if (mode & SPI_TX_DUAL)
+    tr.tx_nbits = 2;
+  if (mode & SPI_RX_QUAD)
+    tr.rx_nbits = 4;
+  else if (mode & SPI_RX_DUAL)
+    tr.rx_nbits = 2;
+  if (!(mode & SPI_LOOP)) {
+    if (mode & (SPI_TX_QUAD | SPI_TX_DUAL))
+      tr.rx_buf = 0;
+		else if (mode & (SPI_RX_QUAD | SPI_RX_DUAL))
+		  tr.tx_buf = 0;
+  }
+  
+  ret = ioctl(vtpSPIFD, SPI_IOC_MESSAGE(1), &tr);
+  if (ret < 1)
+    perror("can't send spi message");
+  
+  /* if (verbose) */
+  /*   hex_dump(tx, len, 32, "TX"); */
+  /* hex_dump(rx, len, 32, "RX"); */
 }
 
 unsigned int
