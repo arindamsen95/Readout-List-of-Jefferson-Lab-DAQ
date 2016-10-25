@@ -20,6 +20,8 @@
  *----------------------------------------------------------------------------*/
 
 #include <stdint.h>
+#include "vtp-i2c.h"
+#include "vtp-spi.h"
 
 #ifndef ERROR
 #define ERROR -1
@@ -281,11 +283,6 @@ void vtpV7WriteCfgData(unsigned short *buf, int N);
 int  vtpV7CfgStart();
 int  vtpV7CfgLoad(char *filename);
 int  vtpV7CfgEnd();
-
-unsigned int vtpI2CRead(int dev, unsigned int addr);
-void vtpI2CWrite(int dev, unsigned int addr, unsigned int val);
-unsigned int vtpSPIRead(int dev, unsigned int addr);
-void vtpSPIWrite(int dev, unsigned int addr, unsigned int val);
 
 int  vtpOpen();
 int  vtpClose();

@@ -17,7 +17,7 @@ CC			= gcc
 AR                      = ar
 RANLIB                  = ranlib
 CFLAGS			= -L.
-INCS			= -I. -I${HOME}/work/vtp/linux-xlnx/include/uapi 
+INCS			= -I. 
 
 LIBS			= lib${BASENAME}.a
 
@@ -26,15 +26,15 @@ CFLAGS			+= -Wall -g
 else
 CFLAGS			+= -O2
 endif
-SRC			= ${BASENAME}Lib.c
+SRC			= vtpLib.c vtp-i2c.c vtp-spi.c
 HDRS			= $(SRC:.c=.h)
-OBJ			= ${BASENAME}Lib.o
+OBJ			= $(SRC:.c=.o)
 DEPS			= $(SRC:.c=.d)
 
 all: echoarch $(LIBS)
 
-$(OBJ): $(SRC) $(HDRS)
-	$(CC) $(CFLAGS) $(INCS) -c -o $@ $(SRC)
+%.o: %.c
+	$(CC) $(CFLAGS) $(INCS) -c -o $@ $<
 
 $(LIBS): $(OBJ)
 	$(CC) -fpic -shared $(CFLAGS) $(INCS) -o $(@:%.a=%.so) $(SRC)
