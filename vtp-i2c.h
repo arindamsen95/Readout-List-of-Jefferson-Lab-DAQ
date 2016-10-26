@@ -19,13 +19,11 @@
  *
  *----------------------------------------------------------------------------*/
 
-
 int vtpI2COpen();
 int vtpI2CClose();
 
-unsigned short vtpI2CRead(int dev, int page, unsigned int addr);
-void vtpI2CWrite(int dev, int page, unsigned int addr, unsigned short val);
-
-
+uint16_t vtpI2CRead(uint8_t slaveAddr, uint8_t page, uint8_t page_cmd, uint8_t cmd);
+void     vtpI2CWrite(uint8_t slaveAddr, uint8_t page, uint8_t page_cmd,
+		     uint8_t cmd, uint16_t val);
 
 #endif /* VTP_I2C_H */

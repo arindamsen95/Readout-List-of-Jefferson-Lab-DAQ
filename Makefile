@@ -6,7 +6,8 @@
 #    Makefile for the JLab VTP module running Linux on an ARMv7 processor
 #
 # Uncomment DEBUG line, to include some debugging info ( -g and -Wall)
-DEBUG=1
+DEBUG   ?= 1
+QUIET	?= 1
 #
 #
 BASENAME=vtp
@@ -16,8 +17,8 @@ KERNEL_VERSION=${shell uname -r}
 CC			= gcc
 AR                      = ar
 RANLIB                  = ranlib
-CFLAGS			= -L.
-INCS			= -I. 
+CFLAGS			= -L. 
+INCS			= -I. -I/usr/local/include
 
 LIBS			= lib${BASENAME}.a
 
@@ -31,19 +32,30 @@ HDRS			= $(SRC:.c=.h)
 OBJ			= $(SRC:.c=.o)
 DEPS			= $(SRC:.c=.d)
 
+ifeq ($(QUIET),1)
+	Q = @
+else
+	Q =
+endif
+
+
 all: echoarch $(LIBS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) $(INCS) -c -o $@ $<
+	@echo " CC     $@"
+	$(Q)$(CC) $(CFLAGS) $(INCS) -c -o $@ $<
 
 $(LIBS): $(OBJ)
-	$(CC) -fpic -shared $(CFLAGS) $(INCS) -o $(@:%.a=%.so) $(SRC)
-	$(AR) ruv $@ $<
-	$(RANLIB) $@
+	@echo " CC     $(@:%.a=%.so)"
+	$(Q)$(CC) -fpic -shared $(CFLAGS) $(INCS) -o $(@:%.a=%.so) $(SRC)
+	@echo " AR     $(@)"
+	$(Q)$(AR) ruv $@ $<
+	@echo " RANLIB $(@)"
+	$(Q)$(RANLIB) $@
 
 %.d: %.c
-	@echo "Building $@ from $<"
-	@set -e; rm -f $@; \
+	@echo " DEP    $@"
+	$(Q)set -e; rm -f $@; \
 	$(CC) -MM -shared $(INCS) $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
@@ -51,10 +63,10 @@ $(LIBS): $(OBJ)
 -include $(DEPS)
 
 clean:
-	@rm -vf ${BASENAME}Lib.{o,d,d.*} lib${BASENAME}.{a,so}
+	$(Q)rm -vf ${BASENAME}Lib.{o,d,d.*} lib${BASENAME}.{a,so}
 
 realclean: clean
-	@rm -vf *~
+	$(Q)rm -vf *~
 
 echoarch:
 	@echo "Make for $(ARCH)"
