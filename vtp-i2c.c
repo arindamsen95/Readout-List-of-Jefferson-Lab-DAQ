@@ -38,7 +38,7 @@ const char vtpI2CDev[2][256] = {
   "/dev/i2c-1"
 };
 
-#define CHECKI2CFD(x)				\
+#define CHECKI2CID(x)				\
   if(vtpI2CFD[x] <= 0) \
     {							\
       printf("%s: ERROR: VTP I2C-%d not open.\n",	\
@@ -49,23 +49,23 @@ const char vtpI2CDev[2][256] = {
 int
 vtpI2COpen()
 {
-  int ifd;
+  int iid;
 
-  for(ifd = 0; ifd < nVTPI2CFD; ifd++)
+  for(iid = 0; iid < nVTPI2CFD; iid++)
     {
-      if(vtpI2CFD[ifd] > 0)
+      if(vtpI2CFD[iid] > 0)
 	{
 	  printf("%s: ERROR: VTP I2C-%d already open.\n",
-		 __func__, ifd);
+		 __func__, iid);
 	  return ERROR;
 	}
       
-      vtpI2CFD[ifd] = open(vtpI2CDev[ifd], O_RDWR);
+      vtpI2CFD[iid] = open(vtpI2CDev[iid], O_RDWR);
       
-      if(vtpI2CFD[ifd] < 0)
+      if(vtpI2CFD[iid] < 0)
 	{
 	  printf("%s: ERROR for %s from open: %s (%d)",
-		 __func__, vtpI2CDev[ifd], strerror(errno), errno);
+		 __func__, vtpI2CDev[iid], strerror(errno), errno);
 	  return ERROR;
 	}
     }
@@ -76,30 +76,30 @@ vtpI2COpen()
 int
 vtpI2CClose()
 {
-  int ifd;
+  int iid;
   
-  for(ifd = 0; ifd < nVTPI2CFD; ifd++)
+  for(iid = 0; iid < nVTPI2CFD; iid++)
     {
-      CHECKI2CFD(ifd);
+      CHECKI2CID(iid);
       
-      close(vtpI2CFD[ifd]);
+      close(vtpI2CFD[iid]);
     }
 
   return OK;
 }
 
 int
-vtpI2CSelectSlave(int fd, uint8_t slaveAddr)
+vtpI2CSelectSlave(int id, uint8_t slaveAddr)
 {
   int lerrno;
 
-  CHECKI2CFD(fd);
+  CHECKI2CID(id);
 
-  if(ioctl(vtpI2CFD[fd], I2C_SLAVE, slaveAddr) < 0)
+  if(ioctl(vtpI2CFD[id], I2C_SLAVE, slaveAddr) < 0)
     {
       lerrno = errno;
       printf("%s(%d): ioctl ERROR %d: %s\n", __func__,
-	     fd, lerrno, strerror(lerrno));
+	     id, lerrno, strerror(lerrno));
       return ERROR;
     }
       
@@ -108,18 +108,18 @@ vtpI2CSelectSlave(int fd, uint8_t slaveAddr)
 
 
 uint8_t
-vtpI2CRead8(int fd, uint8_t cmd)
+vtpI2CRead8(int id, uint8_t cmd)
 {
   uint32_t rval = 0;
   int lerrno = 0;
 
-  CHECKI2CFD(fd);
+  CHECKI2CID(id);
 
-  if((rval = i2c_smbus_read_byte_data(vtpI2CFD[fd], cmd)) < 0)
+  if((rval = i2c_smbus_read_byte_data(vtpI2CFD[id], cmd)) < 0)
 	{
 	  lerrno = errno;
 	  printf("%s(%d): i2c read word ERROR %d: %s\n", __func__,
-		 fd, lerrno, strerror(lerrno));
+		 id, lerrno, strerror(lerrno));
 	  return ERROR;
 	}
   
@@ -127,18 +127,18 @@ vtpI2CRead8(int fd, uint8_t cmd)
 }
 
 uint16_t
-vtpI2CRead16(int fd, uint8_t cmd)
+vtpI2CRead16(int id, uint8_t cmd)
 {
   uint32_t rval = 0;
   int lerrno = 0;
 
-  CHECKI2CFD(fd);
+  CHECKI2CID(id);
 
-  if((rval = i2c_smbus_read_word_data(vtpI2CFD[fd], cmd)) < 0)
+  if((rval = i2c_smbus_read_word_data(vtpI2CFD[id], cmd)) < 0)
     {
       lerrno = errno;
       printf("%s(%d): i2c read word ERROR %d: %s\n", __func__,
-	     fd, lerrno, strerror(lerrno));
+	     id, lerrno, strerror(lerrno));
       return ERROR;
     }
   
@@ -146,18 +146,18 @@ vtpI2CRead16(int fd, uint8_t cmd)
 }
 
 uint32_t
-vtpI2CReadBlock(int fd, uint8_t cmd, uint8_t *buf)
+vtpI2CReadBlock(int id, uint8_t cmd, uint8_t *buf)
 {
   uint32_t rval = 0;
   int lerrno = 0;
 
-  CHECKI2CFD(fd);
+  CHECKI2CID(id);
 
-  if((rval = i2c_smbus_read_block_data(vtpI2CFD[fd], cmd, buf)) < 0)
+  if((rval = i2c_smbus_read_block_data(vtpI2CFD[id], cmd, buf)) < 0)
     {
       lerrno = errno;
       printf("%s(%d): i2c read block ERROR %d: %s\n", __func__,
-	     fd, lerrno, strerror(lerrno));
+	     id, lerrno, strerror(lerrno));
       return ERROR;
     }
   
@@ -165,17 +165,17 @@ vtpI2CReadBlock(int fd, uint8_t cmd, uint8_t *buf)
 }
 
 int
-vtpI2CWrite8(int fd, uint8_t cmd, uint8_t val)
+vtpI2CWrite8(int id, uint8_t cmd, uint8_t val)
 {
   int lerrno = 0;
 
-  CHECKI2CFD(fd);
+  CHECKI2CID(id);
 
-  if(i2c_smbus_write_byte_data(vtpI2CFD[fd], cmd, val) < 0)
+  if(i2c_smbus_write_byte_data(vtpI2CFD[id], cmd, val) < 0)
     {
       lerrno = errno;
       printf("%s(%d, 0x%x,0x%x): i2c write byte ERROR %d: %s\n", __func__,
-	     fd, cmd, val,
+	     id, cmd, val,
 	     lerrno, strerror(lerrno));
       return ERROR;
     }
@@ -184,17 +184,17 @@ vtpI2CWrite8(int fd, uint8_t cmd, uint8_t val)
 }
 
 int
-vtpI2CWrite16(int fd, uint8_t cmd, uint16_t val)
+vtpI2CWrite16(int id, uint8_t cmd, uint16_t val)
 {
   int lerrno = 0;
 
-  CHECKI2CFD(fd);
+  CHECKI2CID(id);
 
-  if(i2c_smbus_write_word_data(vtpI2CFD[fd], cmd, val) < 0)
+  if(i2c_smbus_write_word_data(vtpI2CFD[id], cmd, val) < 0)
     {
       lerrno = errno;
       printf("%s(%d, 0x%x,0x%x): i2c write word ERROR %d: %s\n", __func__,
-	     fd, cmd, val,
+	     id, cmd, val,
 	     lerrno, strerror(lerrno));
       return ERROR;
     }
