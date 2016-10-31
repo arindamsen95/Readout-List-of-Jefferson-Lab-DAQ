@@ -49,7 +49,7 @@ $(LIBS): $(OBJ)
 	@echo " CC     $(@:%.a=%.so)"
 	$(Q)$(CC) -fpic -shared $(CFLAGS) $(INCS) -o $(@:%.a=%.so) $(SRC)
 	@echo " AR     $(@)"
-	$(Q)$(AR) ruv $@ $<
+	$(Q)$(AR) r $@ $<
 	@echo " RANLIB $(@)"
 	$(Q)$(RANLIB) $@
 
