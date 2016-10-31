@@ -22,7 +22,6 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <linux/types.h>
-#include <linux/spi/spidev.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -296,7 +295,7 @@ vtpV7SetCSI_B(int val)
 }
 
 void
-vtpV7WriteCfgData(unsigned short *buf, int N)
+vtpV7WriteCfgData(uint16_t *buf, int N)
 {
   while(N--)
     vtp->v7.Cfg = *buf++;
@@ -348,7 +347,7 @@ vtpV7CfgStart()
 int
 vtpV7CfgLoad(char *filename)
 {
-  unsigned short buf[256];
+  uint16_t buf[256];
   unsigned int bytesRead, i = 0;
   FILE *f;
 
@@ -389,7 +388,7 @@ vtpV7CfgLoad(char *filename)
 int
 vtpV7CfgEnd()
 {
-  unsigned short val = 0;
+  uint16_t val = 0;
   int result, i;
 
   for(i = 0; i <= V7_CFG_DONE_CNT_MAX; i++)

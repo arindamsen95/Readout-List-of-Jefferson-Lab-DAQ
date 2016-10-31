@@ -279,7 +279,7 @@ int  vtpV7GetInit_B();
 int  vtpV7SetProgram_B(int val);
 int  vtpV7SetRDWR_B(int val);
 int  vtpV7SetCSI_B(int val);
-void vtpV7WriteCfgData(unsigned short *buf, int N);
+void vtpV7WriteCfgData(uint16_t *buf, int N);
 int  vtpV7CfgStart();
 int  vtpV7CfgLoad(char *filename);
 int  vtpV7CfgEnd();
