@@ -22,8 +22,10 @@
 int vtpI2COpen();
 int vtpI2CClose();
 
-uint16_t vtpI2CRead(uint8_t slaveAddr, uint8_t page, uint8_t page_cmd, uint8_t cmd);
-void     vtpI2CWrite(uint8_t slaveAddr, uint8_t page, uint8_t page_cmd,
-		     uint8_t cmd, uint16_t val);
-
+int  vtpI2CSelectSlave(int fd, uint8_t slaveAddr);
+uint8_t   vtpI2CRead8(int fd, uint8_t cmd);
+uint16_t  vtpI2CRead16(int fd, uint8_t cmd);
+uint32_t  vtpI2CReadBlock(int fd, uint8_t cmd, uint8_t *buf);
+int  vtpI2CWrite8(int fd, uint8_t cmd, uint8_t val);
+int  vtpI2CWrite16(int fd, uint8_t cmd, uint16_t val);
 #endif /* VTP_I2C_H */
