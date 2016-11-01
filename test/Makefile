@@ -11,17 +11,17 @@
 #
 
 VTPLIB_PATH		= ../
-ARCH=${shell uname -m}
-KERNEL_VERSION=${shell uname -r}
+ARCH			= ${shell uname -m}
+KERNEL_VERSION		= ${shell uname -r}
 
 CC			= gcc
 AR                      = ar
 RANLIB                  = ranlib
-INCS			= -I. -I${VTPLIB_PATH}
+INCS			= -I. -I${VTPLIB_PATH} -I/usr/local/include
 CFLAGS			= -Wall -g ${INCS} \
-			  -L. -L${VTPLIB_PATH} -lrt -lvtp
+			  -L. -L${VTPLIB_PATH} -lrt -lvtp -li2c -lm
 
-PROGS			= vtpLibTest
+PROGS			= vtpLibTest i2cvtpmon
 SRC			= $(PROGS:%=%.c)
 DEPS			= $(SRC:%.c=%.d)
 

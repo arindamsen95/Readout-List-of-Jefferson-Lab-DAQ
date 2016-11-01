@@ -1,6 +1,6 @@
 /*
  * File:
- *    vtpLibTest.c
+ *    vtpI2CTest.c
  *
  * Description:
  *    Test program for the VTP Library
@@ -23,8 +23,17 @@ main(int argc, char *argv[])
   if(vtpCheckAddresses() == ERROR)
     exit(-1);
   
-  if(vtpOpen(VTP_I2C_OPEN) != OK)
-    goto CLOSE;
+  if(vtpOpen(VTP_I2C_OPEN) == ERROR)
+    {
+      printf("vtpOpen not OK\n");
+      goto CLOSE;
+    }
+
+  /* Select Channel 0 */
+  /* vtpI2CWrite8(0, 0); */
+
+  printf("Read: 0x%04x\n", vtpI2CRead16(0x40, 0x8E));
+
   
  CLOSE:
   vtpClose(VTP_I2C_OPEN);
