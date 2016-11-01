@@ -21,7 +21,7 @@ INCS			= -I. -I${VTPLIB_PATH} -I/usr/local/include
 CFLAGS			= -Wall -g ${INCS} \
 			  -L. -L${VTPLIB_PATH} -lrt -lvtp -li2c -lm
 
-PROGS			= vtpLibTest i2cvtpmon
+PROGS			= vtpLibTest i2cvtpmon vtpSPItest vtpI2Ctest
 SRC			= $(PROGS:%=%.c)
 DEPS			= $(SRC:%.c=%.d)
 

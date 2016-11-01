@@ -10,6 +10,7 @@
 #define SI5341_CMD_RDDATA	0x80
 
 static int currentPage = -1;
+static int spiid = -1;
 
 typedef struct
 {
@@ -686,7 +687,8 @@ si5341_checkBasePart()
   partNum = si5341_readReg(2);
   partNum |= si5341_readReg(3)<<8;
 
-  printf("ID=%04X...", partNum);
+  printf("%s: ID=%04X\n",
+	 __func__, partNum);
 
   if(partNum != SI5341_PARTNUM)
     return ERROR;
@@ -770,8 +772,8 @@ si5341_configure(int src)
 int
 si5341_Setup()
 {
-  int Status;
 
+#ifdef SKIPTHIS
   /* 200MHz/16 => 12.5MHz bit rate	 */
   //XSpiPs_SetClkPrescaler(&Spi, XSPIPS_CLK_PRESCALE_16);
   XSpiPs_SetClkPrescaler(&Spi, XSPIPS_CLK_PRESCALE_256);
@@ -779,13 +781,18 @@ si5341_Setup()
   XSpiPs_SetOptions(&Spi, XSPIPS_MASTER_OPTION | XSPIPS_CLK_PHASE_1_OPTION | XSPIPS_CLK_ACTIVE_LOW_OPTION | XSPIPS_MANUAL_START_OPTION);
 
   XSpiPs_SetDelays(&Spi,0,2,0,0);
-
+#endif
+  if(si5341_checkBasePart() != OK)
+    return ERROR;
+  
   return OK;
 }
 
 int
 si5341_Init()
 {
+  spiid = 0;
+
   if(si5341_Setup() != OK)
     return ERROR;
 
@@ -794,8 +801,6 @@ si5341_Init()
   si5341_configure(SI5341_IN_SEL_LOCAL);
 
   si5341_delay(1000);
-  if(si5341_checkBasePart() != OK)
-    return ERROR;
 
   si5341_readStatus(1);
   si5341_delay(1000);
@@ -807,6 +812,7 @@ int
 si5341_Test()
 {
   int status, si5341_status;
+  spiid = 0;
 
   printf("\n\n%s Started...\n", __func__);
 

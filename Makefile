@@ -27,7 +27,7 @@ CFLAGS			+= -Wall -g
 else
 CFLAGS			+= -O2
 endif
-SRC			= vtpLib.c vtp-i2c.c vtp-spi.c
+SRC			= vtpLib.c vtp-i2c.c vtp-spi.c si5341_cfg.c
 HDRS			= $(SRC:.c=.h)
 OBJ			= $(SRC:.c=.o)
 DEPS			= $(SRC:.c=.d)
@@ -49,7 +49,7 @@ $(LIBS): $(OBJ)
 	@echo " CC     $(@:%.a=%.so)"
 	$(Q)$(CC) -fpic -shared $(CFLAGS) $(INCS) -o $(@:%.a=%.so) $(SRC)
 	@echo " AR     $(@)"
-	$(Q)$(AR) r $@ $<
+	$(Q)$(AR) r $@ $(OBJ)
 	@echo " RANLIB $(@)"
 	$(Q)$(RANLIB) $@
 
@@ -63,7 +63,7 @@ $(LIBS): $(OBJ)
 -include $(DEPS)
 
 clean:
-	$(Q)rm -vf ${BASENAME}Lib.{o,d,d.*} lib${BASENAME}.{a,so}
+	$(Q)rm -vf ${OBJ} ${LIBS} $(LIBS:.a=.so) ${DEPS} ${DEPS}.*
 
 realclean: clean
 	$(Q)rm -vf *~

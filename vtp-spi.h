@@ -23,8 +23,6 @@
 int vtpSPIOpen();
 int vtpSPIClose();
 
-uint8_t vtpSPIRead(int id, unsigned int addr);
-int vtpSPIWrite(int id, unsigned int addr, unsigned int val);
-
+void vtpSpiTransfer(int id, uint8_t const *tx, uint8_t const *rx, size_t len);
 
 #endif /* VTP_SPI_H */
