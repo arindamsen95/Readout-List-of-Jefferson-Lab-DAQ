@@ -150,6 +150,11 @@ typedef struct Serdes_Struct
 #define VTP_SERDES_CTRL_RESET         (1<<1)
 #define VTP_SERDES_CTRL_GT_RESET      (1<<0)
 
+#define VTP_SERDES_LOOPBACK_NEAREND_PCS  1
+#define VTP_SERDES_LOOPBACK_NEAREND_PMA  2
+#define VTP_SERDES_LOOPBACK_FAREEND_PMA  4
+#define VTP_SERDES_LOOPBACK_FAREND_PCS   6
+
 #define VTP_SERDES_STATUS_LINK_RST          (1<<21)
 #define VTP_SERDES_STATUS_RX_RST_DONE       (1<<20)
 #define VTP_SERDES_STATUS_TX_RST_DONE       (1<<19)
@@ -158,7 +163,7 @@ typedef struct Serdes_Struct
 #define VTP_SERDES_STATUS_CHUP              (1<<6)
 #define VTP_SERDES_STATUS_LANE_UP(x)        (1<<(x+2))
 #define VTP_SERDES_STATUS_SOFT_ERR          (1<<1)
-#define VTP_SERDES_STATUS_HARD_ERR          (1<<0
+#define VTP_SERDES_STATUS_HARD_ERR          (1<<0)
 
 #define VTP_SERDES_DRP_CTRL_EN3       (1<<29)
 #define VTP_SERDES_DRP_CTRL_EN2       (1<<28)
@@ -270,6 +275,13 @@ typedef struct zync_reg_struct
 					     
 /* Routine prototypes */
 int  vtpCheckAddresses();
+
+int  vtpVXSSerdesSetLoopback(uint16_t pp, uint8_t lb_select);
+int  vtpVXSSerdesSoftErrorReset(uint16_t pp, int enable);
+int  vtpVXSSerdesPower(uint16_t pp, int enable);
+int  vtpVXSSerdesGTReset(uint16_t pp, int enable);
+int  vtpVXSSerdesReset(uint16_t pp, int enable);
+int  vtpVXSSerdesStatus(uint16_t pp, int pflag);
 
 int  vtpV7CtrlInit();
 int  vtpV7SetReset(int val);

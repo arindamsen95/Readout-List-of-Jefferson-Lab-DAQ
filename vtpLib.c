@@ -163,6 +163,119 @@ vtpCheckAddresses()
   return rval;
 }
 
+int
+vtpVXSSerdesSetLoopback(uint16_t pp, uint8_t lb_select)
+{
+  CHECKINIT;
+
+  if(lb_select > 7)
+    {
+      printf("%s: ERROR: Invalid loopback selection (%d)\n",
+	     __func__, lb_select);
+      return ERROR;
+    }
+  
+  VLOCK;
+  vtp->v7.vxs[pp].Ctrl =
+    (vtp->v7.vxs[pp].Ctrl &~ VTP_SERDES_CTRL_LOOPBACK_MASK) | (lb_select<<6);
+  VUNLOCK;
+  
+  return OK;
+}
+
+int
+vtpVXSSerdesSoftErrorReset(uint16_t pp, int enable)
+{
+  CHECKINIT;
+
+  VLOCK;
+  if(enable)
+    vtp->v7.vxs[pp].Ctrl |= VTP_SERDES_CTRL_ER_CNT_RST;
+  else
+    vtp->v7.vxs[pp].Ctrl &= ~VTP_SERDES_CTRL_ER_CNT_RST;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpVXSSerdesPower(uint16_t pp, int enable)
+{
+  CHECKINIT;
+
+  VLOCK;
+  if(enable)
+    vtp->v7.vxs[pp].Ctrl &= ~VTP_SERDES_CTRL_POWERDOWN;
+  else
+    vtp->v7.vxs[pp].Ctrl |= VTP_SERDES_CTRL_POWERDOWN;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpVXSSerdesGTReset(uint16_t pp, int enable)
+{
+  CHECKINIT;
+
+  VLOCK;
+  if(enable)
+    vtp->v7.vxs[pp].Ctrl |= VTP_SERDES_CTRL_GT_RESET;  /* Toggle On  */
+  else
+    vtp->v7.vxs[pp].Ctrl &= ~VTP_SERDES_CTRL_GT_RESET; /* Toggle Off */
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpVXSSerdesReset(uint16_t pp, int enable)
+{
+  CHECKINIT;
+
+  VLOCK;
+  if(enable)
+    vtp->v7.vxs[pp].Ctrl |= VTP_SERDES_CTRL_RESET;  /* Toggle On  */
+  else
+    vtp->v7.vxs[pp].Ctrl &= ~VTP_SERDES_CTRL_RESET; /* Toggle Off */
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpVXSSerdesStatus(uint16_t pp, int pflag)
+{
+  uint32_t status = 0;
+  CHECKINIT;
+
+  VLOCK;
+  status = vtp->v7.vxs[pp].Status;
+  VUNLOCK;
+
+  if(pflag)
+    {
+      printf("    Hard   Soft   ---Lane---          Soft Error  TX      Reset     Link\n");
+      printf("PP  Error  Error  0     1      Ch     Count       PLL    TX   RX    Reset\n");
+    }
+  
+  printf("%2d  ", pp);
+  printf("%s    ", (status & VTP_SERDES_STATUS_HARD_ERR)?"ERR":"---");
+  printf("%s    ", (status & VTP_SERDES_STATUS_SOFT_ERR)?"ERR":"---");
+  printf("%s  ", (status & VTP_SERDES_STATUS_LANE_UP(0))?" UP ":"DOWN");
+  printf("%s   ", (status & VTP_SERDES_STATUS_LANE_UP(1))?" UP ":"DOWN");
+  printf("%s   ", (status & VTP_SERDES_STATUS_CHUP)?" UP ":"DOWN");
+  printf("%3d         ", (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>8);
+  printf("%s   ", (status & VTP_SERDES_STATUS_TX_LOCK)?"LOCK":"----");
+  printf("%s ", (status & VTP_SERDES_STATUS_TX_RST_DONE)?"DONE":"----");
+  printf("%s  ", (status & VTP_SERDES_STATUS_RX_RST_DONE)?"DONE":"----");
+  printf("%s", (status & VTP_SERDES_STATUS_LINK_RST)?"IN PROGRESS":"");
+  printf("\n");
+  
+  return OK;
+}
+
+
 static unsigned int CfgCtrl_Shadow = 0x1F;
 
 int

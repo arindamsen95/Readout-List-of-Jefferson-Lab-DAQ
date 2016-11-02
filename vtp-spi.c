@@ -31,12 +31,12 @@
 #include "vtp-spi.h"
 
 static const int nVTPSPIFD = 1;
-static int vtpSPIFD[1] = {-1,};
+static int vtpSPIFD[1] = {-1, };
 const char vtpSPIDev[1][256] = {"/dev/spidev32766.0", };
 static uint32_t vtpSpiMode[1];
-uint32_t vtpSpiSpeed[1] = {500000};
-uint16_t vtpSpiDelay[1];
-uint8_t vtpSpiBits[1] = {8};
+uint32_t vtpSpiSpeed[1] = {781250, };
+uint16_t vtpSpiDelay[1] = {200, };
+uint8_t vtpSpiBits[1] = {8, };
 
 /* static struct spi_ioc_transfer xfer[2]; */
 #define CHECKSPIID(x)				\
@@ -73,10 +73,12 @@ vtpSPIOpen()
       /*
        * spi vtpSpiMode
        */
-      /* ret = ioctl(vtpSPIFD, SPI_IOC_WR_MODE32, &mode); */
-      /* if (ret == -1) */
-      /*   perror("can't set spi mode"); */
-      
+#define SETDEFAULT
+#ifdef SETDEFAULT
+      ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_MODE32, &vtpSpiMode[iid]);
+      if (ret == -1)
+        perror("can't set spi mode");
+#endif      
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_RD_MODE32, &vtpSpiMode[iid]);
       if (ret == -1)
 	perror("can't get spi mode");
@@ -84,10 +86,11 @@ vtpSPIOpen()
       /*
        * bits per word
        */
-      /* ret = ioctl(vtpSPIFD, SPI_IOC_WR_BITS_PER_WORD, &vtpSpiBits); */
-      /* if (ret == -1) */
-      /*   perror("can't set bits per word"); */
-      
+#ifdef SETDEFAULT
+      ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_BITS_PER_WORD, &vtpSpiBits);
+      if (ret == -1)
+        perror("can't set bits per word");
+#endif            
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_RD_BITS_PER_WORD, &vtpSpiBits[iid]);
       if (ret == -1)
 	perror("can't get bits per word");
@@ -95,10 +98,11 @@ vtpSPIOpen()
       /*
        * max speed hz
        */
-      /* ret = ioctl(vtpSPIFD, SPI_IOC_WR_MAX_SPEED_HZ, &vtpSpiSpeed); */
-      /* if (ret == -1) */
-      /*   perror("can't set max speed hz"); */
-      
+#ifdef SETDEFAULT
+      ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_MAX_SPEED_HZ, &vtpSpiSpeed);
+      if (ret == -1)
+        perror("can't set max speed hz");
+#endif      
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_RD_MAX_SPEED_HZ, &vtpSpiSpeed[iid]);
       if (ret == -1)
 	perror("can't get max speed hz");
