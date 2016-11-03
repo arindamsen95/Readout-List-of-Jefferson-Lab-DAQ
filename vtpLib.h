@@ -176,6 +176,9 @@ typedef struct Serdes_Struct
 #define VTP_SERDES_DRP_STATUS_RDY     (1<<16)
 #define VTP_SERDES_DRP_STATUS_DO_MASK 0xFFFF
 
+#define VTP_SERDES_VXS   0
+#define VTP_SERDES_QSFP  1
+
 typedef struct ECTrigger_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
@@ -282,6 +285,12 @@ int  vtpVXSSerdesPower(uint16_t pp, int enable);
 int  vtpVXSSerdesGTReset(uint16_t pp, int enable);
 int  vtpVXSSerdesReset(uint16_t pp, int enable);
 int  vtpVXSSerdesStatus(uint16_t pp, int pflag);
+int  vtpQSFPSerdesSetLoopback(uint16_t qsfp, uint8_t lb_select);
+int  vtpQSFPSerdesSoftErrorReset(uint16_t qsfp, int enable);
+int  vtpQSFPSerdesPower(uint16_t qsfp, int enable);
+int  vtpQSFPSerdesGTReset(uint16_t qsfp, int enable);
+int  vtpQSFPSerdesReset(uint16_t qsfp, int enable);
+int  vtpQSFPSerdesStatus(uint16_t qsfp, int pflag);
 
 int  vtpV7CtrlInit();
 int  vtpV7SetReset(int val);

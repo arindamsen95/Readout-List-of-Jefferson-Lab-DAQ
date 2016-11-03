@@ -163,11 +163,38 @@ vtpCheckAddresses()
   return rval;
 }
 
-int
-vtpVXSSerdesSetLoopback(uint16_t pp, uint8_t lb_select)
-{
-  CHECKINIT;
+/* Macro for Serdes routines */
+#define CHECKTYPEDEV {							\
+    if(type == VTP_SERDES_VXS) {					\
+      if(dev > 16) {							\
+	printf("%s: ERROR: Invalid dev (%d) for type (%d)\n",		\
+	       __func__, dev, type);					\
+	return ERROR;							\
+      }	else {								\
+	sdev = &vtp->v7.vxs[dev];					\
+      }									\
+    } else if(type == VTP_SERDES_QSFP) {				\
+      if(dev > 3) {							\
+	printf("%s: ERROR: Invalid dev (%d) for type (%d)\n",		\
+	       __func__, dev, type);					\
+	return ERROR;							\
+      }	else {								\
+	sdev = &vtp->v7.qsfp[dev];					\
+      }									\
+    } else {								\
+      printf("%s: ERROR: Invalid type (%d)\n",				\
+	     __func__, type);						\
+      return ERROR;							\
+    }									\
+  }									\
 
+int
+vtpSerdesSetLoopback(int type, uint16_t dev, uint8_t lb_select)
+{
+  volatile SERDES_REGS *sdev;
+  CHECKINIT;
+  CHECKTYPEDEV;
+  
   if(lb_select > 7)
     {
       printf("%s: ERROR: Invalid loopback selection (%d)\n",
@@ -176,90 +203,102 @@ vtpVXSSerdesSetLoopback(uint16_t pp, uint8_t lb_select)
     }
   
   VLOCK;
-  vtp->v7.vxs[pp].Ctrl =
-    (vtp->v7.vxs[pp].Ctrl &~ VTP_SERDES_CTRL_LOOPBACK_MASK) | (lb_select<<6);
+  sdev->Ctrl =
+    (sdev->Ctrl &~ VTP_SERDES_CTRL_LOOPBACK_MASK) | (lb_select<<6);
   VUNLOCK;
   
   return OK;
 }
 
 int
-vtpVXSSerdesSoftErrorReset(uint16_t pp, int enable)
+vtpSerdesSoftErrorReset(int type, uint16_t dev, int enable)
 {
+  volatile SERDES_REGS *sdev;
   CHECKINIT;
+  CHECKTYPEDEV;
 
   VLOCK;
   if(enable)
-    vtp->v7.vxs[pp].Ctrl |= VTP_SERDES_CTRL_ER_CNT_RST;
+    sdev->Ctrl |= VTP_SERDES_CTRL_ER_CNT_RST;
   else
-    vtp->v7.vxs[pp].Ctrl &= ~VTP_SERDES_CTRL_ER_CNT_RST;
+    sdev->Ctrl &= ~VTP_SERDES_CTRL_ER_CNT_RST;
   VUNLOCK;
 
   return OK;
 }
 
 int
-vtpVXSSerdesPower(uint16_t pp, int enable)
+vtpSerdesPower(int type, uint16_t dev, int enable)
 {
+  volatile SERDES_REGS *sdev;
   CHECKINIT;
+  CHECKTYPEDEV;
 
   VLOCK;
   if(enable)
-    vtp->v7.vxs[pp].Ctrl &= ~VTP_SERDES_CTRL_POWERDOWN;
+    sdev->Ctrl &= ~VTP_SERDES_CTRL_POWERDOWN;
   else
-    vtp->v7.vxs[pp].Ctrl |= VTP_SERDES_CTRL_POWERDOWN;
+    sdev->Ctrl |= VTP_SERDES_CTRL_POWERDOWN;
   VUNLOCK;
 
   return OK;
 }
 
 int
-vtpVXSSerdesGTReset(uint16_t pp, int enable)
+vtpSerdesGTReset(int type, uint16_t dev, int enable)
 {
+  volatile SERDES_REGS *sdev;
   CHECKINIT;
+  CHECKTYPEDEV;
 
   VLOCK;
   if(enable)
-    vtp->v7.vxs[pp].Ctrl |= VTP_SERDES_CTRL_GT_RESET;  /* Toggle On  */
+    sdev->Ctrl |= VTP_SERDES_CTRL_GT_RESET;  /* Toggle On  */
   else
-    vtp->v7.vxs[pp].Ctrl &= ~VTP_SERDES_CTRL_GT_RESET; /* Toggle Off */
+    sdev->Ctrl &= ~VTP_SERDES_CTRL_GT_RESET; /* Toggle Off */
   VUNLOCK;
 
   return OK;
 }
 
 int
-vtpVXSSerdesReset(uint16_t pp, int enable)
+vtpSerdesReset(int type, uint16_t dev, int enable)
 {
+  volatile SERDES_REGS *sdev;
   CHECKINIT;
+  CHECKTYPEDEV;
 
   VLOCK;
   if(enable)
-    vtp->v7.vxs[pp].Ctrl |= VTP_SERDES_CTRL_RESET;  /* Toggle On  */
+    sdev->Ctrl |= VTP_SERDES_CTRL_RESET;  /* Toggle On  */
   else
-    vtp->v7.vxs[pp].Ctrl &= ~VTP_SERDES_CTRL_RESET; /* Toggle Off */
+    sdev->Ctrl &= ~VTP_SERDES_CTRL_RESET; /* Toggle Off */
   VUNLOCK;
 
   return OK;
 }
 
 int
-vtpVXSSerdesStatus(uint16_t pp, int pflag)
+vtpSerdesStatus(int type, uint16_t dev, int pflag)
 {
+  volatile SERDES_REGS *sdev;
   uint32_t status = 0;
   CHECKINIT;
-
+  CHECKTYPEDEV;
+  
   VLOCK;
-  status = vtp->v7.vxs[pp].Status;
+  status = sdev->Status;
   VUNLOCK;
 
   if(pflag)
     {
+      printf("\n");
       printf("    Hard   Soft   ---Lane---          Soft Error  TX      Reset     Link\n");
       printf("PP  Error  Error  0     1      Ch     Count       PLL    TX   RX    Reset\n");
+      printf("--------------------------------------------------------------------------------\n");
     }
   
-  printf("%2d  ", pp);
+  printf("%2d  ", dev);
   printf("%s    ", (status & VTP_SERDES_STATUS_HARD_ERR)?"ERR":"---");
   printf("%s    ", (status & VTP_SERDES_STATUS_SOFT_ERR)?"ERR":"---");
   printf("%s  ", (status & VTP_SERDES_STATUS_LANE_UP(0))?" UP ":"DOWN");
@@ -269,12 +308,83 @@ vtpVXSSerdesStatus(uint16_t pp, int pflag)
   printf("%s   ", (status & VTP_SERDES_STATUS_TX_LOCK)?"LOCK":"----");
   printf("%s ", (status & VTP_SERDES_STATUS_TX_RST_DONE)?"DONE":"----");
   printf("%s  ", (status & VTP_SERDES_STATUS_RX_RST_DONE)?"DONE":"----");
-  printf("%s", (status & VTP_SERDES_STATUS_LINK_RST)?"IN PROGRESS":"");
+  printf("%s", (status & VTP_SERDES_STATUS_LINK_RST)?"IN PROGRESS":"----");
   printf("\n");
   
   return OK;
 }
 
+int
+vtpVXSSerdesSetLoopback(uint16_t pp, uint8_t lb_select)
+{
+  return vtpSerdesSetLoopback(VTP_SERDES_VXS, pp, lb_select);
+}
+
+int
+vtpVXSSerdesSoftErrorReset(uint16_t pp, int enable)
+{
+  return vtpSerdesSoftErrorReset(VTP_SERDES_VXS, pp, enable);
+}
+
+int
+vtpVXSSerdesPower(uint16_t pp, int enable)
+{
+  return vtpSerdesPower(VTP_SERDES_VXS, pp, enable);
+}
+
+int
+vtpVXSSerdesGTReset(uint16_t pp, int enable)
+{
+  return vtpSerdesGTReset(VTP_SERDES_VXS, pp, enable);
+}
+
+int
+vtpVXSSerdesReset(uint16_t pp, int enable)
+{
+  return vtpSerdesReset(VTP_SERDES_VXS, pp, enable);
+}
+
+int
+vtpVXSSerdesStatus(uint16_t pp, int pflag)
+{
+  return vtpSerdesStatus(VTP_SERDES_VXS, pp, pflag);
+}
+
+int
+vtpQSFPSerdesSetLoopback(uint16_t qsfp, uint8_t lb_select)
+{
+  return vtpSerdesSetLoopback(VTP_SERDES_QSFP, qsfp, lb_select);
+}
+
+int
+vtpQSFPSerdesSoftErrorReset(uint16_t qsfp, int enable)
+{
+  return vtpSerdesSoftErrorReset(VTP_SERDES_QSFP, qsfp, enable);
+}
+
+int
+vtpQSFPSerdesPower(uint16_t qsfp, int enable)
+{
+  return vtpSerdesPower(VTP_SERDES_QSFP, qsfp, enable);
+}
+
+int
+vtpQSFPSerdesGTReset(uint16_t qsfp, int enable)
+{
+  return vtpSerdesGTReset(VTP_SERDES_QSFP, qsfp, enable);
+}
+
+int
+vtpQSFPSerdesReset(uint16_t qsfp, int enable)
+{
+  return vtpSerdesReset(VTP_SERDES_QSFP, qsfp, enable);
+}
+
+int
+vtpQSFPSerdesStatus(uint16_t qsfp, int pflag)
+{
+  return vtpSerdesStatus(VTP_SERDES_QSFP, qsfp, pflag);
+}
 
 static unsigned int CfgCtrl_Shadow = 0x1F;
 
@@ -594,7 +704,8 @@ vtpOpen(int dev_mask)
 	}
       else
 	{
-	  return ERROR;
+	  printf("%s: ERROR opening V7 map\n",
+		 __func__);
 	}
     }
 
@@ -607,7 +718,8 @@ vtpOpen(int dev_mask)
 	}
       else
 	{
-	  return ERROR;
+	  printf("%s: ERROR opening I2C device\n",
+		 __func__);
 	}
     }
   
@@ -620,7 +732,8 @@ vtpOpen(int dev_mask)
 	}
       else
 	{
-	  return ERROR;
+	  printf("%s: ERROR opening SPI device\n",
+		 __func__);
 	}
     }
 
