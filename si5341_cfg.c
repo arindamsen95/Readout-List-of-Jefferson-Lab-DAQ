@@ -714,9 +714,6 @@ si5341_sync()
   si5341_writeReg(0x1E, 4);
 }
 
-#define SI5341_IN_SEL_VXS	1
-#define SI5341_IN_SEL_LOCAL	3
-
 void
 si5341_selectClockSource(int src)
 {
@@ -789,7 +786,7 @@ si5341_Setup()
 }
 
 int
-si5341_Init()
+si5341_Init(int src)
 {
   spiid = 0;
 
@@ -798,7 +795,7 @@ si5341_Init()
 
   si5341_delay(1000);
 
-  si5341_configure(SI5341_IN_SEL_LOCAL);
+  si5341_configure(src);
 
   si5341_delay(1000);
 

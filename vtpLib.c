@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <pthread.h>
 #include <string.h>
@@ -49,6 +50,87 @@ pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
     }								\
   }
 
+/*******************************************************************************
+ *
+ * vtpInit - Initialize JLAB VTP Library. 
+ *
+ *
+ *   iFlag: 18 bit integer
+ *      bit 3-0:  Defines trig/sync/clock source
+ *             1 Internal clock, software trig & sync
+ *             2 VXS clock, trig, sync
+ *             0,2-15 undefined
+ * 
+ * 
+ *      bit 16:  Exit before board initialization
+ *             0 Initialize FADC (default behavior)
+ *             1 Skip initialization (just setup register map pointers)
+ *
+ *      bit 18:  Skip firmware check.  Useful for firmware updating.
+ *             0 Perform firmware check
+ *             1 Skip firmware check
+ *      
+ *
+ * RETURNS: OK, or ERROR if the address is invalid or a board is not present.
+ */
+
+int
+vtpInit(int iFlag)
+{
+  int rval = OK;
+  int i, syncSrc, trig1Src, clkSrc;
+  
+  rval = vtpCheckAddresses();
+  if(rval != OK)
+    return rval;
+
+  switch(iFlag & VTP_INIT_CLK_MASK)
+  {
+    case VTP_INIT_CLK_INT:
+      syncSrc = VTP_SD_SYNCSEL_0;
+      trig1Src = VTP_SD_TRIG1SEL_0;
+      clkSrc = SI5341_IN_SEL_LOCAL;
+      break;
+      
+    case VTP_INIT_CLK_VXS:
+      syncSrc = VTP_SD_SYNCSEL_VXS;
+      trig1Src = VTP_SD_TRIG1SEL_VXS;
+      clkSrc = SI5341_IN_SEL_VXS;
+      break;
+      
+    default:
+      printf("%s: ERROR invalid trig/sync/clock source specification.\n", __func__);
+      break;
+  }
+
+  if(iFlag & VTP_INIT_SKIP)
+    return rval;
+  
+  si5341_Init(clkSrc);
+  
+  vtpV7SetReset(1);
+  vtpV7SetResetSoft(1);
+
+  vtpV7SetReset(0);
+  vtpV7SetResetSoft(0);
+  
+  vtpV7PllReset(1);
+  vtpV7PllReset(0);
+
+  vtpSetTrig1Source(trig1Src);
+  vtpSetSyncSource(syncSrc);
+
+  for(i = 0; i < 16; i++)
+  {
+    vtpVXSSerdesPower(i, 0);
+    vtpVXSSerdesGTReset(i, 1);
+    vtpVXSSerdesReset(i, 1);
+    vtpVXSSerdesSoftErrorReset(i, 1);    
+  }
+
+  return rval;
+}
+  
 int
 vtpCheckAddresses()
 {
@@ -282,25 +364,26 @@ int
 vtpSerdesStatus(int type, uint16_t dev, int pflag)
 {
   volatile SERDES_REGS *sdev;
-  uint32_t status = 0;
+  uint32_t status = 0, ctrl, latency;
   CHECKINIT;
   CHECKTYPEDEV;
   
   VLOCK;
   status = sdev->Status;
+  ctrl = vtp->v7.fadcDec.Ctrl;
+  latency = vtp->v7.fadcDec.Latency[dev];
   VUNLOCK;
 
   if(pflag)
     {
       printf("\n");
-      printf("    Hard   Soft   ---Lane---          Soft Error  TX      Reset     Link\n");
-      printf("PP  Error  Error  0     1      Ch     Count       PLL    TX   RX    Reset\n");
-      printf("--------------------------------------------------------------------------------\n");
+      printf("    Hard   ---Lane---          Soft Error  TX      Reset     Link  Trg Latency\n");
+      printf("PP  Error  0     1      Ch     Count       PLL    TX   RX    Reset En  (ns)   \n");
+      printf("------------------------------------------------------------------------------\n");
     }
   
   printf("%2d  ", dev);
   printf("%s    ", (status & VTP_SERDES_STATUS_HARD_ERR)?"ERR":"---");
-  printf("%s    ", (status & VTP_SERDES_STATUS_SOFT_ERR)?"ERR":"---");
   printf("%s  ", (status & VTP_SERDES_STATUS_LANE_UP(0))?" UP ":"DOWN");
   printf("%s   ", (status & VTP_SERDES_STATUS_LANE_UP(1))?" UP ":"DOWN");
   printf("%s   ", (status & VTP_SERDES_STATUS_CHUP)?" UP ":"DOWN");
@@ -309,6 +392,8 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag)
   printf("%s ", (status & VTP_SERDES_STATUS_TX_RST_DONE)?"DONE":"----");
   printf("%s  ", (status & VTP_SERDES_STATUS_RX_RST_DONE)?"DONE":"----");
   printf("%s", (status & VTP_SERDES_STATUS_LINK_RST)?"IN PROGRESS":"----");
+  printf("%s", (ctrl & (1<<dev)) ? "1   ":"0   ");
+  printf("%d", latency*4);
   printf("\n");
   
   return OK;
@@ -351,6 +436,16 @@ vtpVXSSerdesStatus(uint16_t pp, int pflag)
 }
 
 int
+vtpVXSSerdesStatusAll()
+{
+  int pp;
+  for(pp = 0; pp < 16; pp++)
+    vtpVXSSerdesStatus(pp, (pp==0));
+
+  return OK;
+}
+
+int
 vtpQSFPSerdesSetLoopback(uint16_t qsfp, uint8_t lb_select)
 {
   return vtpSerdesSetLoopback(VTP_SERDES_QSFP, qsfp, lb_select);
@@ -384,6 +479,45 @@ int
 vtpQSFPSerdesStatus(uint16_t qsfp, int pflag)
 {
   return vtpSerdesStatus(VTP_SERDES_QSFP, qsfp, pflag);
+}
+
+int
+vtpV7PllReset(int enable)
+{
+  int status;
+  
+  if(enable)
+  {
+    VLOCK;
+    vtp->v7.clk.Ctrl = VTP_V7CLK_CTRL_GCLK_RESET;
+    VUNLOCK;
+  }
+  else
+  {
+    VLOCK;
+    vtp->v7.clk.Ctrl &= ~VTP_V7CLK_CTRL_GCLK_RESET;
+    VUNLOCK;
+  }
+  usleep(10000);    
+  
+  VLOCK;
+  status = vtp->v7.clk.Status;
+  VUNLOCK;
+  if(status & VTP_V7CLK_STATUS_GCLK_LOCKED)
+  {
+    printf("%s: PLL successfully locked\n",
+      __func__);
+  }
+  else
+  {
+    printf("%s: PLL not locked\n",
+      __func__);
+
+    if(!enable)
+      return ERROR;
+  }
+  
+  return OK;
 }
 
 static unsigned int CfgCtrl_Shadow = 0x1F;
@@ -493,7 +627,6 @@ vtpV7SetRDWR_B(int val)
   else
     CfgCtrl_Shadow &= ~VTP_V7BRIDGE_CTRL_RDWR_B;
 
-  VLOCK;
   vtp->v7.Ctrl = CfgCtrl_Shadow;
   VUNLOCK;
 
@@ -531,7 +664,6 @@ int
 vtpV7CfgStart()
 {
   int i, result;
-
   vtpV7SetCSI_B(1);
   vtpV7SetProgram_B(1);
   vtpV7SetRDWR_B(0);	// Write Mode
@@ -635,6 +767,172 @@ vtpV7CfgEnd()
 
   return OK;
 }
+
+int
+vtpZ7CfgLoad(char *filename)
+{
+  long len = 0;
+  int fd = 0;
+  unsigned char *pBits;
+  FILE *f = NULL;
+
+  printf("%s: Opening file: %s...", __func__, filename);
+  f = fopen(filename, "rb");
+  if(!f)
+  {
+    printf("failed to open file %s\n", filename);
+    return ERROR;
+  }
+  printf("Opened successfully\r\n");
+
+  fseek(f, 0, SEEK_END);
+  len = ftell(f);
+  fseek(f, 0, SEEK_SET);
+
+  pBits = (unsigned char *)malloc(len);
+  fread(pBits, 1, len, f);
+  fclose(f);
+
+  fd = open("/dev/xdevcfg", O_WRONLY);
+  if(fd < 1)
+  {
+    free(pBits);
+    printf("failed to open device\n");
+    return ERROR;
+  }
+  write(fd, pBits, len);
+  close(fd);
+  free(pBits);
+  
+  printf("%s: wrote %ld bytes\r\n", __func__, len);
+  printf("%s: end reached.\r\n", __func__);
+  
+  return OK;
+}
+
+/**************************************************************************************
+ *
+ *  vtpReadScalers - Scaler Data readout routine
+ *
+ *    data        - local memory address to place data
+ *    max_scalers - Maximum number of scalers that can be written to data
+ * 
+ *   RETURNS the number of 32bit words read, or ERROR if unsuccessful.
+ */
+int
+vtpReadScalers(volatile unsigned int *data, int max_scalers)
+{
+  return 0;
+}
+
+int
+vtpWrite32(volatile unsigned int *addr, unsigned int val)
+{
+  uintptr_t pint = (uintptr_t)vtp + (uintptr_t)addr;
+  volatile unsigned int *p = (volatile unsigned int *)pint;
+  
+  CHECKINIT;
+  VLOCK;
+    *p = val;
+  VUNLOCK;
+  
+  return OK;
+}
+
+unsigned int
+vtpRead32(volatile unsigned int *addr)
+{
+  uintptr_t pint = (uintptr_t)vtp + (uintptr_t)addr;
+  volatile unsigned int *p = (volatile unsigned int *)pint;
+  unsigned int val;
+  
+  CHECKINIT;
+  VLOCK;
+    val = *p;
+  VUNLOCK;
+  return val;
+}
+
+int
+vtpEnableTriggerPayloadMask(int pp_mask)
+{
+  int i;
+  CHECKINIT;
+  
+  VLOCK;
+  vtp->v7.fadcDec.Ctrl = pp_mask;
+  VUNLOCK;
+
+  for(i = 0; i < 16; i++)
+  {
+    if(pp_mask & (1<<i))
+    {
+      vtpVXSSerdesPower(i, 1);
+      vtpVXSSerdesGTReset(i, 1);
+      vtpVXSSerdesReset(i, 1);
+      vtpVXSSerdesSoftErrorReset(i, 1);    
+      vtpVXSSerdesGTReset(i, 0);
+      vtpVXSSerdesReset(i, 0);
+      vtpVXSSerdesSoftErrorReset(i, 0);
+    }
+    else
+    {
+      vtpVXSSerdesPower(i, 0);
+      vtpVXSSerdesGTReset(i, 1);
+      vtpVXSSerdesReset(i, 1);
+      vtpVXSSerdesSoftErrorReset(i, 1);    
+    }
+  }
+  
+  return OK;
+}
+
+int
+vtpSetTrig1Source(int src)
+{
+  CHECKINIT;
+  
+  src &= VTP_SD_TRIG1SEL_MASK;
+  
+  if(src == VTP_SD_TRIG1SEL_0)
+    printf("%s: Setting trig1 source to constant 0.\n", __func__);
+  else if(src == VTP_SD_TRIG1SEL_1)
+    printf("%s: Setting trig1 source to constant 1.\n", __func__);
+  else //if(src == VTP_SD_TRIG1SEL_VXS)
+    printf("%s: Setting trig1 source to VXS.\n", __func__);
+  
+  printf("&vtp->v7 = 0x%08X\n", (unsigned int)&vtp->v7);
+  printf("&vtp->v7.sd.Trig1Sel = 0x%08X\n", (unsigned int)(&vtp->v7.sd.Trig1Sel));
+  printf("&vtp->v7.sd.Trig1Sel-&vtp->v7 = 0x%08X\n", (unsigned int)(&vtp->v7.sd.Trig1Sel)-(unsigned int)(&vtp->v7));
+  
+  VLOCK;
+    vtp->v7.sd.Trig1Sel = src;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpSetSyncSource(int src)
+{
+  CHECKINIT;
+  
+  src &= VTP_SD_SYNCSEL_MASK;
+  
+  if(src == VTP_SD_SYNCSEL_0)
+    printf("%s: Setting sync source to constant 0.\n", __func__);
+  else if(src == VTP_SD_SYNCSEL_1)
+    printf("%s: Setting sync source to constant 1.\n", __func__);
+  else //if(src == VTP_SD_SYNCSEL_VXS)
+    printf("%s: Setting sync source to VXS.\n", __func__);
+  
+  VLOCK;
+    vtp->v7.sd.SyncSel = src;
+  VUNLOCK;
+  
+  return OK;
+}
+
 
 static int
 vtpFPGAOpen()

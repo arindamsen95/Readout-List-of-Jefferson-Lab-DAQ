@@ -5,6 +5,13 @@
 # Description:
 #    Makefile for the JLab VTP module running Linux on an ARMv7 processor
 #
+# CLAS stuff
+#MAIN = vtp
+#include $(CODA)/src/Makefile.include
+#
+#
+#
+
 # Uncomment DEBUG line, to include some debugging info ( -g and -Wall)
 DEBUG   ?= 1
 QUIET	?= 1
@@ -67,6 +74,11 @@ clean:
 
 realclean: clean
 	$(Q)rm -vf *~
+
+install:
+	-cp *.a $(CODA)/Linux_armv7l/lib/
+	-cp *.so $(CODA)/Linux_armv7l/lib/
+	-cp *.h $(CODA)/Linux_armv7l/include/
 
 echoarch:
 	@echo "Make for $(ARCH)"

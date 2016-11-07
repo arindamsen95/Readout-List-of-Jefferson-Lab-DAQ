@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include "vtp-i2c.h"
 #include "vtp-spi.h"
+#include "si5341_cfg.h"
 
 #ifndef ERROR
 #define ERROR -1
@@ -110,8 +111,14 @@ typedef struct SD_Struct
 #define VTP_SD_BUSYSEL_MASK  0x0003
 
 #define VTP_SD_TRIG1SEL_MASK 0x0003
+#define VTP_SD_TRIG1SEL_0    (0<<0)
+#define VTP_SD_TRIG1SEL_1    (1<<0)
+#define VTP_SD_TRIG1SEL_VXS  (2<<0)
 
 #define VTP_SD_SYNCSEL_MASK  0x0003
+#define VTP_SD_SYNCSEL_0     (0<<0)
+#define VTP_SD_SYNCSEL_1     (1<<0)
+#define VTP_SD_SYNCSEL_VXS   (2<<0)
 
 #define VTP_SD_TRIG1_STATUS (1<<0)
 
@@ -291,6 +298,7 @@ int  vtpQSFPSerdesPower(uint16_t qsfp, int enable);
 int  vtpQSFPSerdesGTReset(uint16_t qsfp, int enable);
 int  vtpQSFPSerdesReset(uint16_t qsfp, int enable);
 int  vtpQSFPSerdesStatus(uint16_t qsfp, int pflag);
+int  vtpV7PllReset(int enable);
 
 int  vtpV7CtrlInit();
 int  vtpV7SetReset(int val);
@@ -304,8 +312,26 @@ void vtpV7WriteCfgData(uint16_t *buf, int N);
 int  vtpV7CfgStart();
 int  vtpV7CfgLoad(char *filename);
 int  vtpV7CfgEnd();
+int  vtpZ7CfgLoad(char *filename);
 
-int  vtpOpen();
-int  vtpClose();
+int  vtpOpen(int dev_mask);
+int  vtpClose(int dev_mask);
+
+unsigned int vtpRead32(volatile unsigned int *addr);
+int  vtpWrite32(volatile unsigned int *addr, unsigned int val);
+int  vtpReadScalers(volatile unsigned int *data, int max_scalers);
+int  vtpVXSSerdesStatusAll();
+int  vtpSetTrig1Source(int src);
+int  vtpSetSyncSource(int src);
+int  vtpEnableTriggerPayloadMask(int pp_mask);
+
+#define VTP_INIT_CLK_MASK            0x0000000F
+#define VTP_INIT_CLK_INT             (1<<0)
+#define VTP_INIT_CLK_VXS             (2<<0)
+#define VTP_INIT_SKIP                (1<<16)
+#define VTP_INIT_SKIP_FIRMWARE_CHECK (1<<18)
+
+int  vtpInit(int iFlag);
+
 
 #endif /* VTPLIB_H */
