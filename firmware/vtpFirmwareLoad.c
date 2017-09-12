@@ -43,7 +43,7 @@ main(int argc, char *argv[])
     }
 
   /* Initialize library */
-  stat = vtpOpen();
+  stat = vtpOpen(VTP_FPGA_OPEN | VTP_I2C_OPEN | VTP_SPI_OPEN);
   if(stat < 0)
     {
       printf(" Unable to initialize VTP library.\n");
@@ -77,7 +77,7 @@ main(int argc, char *argv[])
     }
   
  CLOSE:
-  vtpClose();
+  vtpClose(VTP_FPGA_OPEN | VTP_I2C_OPEN | VTP_SPI_OPEN);
     
   exit(0);
 }

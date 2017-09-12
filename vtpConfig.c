@@ -1,0 +1,963 @@
+
+/* vtpConfig.c */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "vtpConfig.h"
+#include "vtpLib.h"
+//#include "xxxConfig.h"
+
+#undef DEBUG
+
+#define ADD_TO_STRING \
+  len1 = strlen(str); \
+  len2 = strlen(sss); \
+  if((len1+len2) < length) strcat(str,sss); \
+  else return(len1)
+
+#define CLOSE_STRING \
+  len1 = strlen(str); \
+  return(len1)
+
+static int active;
+
+static VTP_CONF vtpConf;
+
+char *getenv();
+
+#define SCAN_MSK \
+  args = sscanf (str_tmp, "%*s %d %d %d %d %d %d %d %d   \
+                                     %d %d %d %d %d %d %d %d", \
+           &msk[ 0], &msk[ 1], &msk[ 2], &msk[ 3], \
+           &msk[ 4], &msk[ 5], &msk[ 6], &msk[ 7], \
+           &msk[ 8], &msk[ 9], &msk[10], &msk[11], \
+           &msk[12], &msk[13], &msk[14], &msk[15])
+
+#define SCAN_FMSK \
+  args = sscanf (str_tmp, "%*s %f %f %f %f %f %f %f %f   \
+                                     %f %f %f %f %f %f %f %f", \
+           &fmsk[ 0], &fmsk[ 1], &fmsk[ 2], &fmsk[ 3], \
+           &fmsk[ 4], &fmsk[ 5], &fmsk[ 6], &fmsk[ 7], \
+           &fmsk[ 8], &fmsk[ 9], &fmsk[10], &fmsk[11], \
+           &fmsk[12], &fmsk[13], &fmsk[14], &fmsk[15])
+
+#define GET_READ_MSK \
+  SCAN_MSK; \
+  ui1 = 0; \
+  for(jj=0; jj<16; jj++) \
+  { \
+    if((msk[jj] < 0) || (msk[jj] > 1)) \
+    { \
+      printf("\nReadConfigFile: Wrong mask bit value, %d\n\n",msk[jj]); return(-6); \
+    } \
+    if(strcmp(keyword,"FADC250_ADC_MASK") == 0) msk[jj] = ~(msk[jj])&0x1; \
+    ui1 |= (msk[jj]<<jj); \
+  }
+
+#define SCAN_MSK4 \
+  args = sscanf (str_tmp, "%*s %d %d %d %d", \
+           &msk[ 0], &msk[ 1], &msk[ 2], &msk[ 3])
+           
+#define GET_READ_MSK4 \
+  SCAN_MSK4; \
+  ui1 = 0; \
+  for(jj=0; jj<4; jj++) \
+  { \
+    if((msk[jj] < 0) || (msk[jj] > 1)) \
+    { \
+      printf("\nReadConfigFile: Wrong mask bit value, %d\n\n",msk[jj]); return(-6); \
+    } \
+    ui1 |= (msk[jj]<<jj); \
+  }  
+  
+
+static char *expid = NULL;
+
+void
+vtpSetExpid(char *string)
+{
+  expid = strdup(string);
+}
+
+int
+vtpConfig(char *fname)
+{
+  int res;
+  
+  //vtpInitGlobals();
+
+  /* reading and parsing config file */
+  if( (res = vtpReadConfigFile(fname)) < 0 )
+  {
+    printf("ERROR in vtpConfig: vtpReadConfigFile() returns %d\n",res);
+    return(res);
+  }
+
+  /* download to all boards */
+  vtpDownloadAll();
+
+  return(0);
+}
+
+void
+vtpInitGlobals()
+{
+  int i;
+
+  printf("vtpInitGlobals reached\n");
+
+  memset(vtpConf.fw_filename, 0, sizeof(vtpConf.fw_filename));
+  
+  vtpConf.v7_configured = 0;
+  vtpConf.fw_rev = -1;
+  vtpConf.fw_type = -1;
+  vtpConf.window_width = 0;
+  vtpConf.window_offset = 0;
+  
+  vtpConf.payload_en = 0;
+  vtpConf.fiber_en = 0;
+
+  // EC configuration
+  for(i=0; i<8; i++)
+    vtpConf.ec.fadcsum_ch_en[i] = 0;
+  
+  vtpConf.ec.inner.hit_emin = 0;
+  vtpConf.ec.inner.hit_dt = 0;
+  vtpConf.ec.inner.dalitz_min = 0;
+  vtpConf.ec.inner.dalitz_max = 0;
+  vtpConf.ec.inner.cosmic_emin = 0;
+  vtpConf.ec.inner.cosmic_multmax = 0;
+  vtpConf.ec.inner.cosmic_hitwidth = 0;
+  vtpConf.ec.inner.cosmic_evaldelay = 0;
+
+  vtpConf.ec.outer.hit_emin = 0;
+  vtpConf.ec.outer.hit_dt = 0;
+  vtpConf.ec.outer.dalitz_min = 0;
+  vtpConf.ec.outer.dalitz_max = 0;
+  vtpConf.ec.outer.cosmic_emin = 0;
+  vtpConf.ec.outer.cosmic_multmax = 0;
+  vtpConf.ec.outer.cosmic_hitwidth = 0;
+  vtpConf.ec.outer.cosmic_evaldelay = 0;
+  
+  
+  // PC configuration
+  for(i=0; i<8; i++)
+    vtpConf.pc.fadcsum_ch_en[i] = 0;
+  
+  vtpConf.pc.cosmic_emin = 0;
+  vtpConf.pc.cosmic_multmax = 0;
+  vtpConf.pc.cosmic_hitwidth = 0;
+  vtpConf.pc.cosmic_evaldelay = 0;
+  vtpConf.pc.cosmic_pixelen = 0;
+  
+  
+  // PCS configuration
+  vtpConf.pcs.threshold[0] = 0;
+  vtpConf.pcs.threshold[1] = 0;
+  vtpConf.pcs.threshold[2] = 0;
+  vtpConf.pcs.nframes = 0;
+  vtpConf.pcs.dipfactor = 0;
+  vtpConf.pcs.dalitz_min = 0;
+  vtpConf.pcs.dalitz_max = 0;
+  vtpConf.pcs.nstrip_min = 0;
+  vtpConf.pcs.nstrip_max = 0;
+
+  // ECS configuration
+  vtpConf.ecs.threshold[0] = 0;
+  vtpConf.ecs.threshold[1] = 0;
+  vtpConf.ecs.threshold[2] = 0;
+  vtpConf.ecs.nframes = 0;
+  vtpConf.ecs.dipfactor = 0;
+  vtpConf.ecs.dalitz_min = 0;
+  vtpConf.ecs.dalitz_max = 0;
+  vtpConf.ecs.nstrip_min = 0;
+  vtpConf.ecs.nstrip_max = 0;
+
+  
+  // GT configuration
+  vtpConf.gt.trig_latency = 1000;
+  vtpConf.gt.trig_width = 100;
+  
+  for(i=0; i<16; i++)
+  {
+    vtpConf.gt.trgbits[i].ssp_strigger_bit_mask = 0;
+    vtpConf.gt.trgbits[i].ssp_sector_mask = 0;
+    vtpConf.gt.trgbits[i].sector_mult_min = 0;
+    vtpConf.gt.trgbits[i].sector_coin_width = 0;
+    vtpConf.gt.trgbits[i].central_en = 0;
+  }
+  
+  // DC configuration
+  vtpConf.dc.dcsegfind_threshold[0] = 0;
+  vtpConf.dc.dcsegfind_threshold[1] = 0;
+  
+  // HCAL configuration
+  vtpConf.hcal.hit_dt = 0;
+  vtpConf.hcal.cluster_emin = 0;
+
+  // FTCAL configuration
+  vtpConf.ftcal.seed_emin = 0;
+  vtpConf.ftcal.seed_dt = 0;
+}
+
+
+/* reading and parsing config file */
+int
+vtpReadConfigFile(char *filename_in)
+{
+  FILE   *fd;
+  char   filename[FNLEN];
+  char   fname[FNLEN] = { "" };  /* config file name */
+  int    jj, ch;
+  char   str_tmp[STRLEN], keyword[ROCLEN];
+  char   host[ROCLEN], ROC_name[ROCLEN];
+  int    args,i1,i2,i3,i4,i5,i6,msk[16];
+  unsigned int  ui1;
+  char *clonparms;
+  int do_parsing;
+
+  gethostname(host,ROCLEN);  /* obtain our hostname */
+  for(jj=0; jj<strlen(host); jj++)
+  {
+    if(host[jj] == '.')
+    {
+      host[jj] = '\0';
+      break;
+    }
+  }
+  
+  clonparms = getenv("CLON_PARMS");
+
+  if(expid==NULL)
+  {
+    expid = getenv("EXPID");
+    printf("\nNOTE: use EXPID=>%s< from environment\n",expid);
+  }
+  else
+  {
+    printf("\nNOTE: use EXPID=>%s< from CODA\n",expid);
+  }
+
+  strcpy(filename,filename_in); /* copy filename from parameter list to local string */
+  do_parsing = 1;
+
+  while(do_parsing)
+  {
+    if(strlen(filename)!=0) /* filename specified */
+    {
+      if ( filename[0]=='/' || (filename[0]=='.' && filename[1]=='/') )
+      {
+        sprintf(fname, "%s", filename);
+      }
+      else
+      {
+        sprintf(fname, "%s/vtp/%s", clonparms, filename);
+      }
+
+      if((fd=fopen(fname,"r")) == NULL)
+      {
+        printf("\nReadConfigFile: Can't open config file >%s<\n",fname);
+        return(-1);
+      }
+    }
+    else if(do_parsing<2) /* filename does not specified */
+    {
+      sprintf(fname, "%s/vtp/%s.cnf", clonparms, host);
+      if((fd=fopen(fname,"r")) == NULL)
+      {
+        sprintf(fname, "%s/vtp/%s.cnf", clonparms, expid);
+        if((fd=fopen(fname,"r")) == NULL)
+        {
+          printf("\nReadConfigFile: Can't open config file >%s<\n",fname);
+          return(-2);
+        }
+      }
+    }
+    else
+    {
+      printf("\nReadConfigFile: ERROR: since do_parsing=%d (>1), filename must be specified\n",do_parsing);
+      return(-1);
+    }
+
+    printf("\nReadConfigFile: Using configuration file >%s<\n",fname);
+
+    /* Parsing of config file */
+    active = 0; /* by default disable crate */
+    do_parsing = 0; /* will parse only one file specified above, unless it changed during parsing */
+    while ((ch = getc(fd)) != EOF)
+    {
+      if ( ch == '#' || ch == ' ' || ch == '\t' )
+      {
+        while ( getc(fd)!='\n' /*&& getc(fd)!=!= EOF*/ ) {} /*ERROR !!!*/
+      }
+      else if( ch == '\n' ) {}
+      else
+      {
+        ungetc(ch,fd);
+        fgets(str_tmp, STRLEN, fd);
+        sscanf (str_tmp, "%s %s", keyword, ROC_name);
+#ifdef DEBUG
+        printf("\nfgets returns %s so keyword=%s\n\n",str_tmp,keyword);
+#endif
+        /* Start parsing real config inputs */
+        if(strcmp(keyword,"VTP_CRATE") == 0)
+        {
+          if(strcmp(ROC_name,host) == 0)
+          {
+            printf("\nReadConfigFile: crate = %s  host = %s - activated\n",ROC_name,host);
+            active = 1;
+          }
+          else if(strcmp(ROC_name,"all") == 0)
+          {
+            printf("\nReadConfigFile: crate = %s  host = %s - activated\n",ROC_name,host);
+            active = 1;
+          }
+          else
+          {
+            printf("\nReadConfigFile: crate = %s  host = %s - disactivated\n",ROC_name,host);
+            active = 0;
+          }
+        }
+        else if(active && (strcmp(keyword,"VTP_W_WIDTH") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.window_width = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_W_OFFSET") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.window_offset = i1;
+        }
+        else if(active && !strcmp(keyword,"VTP_FIRMWARE"))
+        {
+          sscanf(str_tmp, "%*s %250s", vtpConf.fw_filename);
+          printf("VTP_FIRMWARE = %s\n", vtpConf.fw_filename);
+        }
+        else if(active && (strcmp(keyword,"VTP_PAYLOAD_EN") == 0))
+        {
+          GET_READ_MSK;
+          vtpConf.payload_en = ui1;
+        }
+        else if(active && (strcmp(keyword,"VTP_FIBER_EN") == 0))
+        {
+          GET_READ_MSK4;
+          vtpConf.fiber_en = ui1;
+          printf("vtpConf.fiber_en = 0x%08X\n", vtpConf.fiber_en);
+        }
+        else if(active && (strcmp(keyword,"VTP_EC_FADCSUM_CH") == 0))
+        {
+          sscanf (str_tmp, "%*s 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X",
+                 &vtpConf.ec.fadcsum_ch_en[0], &vtpConf.ec.fadcsum_ch_en[1],
+                 &vtpConf.ec.fadcsum_ch_en[2], &vtpConf.ec.fadcsum_ch_en[3], 
+                 &vtpConf.ec.fadcsum_ch_en[4], &vtpConf.ec.fadcsum_ch_en[5],
+                 &vtpConf.ec.fadcsum_ch_en[6], &vtpConf.ec.fadcsum_ch_en[7]
+                );
+        }
+        else if(active && (strcmp(keyword,"VTP_ECINNER_HIT_EMIN") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.inner.hit_emin = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECINNER_HIT_DT") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.inner.hit_dt = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECINNER_HIT_DALITZ") == 0))
+        {
+          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
+          vtpConf.ec.inner.dalitz_min = i1*8;
+          vtpConf.ec.inner.dalitz_max = i2*8;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECINNER_COSMIC_EMIN") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.inner.cosmic_emin = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECINNER_COSMIC_MULTMAX") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.inner.cosmic_multmax = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECINNER_COSMIC_HITWIDTH") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.inner.cosmic_hitwidth = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECINNER_COSMIC_EVALDELAY") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.inner.cosmic_evaldelay = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECOUTER_HIT_EMIN") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.outer.hit_emin = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECOUTER_HIT_DT") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.outer.hit_dt = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECOUTER_HIT_DALITZ") == 0))
+        {
+          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
+          vtpConf.ec.outer.dalitz_min = i1*8;
+          vtpConf.ec.outer.dalitz_max = i2*8;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECOUTER_COSMIC_EMIN") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.outer.cosmic_emin = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECOUTER_COSMIC_MULTMAX") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.outer.cosmic_multmax = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECOUTER_COSMIC_HITWIDTH") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.outer.cosmic_hitwidth = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECOUTER_COSMIC_EVALDELAY") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ec.outer.cosmic_evaldelay = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_PC_COSMIC_EMIN") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pc.cosmic_emin = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_PC_COSMIC_MULTMAX") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pc.cosmic_multmax = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_PC_COSMIC_HITWIDTH") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pc.cosmic_hitwidth = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_PC_COSMIC_EVALDELAY") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pc.cosmic_evaldelay = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_PC_COSMIC_PIXELEN") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pc.cosmic_pixelen = i1;
+        }
+
+
+        else if(active && (strcmp(keyword,"VTP_PCS_THRESHOLDS") == 0))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
+          vtpConf.pcs.threshold[0] = i1;
+          vtpConf.pcs.threshold[1] = i2;
+          vtpConf.pcs.threshold[2] = i3;
+        }
+        else if(active && (strcmp(keyword,"VTP_PCS_NFRAMES") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pcs.nframes = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_PCS_DIPFACTOR") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pcs.dipfactor = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_PCS_NSTRIP") == 0))
+        {
+          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
+          vtpConf.pcs.nstrip_min = i1;
+          vtpConf.pcs.nstrip_max = i2;
+        }
+        else if(active && (strcmp(keyword,"VTP_PCS_DALITZ") == 0))
+        {
+          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
+          vtpConf.pcs.dalitz_min = i1;
+          vtpConf.pcs.dalitz_max = i2;
+        }
+
+
+
+        else if(active && (strcmp(keyword,"VTP_ECS_THRESHOLDS") == 0))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
+          vtpConf.ecs.threshold[0] = i1;
+          vtpConf.ecs.threshold[1] = i2;
+          vtpConf.ecs.threshold[2] = i3;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECS_NFRAMES") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ecs.nframes = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECS_DIPFACTOR") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ecs.dipfactor = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECS_NSTRIP") == 0))
+        {
+          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
+          vtpConf.ecs.nstrip_min = i1;
+          vtpConf.ecs.nstrip_max = i2;
+        }
+        else if(active && (strcmp(keyword,"VTP_ECS_DALITZ") == 0))
+        {
+          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
+          vtpConf.ecs.dalitz_min = i1;
+          vtpConf.ecs.dalitz_max = i2;
+        }
+
+
+
+        else if(active && (strcmp(keyword,"VTP_GT_LATENCY") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.gt.trig_latency = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_GT_WIDTH") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.gt.trig_width = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_GT_TRGBIT") == 0))
+        {
+          sscanf (str_tmp, "%*s %d %d %d %d %d %d", &i1, &i2, &i3, &i4, &i5, &i6);
+          vtpConf.gt.trgbits[i1].ssp_strigger_bit_mask = i2;
+          vtpConf.gt.trgbits[i1].ssp_sector_mask = i3;
+          vtpConf.gt.trgbits[i1].sector_mult_min = i4;
+          vtpConf.gt.trgbits[i1].sector_coin_width = i5;
+          vtpConf.gt.trgbits[i1].central_en = i6;
+        }
+
+        else if(active && (strcmp(keyword,"VTP_DC_SEGTHR") == 0))
+        {
+          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
+          if(i1 < 0 || i1 > 2)
+          {
+            printf("\n%s: ERROR - invalid keyword %s instance %d\n", __func__, keyword, i1);
+            return -1;
+          }
+          vtpConf.dc.dcsegfind_threshold[i1] = i2;
+        }
+        else if(active && (strcmp(keyword,"VTP_HCAL_HIT_DT") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.hcal.hit_dt = i1;
+        }
+        else if(active && (strcmp(keyword,"VTP_HCAL_HIT_EMIN") == 0))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.hcal.cluster_emin = i1;
+        }
+        else if(active && (!strcmp(keyword,"VTP_FTCAL_SEED_EMIN")))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ftcal.seed_emin = i1;
+        }
+        else if(active && (!strcmp(keyword,"VTP_FTCAL_SEED_DT")))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ftcal.seed_dt = i1;
+        }
+        else if(active)
+        {
+          printf("Error: VTP unknown line: fgets returns %s so keyword=%s\n\n",str_tmp,keyword);
+        }
+      }
+    }
+    fclose(fd);
+  }
+
+  return(0);
+}
+
+
+/* download setting into VTP */
+int
+vtpDownloadAll()
+{
+  int ii;  
+  char fname[FNLEN];
+  char *clonparms;
+  
+  clonparms = getenv("CLON_PARMS");
+  
+  // Open VTP hardware interfaces
+  vtpOpen(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
+
+  // Load VTP Zynq FPGA image
+  snprintf(fname, FNLEN, "%s/firmwares/%s", clonparms, "fe_vtp_hallb_z7.bin");
+  if(vtpZ7CfgLoad(fname) != OK)
+    exit(1);
+
+  if(strlen(vtpConf.fw_filename) <= 0 && !vtpConf.v7_configured)
+  {
+    printf("No firmware file specified, skipping register download.\n");
+    return(0);
+  }
+  
+  vtpV7CfgStart();
+  snprintf(fname, FNLEN, "%s/firmwares/%s", clonparms, vtpConf.fw_filename);
+  if(vtpV7CfgLoad(fname) != OK)
+    exit(1);
+  vtpV7CfgEnd();
+  
+  vtpConf.v7_configured = 1;
+
+  vtpInit(VTP_INIT_CLK_VXS);
+
+  // Check firmware type
+  vtpConf.fw_rev = vtpV7GetFW_Version();
+  vtpConf.fw_type = vtpV7GetFW_Type();
+  
+  printf("vtpConfig type = %d\n",vtpConf.fw_type);
+
+  // Set parameters based on firmware type
+  vtpSetWindow(vtpConf.window_offset, vtpConf.window_width);
+  
+  vtpEnableTriggerPayloadMask(vtpConf.payload_en);
+  vtpEnableTriggerFiberMask(vtpConf.fiber_en);
+
+  if(vtpConf.fw_type == VTP_FW_TYPE_EC)
+  {
+    // EC configuration
+    vtpSetFadcSum_MaskEn(vtpConf.ec.fadcsum_ch_en);
+    
+    vtpSetECtrig_emin(0, vtpConf.ec.inner.hit_emin);
+    vtpSetECtrig_dt(0, vtpConf.ec.inner.hit_dt);
+    vtpSetECtrig_dalitz(0, vtpConf.ec.inner.dalitz_min, vtpConf.ec.inner.dalitz_max);
+    vtpSetECcosmic_emin(0, vtpConf.ec.inner.cosmic_emin);
+    vtpSetECcosmic_multmax(0, vtpConf.ec.inner.cosmic_multmax);
+    vtpSetECcosmic_width(0, vtpConf.ec.inner.cosmic_hitwidth);
+    vtpSetECcosmic_delay(0, vtpConf.ec.inner.cosmic_evaldelay);
+    
+    vtpSetECtrig_emin(1, vtpConf.ec.outer.hit_emin);
+    vtpSetECtrig_dt(1, vtpConf.ec.outer.hit_dt);
+    vtpSetECtrig_dalitz(1, vtpConf.ec.outer.dalitz_min, vtpConf.ec.outer.dalitz_max);
+    vtpSetECcosmic_emin(1, vtpConf.ec.outer.cosmic_emin);
+    vtpSetECcosmic_multmax(1, vtpConf.ec.outer.cosmic_multmax);
+    vtpSetECcosmic_width(1, vtpConf.ec.outer.cosmic_hitwidth);
+    vtpSetECcosmic_delay(1, vtpConf.ec.outer.cosmic_evaldelay);
+  }
+  
+  if(vtpConf.fw_type == VTP_FW_TYPE_PC)
+  {
+    // PC configuration
+    vtpSetFadcSum_MaskEn(vtpConf.pc.fadcsum_ch_en);
+    
+    vtpSetPCcosmic_emin(vtpConf.pc.cosmic_emin);
+    vtpSetPCcosmic_multmax(vtpConf.pc.cosmic_multmax);
+    vtpSetPCcosmic_width(vtpConf.pc.cosmic_hitwidth);
+    vtpSetPCcosmic_delay(vtpConf.pc.cosmic_evaldelay);
+    vtpSetPCcosmic_pixel(vtpConf.pc.cosmic_pixelen);
+  }
+
+  if(vtpConf.fw_type == VTP_FW_TYPE_PCS)
+  {
+    // PCS configuration
+    vtpSetPCS_thresholds(vtpConf.pcs.threshold[0], vtpConf.pcs.threshold[1], vtpConf.pcs.threshold[2]);
+    vtpSetPCS_nframes(vtpConf.pcs.nframes);
+    vtpSetPCS_dipfactor(vtpConf.pcs.dipfactor);
+    vtpSetPCS_nstrip(vtpConf.pcs.nstrip_min, vtpConf.pcs.nstrip_max);
+    vtpSetPCS_dalitz(vtpConf.pcs.dalitz_min, vtpConf.pcs.dalitz_max);
+  }
+     
+  if(vtpConf.fw_type == VTP_FW_TYPE_ECS)
+  {
+    // ECS configuration
+    vtpSetECS_thresholds(vtpConf.ecs.threshold[0], vtpConf.ecs.threshold[1], vtpConf.ecs.threshold[2]);
+    vtpSetECS_nframes(vtpConf.ecs.nframes);
+    vtpSetECS_dipfactor(vtpConf.ecs.dipfactor);
+    vtpSetECS_nstrip(vtpConf.ecs.nstrip_min, vtpConf.ecs.nstrip_max);
+    vtpSetECS_dalitz(vtpConf.ecs.dalitz_min, vtpConf.ecs.dalitz_max);
+  }
+     
+  if(vtpConf.fw_type == VTP_FW_TYPE_GT)
+  {
+    // GT configuration
+    vtpSetGt_latency(vtpConf.gt.trig_latency);
+    vtpSetGt_width(vtpConf.gt.trig_width);
+    
+    for(ii=0; ii<16; ii++)
+    {
+      vtpSetGtTriggerBit(ii,
+          vtpConf.gt.trgbits[ii].ssp_strigger_bit_mask,
+          vtpConf.gt.trgbits[ii].ssp_sector_mask,
+          vtpConf.gt.trgbits[ii].sector_mult_min,
+          vtpConf.gt.trgbits[ii].sector_coin_width,
+          vtpConf.gt.trgbits[ii].central_en
+        );
+    }
+  }
+  
+  if(vtpConf.fw_type == VTP_FW_TYPE_DC)
+  {
+    vtpSetDc_SegmentThresholdMin(0, vtpConf.dc.dcsegfind_threshold[0]);
+    vtpSetDc_SegmentThresholdMin(1, vtpConf.dc.dcsegfind_threshold[1]);
+  }
+
+  if(vtpConf.fw_type == VTP_FW_TYPE_HCAL)
+  {
+    vtpSetHcal_ClusterCoincidence(vtpConf.hcal.hit_dt);
+    vtpSetHcal_ClusterThreshold(vtpConf.hcal.cluster_emin);
+  }
+ 
+  if(vtpConf.fw_type == VTP_FW_TYPE_FTCAL)
+  {
+    vtpSetFTCALseed_emin(vtpConf.ftcal.seed_emin);
+    vtpSetFTCALseed_dt(vtpConf.ftcal.seed_dt);
+  } 
+  return(0);
+}
+
+int
+vtpUploadAll(char *string, int length)
+{
+  int i, len1, len2;
+  char *str, sss[1024];
+
+  vtpConf.fw_rev = vtpV7GetFW_Version();
+  vtpConf.fw_type = vtpV7GetFW_Type();
+  
+  vtpConf.window_width = vtpGetWindowWidth();
+  vtpConf.window_offset = vtpGetWindowLookback();
+
+  vtpConf.payload_en = vtpGetTriggerPayloadMask();
+  vtpConf.fiber_en = vtpGetTriggerFiberMask();
+
+  if(vtpConf.fw_type == VTP_FW_TYPE_EC)
+  {
+    // EC configuration
+    vtpGetFadcSum_MaskEn(vtpConf.ec.fadcsum_ch_en);
+    
+    vtpGetECtrig_emin(0, &vtpConf.ec.inner.hit_emin);
+    vtpGetECtrig_dt(0, &vtpConf.ec.inner.hit_dt);
+    vtpGetECcosmic_emin(0, &vtpConf.ec.inner.cosmic_emin);
+    vtpGetECcosmic_multmax(0, &vtpConf.ec.inner.cosmic_multmax);
+    vtpGetECcosmic_width(0, &vtpConf.ec.inner.cosmic_hitwidth);
+    vtpGetECcosmic_delay(0, &vtpConf.ec.inner.cosmic_evaldelay);
+    vtpGetECtrig_dalitz(0, &vtpConf.ec.inner.dalitz_min, &vtpConf.ec.inner.dalitz_max);
+    vtpConf.ec.inner.dalitz_min = vtpConf.ec.inner.dalitz_min/8;
+    vtpConf.ec.inner.dalitz_max = vtpConf.ec.inner.dalitz_max/8;
+    
+    vtpGetECtrig_emin(1, &vtpConf.ec.outer.hit_emin);
+    vtpGetECtrig_dt(1, &vtpConf.ec.outer.hit_dt);
+    vtpGetECcosmic_emin(1, &vtpConf.ec.outer.cosmic_emin);
+    vtpGetECcosmic_multmax(1, &vtpConf.ec.outer.cosmic_multmax);
+    vtpGetECcosmic_width(1, &vtpConf.ec.outer.cosmic_hitwidth);
+    vtpGetECcosmic_delay(1, &vtpConf.ec.outer.cosmic_evaldelay);
+    vtpGetECtrig_dalitz(1, &vtpConf.ec.outer.dalitz_min, &vtpConf.ec.outer.dalitz_max);
+    vtpConf.ec.outer.dalitz_min = vtpConf.ec.outer.dalitz_min/8;
+    vtpConf.ec.outer.dalitz_max = vtpConf.ec.outer.dalitz_max/8;
+  }
+
+  if(vtpConf.fw_type == VTP_FW_TYPE_PC)
+  {
+    // PC configuration
+    vtpGetFadcSum_MaskEn(vtpConf.pc.fadcsum_ch_en);
+    
+    vtpGetPCcosmic_emin(&vtpConf.pc.cosmic_emin);
+    vtpGetPCcosmic_multmax(&vtpConf.pc.cosmic_multmax);
+    vtpGetPCcosmic_width(&vtpConf.pc.cosmic_hitwidth);
+    vtpGetPCcosmic_delay(&vtpConf.pc.cosmic_evaldelay);
+    vtpGetPCcosmic_pixel(&vtpConf.pc.cosmic_pixelen);
+  }
+  
+  if(vtpConf.fw_type == VTP_FW_TYPE_PCS)
+  {
+    // PCS configuration
+    vtpGetPCS_thresholds(&vtpConf.pcs.threshold[0], &vtpConf.pcs.threshold[1], &vtpConf.pcs.threshold[2]);
+    vtpGetPCS_nframes(&vtpConf.pcs.nframes);
+    vtpGetPCS_dipfactor(&vtpConf.pcs.dipfactor);
+    vtpGetPCS_nstrip(&vtpConf.pcs.nstrip_min, &vtpConf.pcs.nstrip_max);
+    vtpGetPCS_dalitz(&vtpConf.pcs.dalitz_min, &vtpConf.pcs.dalitz_max);
+  }
+  
+  if(vtpConf.fw_type == VTP_FW_TYPE_ECS)
+  {
+    // ECS configuration
+    vtpGetECS_thresholds(&vtpConf.ecs.threshold[0], &vtpConf.ecs.threshold[1], &vtpConf.ecs.threshold[2]);
+    vtpGetECS_nframes(&vtpConf.ecs.nframes);
+    vtpGetECS_dipfactor(&vtpConf.ecs.dipfactor);
+    vtpGetECS_nstrip(&vtpConf.ecs.nstrip_min, &vtpConf.ecs.nstrip_max);
+    vtpGetECS_dalitz(&vtpConf.ecs.dalitz_min, &vtpConf.ecs.dalitz_max);
+  }
+  
+  if(vtpConf.fw_type == VTP_FW_TYPE_GT)
+  {
+    // GT configuration
+    vtpConf.gt.trig_latency = vtpGetGt_latency();
+    vtpConf.gt.trig_width = vtpGetGt_width();
+    
+    for(i=0; i<16; i++)
+    {
+      vtpGetGtTriggerBit(i,
+          &vtpConf.gt.trgbits[i].ssp_strigger_bit_mask,
+          &vtpConf.gt.trgbits[i].ssp_sector_mask,
+          &vtpConf.gt.trgbits[i].sector_mult_min,
+          &vtpConf.gt.trgbits[i].sector_coin_width,
+          &vtpConf.gt.trgbits[i].central_en
+        );
+    }
+  }
+  
+  if(vtpConf.fw_type == VTP_FW_TYPE_DC)
+  {
+    vtpGetDc_SegmentThresholdMin(0, &vtpConf.dc.dcsegfind_threshold[0]);
+    vtpGetDc_SegmentThresholdMin(1, &vtpConf.dc.dcsegfind_threshold[1]);
+  }
+  
+  if(vtpConf.fw_type == VTP_FW_TYPE_HCAL)
+  {
+    vtpGetHcal_ClusterCoincidence(&vtpConf.hcal.hit_dt);
+    vtpGetHcal_ClusterThreshold(&vtpConf.hcal.cluster_emin);
+  }
+
+  if(vtpConf.fw_type == VTP_FW_TYPE_FTCAL)
+  {
+    vtpGetFTCALseed_emin(&vtpConf.ftcal.seed_emin);
+    vtpGetFTCALseed_dt(&vtpConf.ftcal.seed_dt);
+  } 
+
+  if(length)
+  {
+    str = string;
+    str[0] = '\0';
+
+    sprintf(sss, "VTP_FIRMWAREVERSION %d\n", vtpConf.fw_rev); ADD_TO_STRING;
+    sprintf(sss, "VTP_FIRMWARETYPE %d\n", vtpConf.fw_type); ADD_TO_STRING;
+    sprintf(sss, "VTP_W_WIDTH %d\n",vtpConf.window_width); ADD_TO_STRING;
+    sprintf(sss, "VTP_W_OFFSET %d\n",vtpConf.window_offset); ADD_TO_STRING;
+    sprintf(sss, "VTP_PAYLOAD_EN %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+            (vtpConf.payload_en>>0)&0x1, (vtpConf.payload_en>>1)&0x1, (vtpConf.payload_en>>2)&0x1, (vtpConf.payload_en>>3)&0x1,
+            (vtpConf.payload_en>>4)&0x1, (vtpConf.payload_en>>5)&0x1, (vtpConf.payload_en>>6)&0x1, (vtpConf.payload_en>>7)&0x1,
+            (vtpConf.payload_en>>8)&0x1, (vtpConf.payload_en>>9)&0x1, (vtpConf.payload_en>>10)&0x1, (vtpConf.payload_en>>11)&0x1,
+            (vtpConf.payload_en>>12)&0x1, (vtpConf.payload_en>>13)&0x1, (vtpConf.payload_en>>14)&0x1, (vtpConf.payload_en>>15)&0x1
+           ); ADD_TO_STRING;
+    sprintf(sss, "VTP_FIBER_EN %d %d %d %d\n",
+            (vtpConf.fiber_en>>0)&0x1, (vtpConf.fiber_en>>1)&0x1, (vtpConf.fiber_en>>2)&0x1, (vtpConf.fiber_en>>3)&0x1); ADD_TO_STRING;
+
+    if(vtpConf.fw_type == VTP_FW_TYPE_EC)
+    {
+      sprintf(sss, "VTP_EC_FADCSUM_CH 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X\n",
+              vtpConf.ec.fadcsum_ch_en[0], vtpConf.ec.fadcsum_ch_en[1],
+              vtpConf.ec.fadcsum_ch_en[2], vtpConf.ec.fadcsum_ch_en[3],
+              vtpConf.ec.fadcsum_ch_en[4], vtpConf.ec.fadcsum_ch_en[5],
+              vtpConf.ec.fadcsum_ch_en[6], vtpConf.ec.fadcsum_ch_en[7]
+        ); ADD_TO_STRING;
+      
+      sprintf(sss, "VTP_ECINNER_HIT_EMIN %d\n", vtpConf.ec.inner.hit_emin); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECINNER_HIT_DT %d\n", vtpConf.ec.inner.hit_dt); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECINNER_COSMIC_EMIN %d\n", vtpConf.ec.inner.cosmic_emin); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECINNER_COSMIC_MULTMAX %d\n", vtpConf.ec.inner.cosmic_multmax); ADD_TO_STRING;      
+      sprintf(sss, "VTP_ECINNER_COSMIC_HITWIDTH %d\n", vtpConf.ec.inner.cosmic_hitwidth); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECINNER_COSMIC_EVALDELAY %d\n", vtpConf.ec.inner.cosmic_evaldelay); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECINNER_HIT_DALITZ %d %d\n", vtpConf.ec.inner.dalitz_min, vtpConf.ec.inner.dalitz_max); ADD_TO_STRING;
+      
+      sprintf(sss, "VTP_ECOUTER_HIT_EMIN %d\n", vtpConf.ec.outer.hit_emin); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECOUTER_HIT_DT %d\n", vtpConf.ec.outer.hit_dt); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECOUTER_COSMIC_EMIN %d\n", vtpConf.ec.outer.cosmic_emin); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECOUTER_COSMIC_MULTMAX %d\n", vtpConf.ec.outer.cosmic_multmax); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECOUTER_COSMIC_HITWIDTH %d\n", vtpConf.ec.outer.cosmic_hitwidth); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECOUTER_COSMIC_EVALDELAY %d\n", vtpConf.ec.outer.cosmic_evaldelay); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECOUTER_HIT_DALITZ %d %d\n", vtpConf.ec.outer.dalitz_min, vtpConf.ec.outer.dalitz_max); ADD_TO_STRING;
+    }
+    
+    if(vtpConf.fw_type == VTP_FW_TYPE_PC)
+    {
+      sprintf(sss, "VTP_PC_FADCSUM_CH 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X\n",
+              vtpConf.pc.fadcsum_ch_en[0], vtpConf.pc.fadcsum_ch_en[1],
+              vtpConf.pc.fadcsum_ch_en[2], vtpConf.pc.fadcsum_ch_en[3],
+              vtpConf.pc.fadcsum_ch_en[4], vtpConf.pc.fadcsum_ch_en[5],
+              vtpConf.pc.fadcsum_ch_en[6], vtpConf.pc.fadcsum_ch_en[7]
+        ); ADD_TO_STRING;
+      
+      sprintf(sss, "VTP_PC_COSMIC_EMIN %d\n", vtpConf.pc.cosmic_emin); ADD_TO_STRING;
+      sprintf(sss, "VTP_PC_COSMIC_MULTMAX %d\n", vtpConf.pc.cosmic_multmax); ADD_TO_STRING;      
+      sprintf(sss, "VTP_PC_COSMIC_HITWIDTH %d\n", vtpConf.pc.cosmic_hitwidth); ADD_TO_STRING;
+      sprintf(sss, "VTP_PC_COSMIC_EVALDELAY %d\n", vtpConf.pc.cosmic_evaldelay); ADD_TO_STRING;
+      sprintf(sss, "VTP_PC_COSMIC_PIXELEN %d\n", vtpConf.pc.cosmic_pixelen); ADD_TO_STRING;
+    }
+    
+    if(vtpConf.fw_type == VTP_FW_TYPE_PCS)
+    {
+      sprintf(sss, "VTP_PCS_THRESHOLDS %d %d %d\n", vtpConf.pcs.threshold[0], vtpConf.pcs.threshold[1], vtpConf.pcs.threshold[2]); ADD_TO_STRING;
+      sprintf(sss, "VTP_PCS_NFRAMES %d\n", vtpConf.pcs.nframes); ADD_TO_STRING;      
+      sprintf(sss, "VTP_PCS_DIPFACTOR %d\n", vtpConf.pcs.dipfactor); ADD_TO_STRING;
+      sprintf(sss, "VTP_PCS_NSTRIP %d %d\n", vtpConf.pcs.nstrip_min, vtpConf.pcs.nstrip_max); ADD_TO_STRING;
+      sprintf(sss, "VTP_PCS_DALITZ %d %d\n", vtpConf.pcs.dalitz_min, vtpConf.pcs.dalitz_max); ADD_TO_STRING;
+    }
+    
+    if(vtpConf.fw_type == VTP_FW_TYPE_ECS)
+    {
+      sprintf(sss, "VTP_ECS_THRESHOLDS %d %d %d\n", vtpConf.ecs.threshold[0], vtpConf.ecs.threshold[1], vtpConf.ecs.threshold[2]); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECS_NFRAMES %d\n", vtpConf.ecs.nframes); ADD_TO_STRING;      
+      sprintf(sss, "VTP_ECS_DIPFACTOR %d\n", vtpConf.ecs.dipfactor); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECS_NSTRIP %d %d\n", vtpConf.ecs.nstrip_min, vtpConf.ecs.nstrip_max); ADD_TO_STRING;
+      sprintf(sss, "VTP_ECS_DALITZ %d %d\n", vtpConf.ecs.dalitz_min, vtpConf.ecs.dalitz_max); ADD_TO_STRING;
+    }
+    
+    if(vtpConf.fw_type == VTP_FW_TYPE_GT)
+    {
+      sprintf(sss, "VTP_GT_LATENCY %d\n", vtpConf.gt.trig_latency); ADD_TO_STRING;
+      sprintf(sss, "VTP_GT_WIDTH %d\n", vtpConf.gt.trig_width); ADD_TO_STRING;
+      
+      for(i=0; i<16; i++)
+      {
+        sprintf(sss, "VTP_GT_TRGBIT %d %d %d %d %d %d\n", i,
+                vtpConf.gt.trgbits[i].ssp_strigger_bit_mask,
+                vtpConf.gt.trgbits[i].ssp_sector_mask,
+                vtpConf.gt.trgbits[i].sector_mult_min,
+                vtpConf.gt.trgbits[i].sector_coin_width,
+                vtpConf.gt.trgbits[i].central_en
+            ); ADD_TO_STRING;
+      }
+    }
+    
+    if(vtpConf.fw_type == VTP_FW_TYPE_DC)
+    {
+      sprintf(sss, "VTP_DC_SEGTHR 0 %d\n", vtpConf.dc.dcsegfind_threshold[0]); ADD_TO_STRING;
+      sprintf(sss, "VTP_DC_SEGTHR 1 %d\n", vtpConf.dc.dcsegfind_threshold[1]); ADD_TO_STRING;      
+    }
+    
+    if(vtpConf.fw_type == VTP_FW_TYPE_HCAL)
+    {
+      sprintf(sss, "VTP_HCAL_HIT_DT %d\n", vtpConf.hcal.hit_dt); ADD_TO_STRING;
+      sprintf(sss, "VTP_HCAL_HIT_EMIN %d\n", vtpConf.hcal.cluster_emin); ADD_TO_STRING;
+    }
+
+    if(vtpConf.fw_type == VTP_FW_TYPE_FTCAL)
+    {
+      sprintf(sss, "VTP_FTCAL_SEED_EMIN %d\n", vtpConf.ftcal.seed_emin); ADD_TO_STRING;
+      sprintf(sss, "VTP_FTCAL_SEED_DT %d\n", vtpConf.ftcal.seed_dt); ADD_TO_STRING;
+    }
+ 
+    CLOSE_STRING;
+  }
+  return(0);
+}
+
+int
+vtpUploadAllPrint()
+{
+  char str[16001];
+  vtpUploadAll(str, 16000);
+  printf("%s",str);
+  return 0;
+}
+
+void
+vtpMon()
+{
+  return;
+}

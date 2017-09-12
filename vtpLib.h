@@ -46,7 +46,11 @@ typedef struct EventBuilder_Struct
   /** 0x0008 */ volatile uint32_t LinkStatus;
   /** 0x000C */ volatile uint32_t TiStatus;
   /** 0x0010 */ volatile uint32_t EbCtrl;
-  /** 0x0014 */ BLANK[(0x100-0x14)/4];
+  /** 0x0014 */ volatile uint32_t EbStatus;
+  /** 0x0018 */ volatile uint32_t TiFifo;
+  /** 0x001C */ volatile uint32_t VtpFifo;
+  /** 0x0020 */ volatile uint32_t TestFifo;
+  /** 0x0024 */ BLANK[(0x100-0x24)/4];
 } EB_REGS;
 
 #define VTP_EB_LINKCTRL_FIFO_RST    (1<<3)
@@ -59,6 +63,7 @@ typedef struct EventBuilder_Struct
 #define VTP_EB_TICTRL_TI_BL_REQ   (1<<0)
 
 #define VTP_EB_LINKSTATUS_GCLK_PLL_LOCK     (1<<18)
+#define VTP_EB_LINKSTATYS_RX_LOCKED         (1<<17)
 #define VTP_EB_LINKSTATUS_RX_READY          (1<<16)
 #define VTP_EB_LINKSTATUS_RX_ERROR_CNT_MASK 0xFFFF
 
@@ -69,12 +74,35 @@ typedef struct EventBuilder_Struct
 #define VTP_EB_EBCTRL_BUILD_VTP  (1<<1)
 #define VTP_EB_EBCTRL_BUILD_TI   (1<<0)
 
+typedef struct AxiDma_Struct
+{
+  /** 0x0000 */ volatile uint32_t MM2S_DMACR;
+  /** 0x0004 */ volatile uint32_t MM2S_DMASR;
+  /** 0x0008 */ BLANK[(0x18-0x8)/4];
+  /** 0x0018 */ volatile uint32_t MM2S_SA;
+  /** 0x001C */ volatile uint32_t MM2S_SA_MSB;
+  /** 0x0020 */ BLANK[(0x28-0x20)/4];
+  /** 0x0028 */ volatile uint32_t MM2S_LENGTH;
+  /** 0x002C */ BLANK[(0x30-0x2C)/4];
+  /** 0x0030 */ volatile uint32_t S2MM_DMACR;
+  /** 0x0034 */ volatile uint32_t S2MM_DMASR;
+  /** 0x0038 */ BLANK[(0x48-0x38)/4];
+  /** 0x0048 */ volatile uint32_t S2MM_DA;
+  /** 0x004C */ volatile uint32_t S2MM_DA_MSB;
+  /** 0x0050 */ BLANK[(0x58-0x50)/4];
+  /** 0x0058 */ volatile uint32_t S2MM_LENGTH;
+  /** 0x005C */ BLANK[(0x1000-0x5C)/4];
+} AXI_DMA_REGS;
+
 typedef struct V7Clk_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
   /** 0x0004 */ volatile uint32_t Status;
-  /** 0x0008 */ BLANK[(0x100-0x8)/4];
-} V7CLK_REGS;
+  /** 0x0008 */ volatile uint32_t FW_Version;
+  /** 0x000C */ BLANK[(0x10-0xC)/4];
+  /** 0x0010 */ volatile uint32_t FW_Type;
+  /** 0x0014 */ BLANK[(0x100-0x14)/4];
+} V7CLK_REGS; /* must be 256 bytes */
 
 #define VTP_V7CLK_CTRL_GCLK_RESET    (1<<0)
 #define VTP_V7CLK_STATUS_GCLK_LOCKED (1<<0)
@@ -98,7 +126,12 @@ typedef struct SD_Struct
   /** 0x0064 */ volatile uint32_t Trig1Status;
   /** 0x0068 */ volatile uint32_t Trig2Status;
   /** 0x006C */ volatile uint32_t SyncStatus;
-  /** 0x0070 */ BLANK[(0x100-0x70)/4];
+  /** 0x0070 */ volatile uint32_t Scaler_BusClk;
+  /** 0x0074 */ volatile uint32_t Scaler_Sync;
+  /** 0x0078 */ volatile uint32_t Scaler_Trig1;
+  /** 0x007C */ volatile uint32_t Scaler_Trig2;
+  /** 0x0080 */ volatile uint32_t Scaler_Trigger[16];
+  /** 0x00C0 */ BLANK[(0x100-0xC0)/4];
 } SD_REGS;
 
 #define VTP_SD_CTRL_FPB_OEN  (1<<1)
@@ -129,23 +162,46 @@ typedef struct SD_Struct
 typedef struct FadcDecoder_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
-  /** 0x0004 */ BLANK[(0x20-0x4)/4];
-  /** 0x0020 */ volatile uint32_t Latency[16];
-  /** 0x0060 */ BLANK[(0x100-0x60)/4];
+  /** 0x0004 */ BLANK[(0x100-0x4)/4];
 } FADCDECODER_REGS;
 
 #define VTP_FADCDECODER_CTRL_PP_EN(x)  (1<<(x-1))
 
 #define VTP_FADCDECODER_LATENCY_MASK   0xFFFF
 
+typedef struct SspDecoder_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x100-0x4)/4];
+} SSPDECODER_REGS;
+
+typedef struct DcrbDecoder_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x100-0x4)/4];
+} DCRBDECODER_REGS;
+
+#define VTP_FTCALDECODER_CTRL_PP_EN(x)    (1<<(x-1))
+#define VTP_FTCALDECODER_CTRL_FIBER_EN(x) (1<<(x+16))
+
+typedef struct FtcalDecoder_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x100-0x4)/4];
+} FTCALDECODER_REGS;
+
 /* Same struct for VXS and QSFP */
 typedef struct Serdes_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
-  /** 0x0004 */ volatile uint32_t Status;
-  /** 0x0008 */ volatile uint32_t DrpCtrl;
-  /** 0x000C */ volatile uint32_t DrpStatus;
-  /** 0x0010 */ BLANK[(0x100-0x10)/4];
+  /** 0x0004 */ volatile uint32_t DrpCtrl;
+  /** 0x0008 */ volatile uint32_t TrxCtrl;
+  /** 0x000C */ BLANK[(0x10-0xC)/4];
+  /** 0x0010 */ volatile uint32_t Status;
+  /** 0x0014 */ volatile uint32_t DrpStatus;
+  /** 0x0018 */ BLANK[(0x34-0x18)/4];
+  /** 0x0034 */ volatile uint32_t Latency;
+  /** 0x0038 */ BLANK[(0x100-0x38)/4];
 } SERDES_REGS;
 
 #define VTP_SERDES_CTRL_ER_CNT_RST    (1<<9)
@@ -162,15 +218,9 @@ typedef struct Serdes_Struct
 #define VTP_SERDES_LOOPBACK_FAREEND_PMA  4
 #define VTP_SERDES_LOOPBACK_FAREND_PCS   6
 
-#define VTP_SERDES_STATUS_LINK_RST          (1<<21)
-#define VTP_SERDES_STATUS_RX_RST_DONE       (1<<20)
-#define VTP_SERDES_STATUS_TX_RST_DONE       (1<<19)
-#define VTP_SERDES_STATUS_TX_LOCK           (1<<18)
-#define VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK 0xFF00
-#define VTP_SERDES_STATUS_CHUP              (1<<6)
-#define VTP_SERDES_STATUS_LANE_UP(x)        (1<<(x+2))
-#define VTP_SERDES_STATUS_SOFT_ERR          (1<<1)
-#define VTP_SERDES_STATUS_HARD_ERR          (1<<0)
+#define VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK 0xFF000000
+#define VTP_SERDES_STATUS_CHUP              (1<<0)
+#define VTP_SERDES_STATUS_LANE_UP(x)        (1<<(x+1))
 
 #define VTP_SERDES_DRP_CTRL_EN3       (1<<29)
 #define VTP_SERDES_DRP_CTRL_EN2       (1<<28)
@@ -188,13 +238,104 @@ typedef struct Serdes_Struct
 
 typedef struct ECTrigger_Struct
 {
-  /** 0x0000 */ volatile uint32_t Ctrl;
-  /** 0x0004 */ BLANK[(0x100-0x4)/4];
+  /** 0x0000 */ volatile uint32_t Hit;
+  /** 0x0004 */ volatile uint32_t Dalitz;
+  /** 0x0008 */ BLANK[(0x010-0x8)/4];
+  /** 0x0010 */ volatile uint32_t HistCtrl;
+  /** 0x0014 */ volatile uint32_t HistTime;
+  /** 0x0018 */ volatile uint32_t HistPeakPosition;
+  /** 0x001C */ volatile uint32_t HistClusterPosition;
+  /** 0x0020 */ volatile uint32_t HistClusterEnergy;
+  /** 0x0024 */ volatile uint32_t HistClusterDalitz;
+  /** 0x0028 */ volatile uint32_t HistClusterLatency;
+  /** 0x002C */ BLANK[(0x100-0x2C)/4];
 } ECTRIGGER_REGS;
 
-#define VTP_ECTRIGGER_CTRL_TCOIL_MASK      0x00F00000
-#define VTP_ECTRIGGER_CTRL_DALITZ_MAX_MASK 0x000FFC00
+#define VTP_ECTRIGGER_CTRL_EMIN_MASK       0x00001FFF
+#define VTP_ECTRIGGER_CTRL_TCOIN_MASK      0x000F0000
+#define VTP_ECTRIGGER_CTRL_DALITZ_MAX_MASK 0x03FF0000
 #define VTP_ECTRIGGER_CTRL_DALITZ_MIN_MASK 0x000003FF
+
+typedef struct FadcSum_Struct
+{
+  /** 0x0000 */ volatile uint32_t SumEn[8];
+  /** 0x0020 */ BLANK[(0x100-0x020)/4];
+} FADCSUM_REGS;
+
+typedef struct ECCosmic_Struct
+{
+ /** 0x0000 */ volatile uint32_t Ctrl;
+ /** 0x0004 */ volatile uint32_t Delay;
+ /** 0x0008 */ BLANK[(0x100-0x008)/4];
+} ECCOSMIC_REGS;
+
+#define VTP_ECCOSMIC_CTRL_EMIN_MASK      0x00001FFF
+#define VTP_ECCOSMIC_CTRL_MULTMAX_MASK   0x3F000000
+
+#define VTP_ECCOSMIC_DELAY_WIDTH_MASK    0x000000FF
+#define VTP_ECCOSMIC_DELAY_EVAL_MASK     0x00FF0000
+
+typedef struct PCCosmic_Struct
+{
+ /** 0x0000 */ volatile uint32_t Ctrl;
+ /** 0x0004 */ volatile uint32_t Delay;
+ /** 0x0008 */ BLANK[(0x100-0x008)/4];
+} PCCOSMIC_REGS;
+
+#define VTP_PCCOSMIC_CTRL_EMIN_MASK      0x00001FFF
+#define VTP_PCCOSMIC_CTRL_MULTMAX_MASK   0x3F000000
+#define VTP_PCCOSMIC_CTRL_PIXEL_MASK     0x00010000
+#define VTP_PCCOSMIC_DELAY_WIDTH_MASK    0x000000FF
+#define VTP_PCCOSMIC_DELAY_EVAL_MASK     0x00FF0000
+
+
+typedef struct PCSTrigger_Struct
+{
+ /** 0x0000 */ volatile uint32_t Thresholds[3];
+ /** 0x000C */ volatile uint32_t NFrames;
+ /** 0x0010 */ volatile uint32_t Dipfactor;
+ /** 0x0014 */ volatile uint32_t DalitzMin;
+ /** 0x0018 */ volatile uint32_t DalitzMax;
+ /** 0x001C */ volatile uint32_t NstripMax;
+ /** 0x0020 */ BLANK[(0x080-0x020)/4];
+ /** 0x0080 */ volatile uint32_t ScalerPeakU;
+ /** 0x0084 */ volatile uint32_t ScalerPeakV;
+ /** 0x0088 */ volatile uint32_t ScalerPeakW;
+ /** 0x008c */ volatile uint32_t ScalerHit;
+ /** 0x0090 */ BLANK[(0x100-0x090)/4];
+} PCSTRIGGER_REGS;
+
+
+typedef struct ECSTrigger_Struct
+{
+ /** 0x0000 */ volatile uint32_t Thresholds[3];
+ /** 0x000C */ volatile uint32_t NFrames;
+ /** 0x0010 */ volatile uint32_t Dipfactor;
+ /** 0x0014 */ volatile uint32_t DalitzMin;
+ /** 0x0018 */ volatile uint32_t DalitzMax;
+ /** 0x001C */ volatile uint32_t NstripMax;
+ /** 0x0020 */ BLANK[(0x080-0x020)/4];
+ /** 0x0080 */ volatile uint32_t ScalerPeakU;
+ /** 0x0084 */ volatile uint32_t ScalerPeakV;
+ /** 0x0088 */ volatile uint32_t ScalerPeakW;
+ /** 0x008c */ volatile uint32_t ScalerHit;
+ /** 0x0090 */ BLANK[(0x100-0x090)/4];
+} ECSTRIGGER_REGS;
+
+#define VTP_FTCAL_CTRL_SEEDTHR_MASK   0x00001FFF
+#define VTP_FTCAL_CTRL_SEEDDT_MASK    0x00070000
+
+typedef struct FTCALTrigger_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x100-0x004)/4];
+} FTCALTRIGGER_REGS;
+
+typedef struct DcrbSegment_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x100-0x004)/4];
+} DCRBSEGFIND_REGS;
 
 typedef struct Trigger_Output_Struct
 {
@@ -226,8 +367,28 @@ typedef struct V7_Event_Builder_Struct
 
 #define VTP_V7_EB_WINDOW_MASK     0x07FF
 
+typedef struct GtBit_Struct
+{
+  /** 0x0000 */ volatile uint32_t STrigger;
+  /** 0x0004 */ BLANK[(0x80-0x4)/4];
+} GTBIT_REGS;
+
+#define VTP_V7_HCAL_CTRL_MASK         0xFFFF
+#define VTP_V7_HCAL_CLPULSECOIN_MASK  0x0007
+#define VTP_V7_HCAL_CLPULSETHR_MASK   0x1FFF
+
+typedef struct Hcal_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t ClusterPulseCoincidence;
+  /** 0x0008 */ volatile uint32_t ClusterPulseThreshold;
+  /** 0x000C */ BLANK[(0x100-0x0C)/4];
+} HCAL_REGS;
+
 typedef struct v7_bridge_struct
 {
+  /* almost all 256 bytes */
+
   /** 0x43C10000 */ BLANK[0x100/4];
 
   /** 0x43C10100 */ V7CLK_REGS clk;
@@ -235,8 +396,14 @@ typedef struct v7_bridge_struct
   /** 0x43C10200 */ SD_REGS sd;
 
   /** 0x43C10300 */ FADCDECODER_REGS fadcDec;
+  
+  /** 0x43C10400 */ SSPDECODER_REGS sspDec;
 
-  /** 0x43C10400 */ BLANK[(0x1000 - 0x400)/4];
+  /** 0x43C10500 */ DCRBDECODER_REGS dcrbDec;
+  
+  /** 0x43C10600 */ FTCALDECODER_REGS ftcalDec;
+
+  /** 0x43C10700 */ BLANK[(0x1000 - 0x700)/4];
 
   /** 0x43C11000 */ SERDES_REGS vxs[16];
 
@@ -246,13 +413,35 @@ typedef struct v7_bridge_struct
 
   /** 0x43C14100 */ ECTRIGGER_REGS ecTrigger[2];
 
-  /** 0x43C14300 */ BLANK[(0x5000 - 0x4300)/4];
+  /** 0x43C14300 */ FADCSUM_REGS fadcSum;
+  
+  /** 0x43C14400 */ DCRBSEGFIND_REGS dcrbSegFind[2];
+  
+  /** 0x43C14600 */ ECCOSMIC_REGS ecCosmic[2];
 
+  /** 0x43C14800 */ HCAL_REGS hcal;
+  
+  /** 0x43C14900 */ BLANK[(0x4A00 - 0x4900)/4];
+  
+  /** 0x43C14A00 */ PCCOSMIC_REGS pcCosmic;
+  
+  /** 0x43C14B00 */ FTCALTRIGGER_REGS ftcalTrigger;
+  
+  /** 0x43C14C00 */ PCSTRIGGER_REGS pcsTrigger;
+
+  /** 0x43C14D00 */ ECSTRIGGER_REGS ecsTrigger;
+
+  /** 0x43C14E00 */ BLANK[(0x5000 - 0x4E00)/4];
+  
   /** 0x43C15000 */ TRIGGER_OUTPUT_REGS trigOut;
 
   /** 0x43C15100 */ V7_EB_REGS eb;
 
-  /** 0x43C15200 */ BLANK[(0xFFF4 - 0x5200)/4];
+  /** 0x43C15200 */ BLANK[(0x6000 - 0x5200)/4];
+
+  /** 0x43C16000 */ GTBIT_REGS gtBit[16]; /* 128 bytes */
+  
+  /** 0x43C16800 */ BLANK[(0xFFF4 - 0x6800)/4];
   
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
@@ -274,7 +463,9 @@ typedef struct v7_bridge_struct
 typedef struct zync_reg_struct
 {
   /** 0x43C00000 */ EB_REGS eb;
-  /** 0x43C00100 */ BLANK[(0x10000-0x100)/4];
+  /** 0x43C00100 */ BLANK[(0x1000-0x100)/4];
+  /** 0x43C01000 */ AXI_DMA_REGS dma;
+  /** 0x43C02000 */ BLANK[(0x10000-0x2000)/4];
   /** 0x43C10000 */ V7_REGS v7;
 } ZYNC_REGS;
 
@@ -286,18 +477,11 @@ typedef struct zync_reg_struct
 /* Routine prototypes */
 int  vtpCheckAddresses();
 
-int  vtpVXSSerdesSetLoopback(uint16_t pp, uint8_t lb_select);
-int  vtpVXSSerdesSoftErrorReset(uint16_t pp, int enable);
-int  vtpVXSSerdesPower(uint16_t pp, int enable);
-int  vtpVXSSerdesGTReset(uint16_t pp, int enable);
-int  vtpVXSSerdesReset(uint16_t pp, int enable);
-int  vtpVXSSerdesStatus(uint16_t pp, int pflag);
-int  vtpQSFPSerdesSetLoopback(uint16_t qsfp, uint8_t lb_select);
-int  vtpQSFPSerdesSoftErrorReset(uint16_t qsfp, int enable);
-int  vtpQSFPSerdesPower(uint16_t qsfp, int enable);
-int  vtpQSFPSerdesGTReset(uint16_t qsfp, int enable);
-int  vtpQSFPSerdesReset(uint16_t qsfp, int enable);
-int  vtpQSFPSerdesStatus(uint16_t qsfp, int pflag);
+int  vtpSerdesStatus(int type, uint16_t pp, int pflag);
+int  vtpSerdesEnable(int type, uint16_t idx, int enable);
+int  vtpSerdesStatusAll();
+int  vtpSerdesCheckLinks();
+
 int  vtpV7PllReset(int enable);
 
 int  vtpV7CtrlInit();
@@ -319,11 +503,113 @@ int  vtpClose(int dev_mask);
 
 unsigned int vtpRead32(volatile unsigned int *addr);
 int  vtpWrite32(volatile unsigned int *addr, unsigned int val);
+
+// VTP_FW_TYPE_EC functions
+int  vtpPrintHist_ClusterPosition(int inst);
+int  vtpPrintHist_PeakPosition(int inst);
+int  vtpSetECtrig_dalitz(int inst, int min, int max);
+int  vtpSetECtrig_emin(int inst, int emin);
+int  vtpSetECtrig_dt(int inst, int dt);
+int  vtpGetECtrig_dt(int inst, int *dt);
+int  vtpGetECtrig_emin(int inst, int *emin);
+int  vtpGetECtrig_dalitz(int inst, int *min, int *max);
+int  vtpGetECtrig_peak_multmax(int inst, int *mult_max);
+int  vtpSetFadcSum_MaskEn(unsigned int mask[8]);
+int  vtpGetFadcSum_MaskEn(unsigned int mask[8]);
+int  vtpSetECcosmic_emin(int inst, int emin);
+int  vtpGetECcosmic_emin(int inst, int *emin);
+int  vtpSetECcosmic_multmax(int inst, int mult_max);
+int  vtpGetECcosmic_multmax(int inst, int *mult_max);
+int  vtpSetECcosmic_width(int inst, int hitwidth);
+int  vtpGetECcosmic_width(int inst, int *hitwidth);
+int  vtpSetECcosmic_delay(int inst, int evaldelay);
+int  vtpGetECcosmic_delay(int inst, int *evaldelay);
+
+// VTP_FW_TYPE_PC functions
+//int  vtpSetFadcSum_MaskEn(unsigned int mask[8]);
+//int  vtpGetFadcSum_MaskEn(unsigned int mask[8]);
+int  vtpSetPCcosmic_emin(int emin);
+int  vtpGetPCcosmic_emin(int *emin);
+int  vtpSetPCcosmic_multmax(int mult_max);
+int  vtpGetPCcosmic_multmax(int *mult_max);
+int  vtpSetPCcosmic_width(int hitwidth);
+int  vtpGetPCcosmic_width(int *hitwidth);
+int  vtpSetPCcosmic_delay(int evaldelay);
+int  vtpGetPCcosmic_delay(int *evaldelay);
+int  vtpSetPCcosmic_pixel(int enable);
+int  vtpGetPCcosmic_pixel(int *enable);
+
+// VTP_FW_TYPE_PCS functions
+int  vtpSetPCS_thresholds(int thr0, int thr1, int thr2);
+int  vtpGetPCS_thresholds(int *thr0, int *thr1, int *thr2);
+int  vtpSetPCS_nframes(int nframes);
+int  vtpGetPCS_nframes(int *nframes);
+int  vtpSetPCS_dipfactor(int dipfactor);
+int  vtpGetPCS_dipfactor(int *dipfactor);
+int  vtpSetPCS_nstrip(int nstripmin, int nstripmax);
+int  vtpGetPCS_nstrip(int *nstripmin, int *nstripmax);
+int  vtpSetPCS_dalitz(int dalitz_min, int dalitz_max);
+int  vtpGetPCS_dalitz(int *dalitz_min, int *dalitz_max);
+int  vtpPcsPrintScalers();
+
+// VTP_FW_TYPE_ECS functions
+int  vtpSetECS_thresholds(int thr0, int thr1, int thr2);
+int  vtpGetECS_thresholds(int *thr0, int *thr1, int *thr2);
+int  vtpSetECS_nframes(int nframes);
+int  vtpGetECS_nframes(int *nframes);
+int  vtpSetECS_dipfactor(int dipfactor);
+int  vtpGetECS_dipfactor(int *dipfactor);
+int  vtpSetECS_nstrip(int nstripmin, int nstripmax);
+int  vtpGetECS_nstrip(int *nstripmin, int *nstripmax);
+int  vtpSetECS_dalitz(int dalitz_min, int dalitz_max);
+int  vtpGetECS_dalitz(int *dalitz_min, int *dalitz_max);
+int  vtpEcsPrintScalers();
+
+// VTP_FW_TYPE_GT functions
+int  vtpSetGt_latency(int latency);
+int  vtpGetGt_latency();
+int  vtpSetGt_width(int width);
+int  vtpGetGt_width();
+int  vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int central_en);
+int  vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *central_en);
+
+// VTP_FW_TYPE_DC functions
+int  vtpSetDc_SegmentThresholdMin(int inst, int threshold);
+int  vtpGetDc_SegmentThresholdMin(int inst, int *threshold);
+
+// VTP_FW_TYPE_HCAL functions
+int  vtpSetHcal_ClusterCoincidence(int coin);
+int  vtpGetHcal_ClusterCoincidence(int *coin);
+int  vtpSetHcal_ClusterThreshold(int thr);
+int  vtpGetHcal_ClusterThreshold(int *thr);
+
+// VTP_FW_TYPE_FTCAL functions
+int  vtpSetFTCALseed_emin(int emin);
+int  vtpGetFTCALseed_emin(int *emin);
+int  vtpSetFTCALseed_dt(int dt);
+int  vtpGetFTCALseed_dt(int *dt);
+
+// VTP_FW_TYPE_COMMON functions
 int  vtpReadScalers(volatile unsigned int *data, int max_scalers);
-int  vtpVXSSerdesStatusAll();
 int  vtpSetTrig1Source(int src);
 int  vtpSetSyncSource(int src);
 int  vtpEnableTriggerPayloadMask(int pp_mask);
+int  vtpEnableTriggerFiberMask(int fiber_mask);
+int  vtpGetWindowWidth();
+int  vtpGetWindowLookback();
+int  vtpGetTriggerPayloadMask();
+int  vtpGetTriggerFiberMask();
+int  vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize);
+int  vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize);
+int  vtpEbDecodeEvent(uint32_t *pBuf, uint32_t size);
+int  vtpEbReadAndDecodeEvent();
+int  vtpSetWindow(int, int);
+int  vtpTiLinkInit();
+int  vtpEbResetFifo();
+int  vtpSetBlockLevel(int level);
+int  vtpTiLinkGetBlockLevel(int print);
+int  vtpTiAck(int clearsync);
+
 
 #define VTP_INIT_CLK_MASK            0x0000000F
 #define VTP_INIT_CLK_INT             (1<<0)
@@ -331,7 +617,21 @@ int  vtpEnableTriggerPayloadMask(int pp_mask);
 #define VTP_INIT_SKIP                (1<<16)
 #define VTP_INIT_SKIP_FIRMWARE_CHECK (1<<18)
 
-int  vtpInit(int iFlag);
+#define VTP_FW_TYPE_COMMON            0
+#define VTP_FW_TYPE_EC                1
+#define VTP_FW_TYPE_GT                2
+#define VTP_FW_TYPE_DC                3
+#define VTP_FW_TYPE_HCAL              4
+#define VTP_FW_TYPE_PC                5
+#define VTP_FW_TYPE_PCS               6
+#define VTP_FW_TYPE_HTCC              7
+#define VTP_FW_TYPE_ECS               8
+#define VTP_FW_TYPE_FTCAL             9
+#define VTP_FW_TYPE_FTHODO            10
 
+int  vtpInit(int iFlag);
+int  vtpBReady();
+int  vtpV7GetFW_Version();
+int  vtpV7GetFW_Type();
 
 #endif /* VTPLIB_H */

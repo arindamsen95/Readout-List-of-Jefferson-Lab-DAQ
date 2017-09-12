@@ -4,40 +4,39 @@
 #include <string.h>
 #include "vtpLib.h"
 
-#define I2C_BUS                  1
+#define I2C_BUS                             1
 
-
-#define LTM4676_CMD_PAGE		0x00
-#define LTM4676_CMD_READ_VOUT_MODE	0x20
-#define LTM4676_CMD_READ_VIN		0x88
-#define LTM4676_CMD_READ_VOUT		0x8B
-#define LTM4676_CMD_READ_IIN		0x89
-#define LTM4676_CMD_READ_IIN_CH	        0xED
-#define LTM4676_CMD_READ_IOUT		0x8C
-#define LTM4676_CMD_READ_TEMP1	        0x8D
-#define LTM4676_CMD_READ_TEMP2	        0x8E
-#define LTM4676_CMD_READ_POUT		0x96
-#define LTM4676_CMD_READ_MFG		0x99
-#define LTM4676_CMD_READ_MODEL	        0x9A
+#define LTM4676_CMD_PAGE                    0x00
+#define LTM4676_CMD_READ_VOUT_MODE          0x20
+#define LTM4676_CMD_READ_VIN                0x88
+#define LTM4676_CMD_READ_VOUT               0x8B
+#define LTM4676_CMD_READ_IIN                0x89
+#define LTM4676_CMD_READ_IIN_CH             0xED
+#define LTM4676_CMD_READ_IOUT               0x8C
+#define LTM4676_CMD_READ_TEMP1              0x8D
+#define LTM4676_CMD_READ_TEMP2              0x8E
+#define LTM4676_CMD_READ_POUT               0x96
+#define LTM4676_CMD_READ_MFG                0x99
+#define LTM4676_CMD_READ_MODEL              0x9A
 
 #define LTM4676_CMD_VOUT_OV_FAULT_RESPONSE  0x41
 #define LTM4676_CMD_VOUT_UV_FAULT_RESPONSE  0x45
 
-#define LTM4674_CMD_STATUS_BYTE         0x78
-#define LTM4674_CMD_STATUS_WORD         0x78
-#define LTM4676_CMD_STATUS_VOUT         0x7A
-#define LTM4676_CMD_STATUS_IOUT         0x7B
+#define LTM4674_CMD_STATUS_BYTE             0x78
+#define LTM4674_CMD_STATUS_WORD             0x78
+#define LTM4676_CMD_STATUS_VOUT             0x7A
+#define LTM4676_CMD_STATUS_IOUT             0x7B
 
-#define LTM4676_1_I2C_SLAVEADDR	0x40
-#define LTM4676_2_I2C_SLAVEADDR	0x4D
-#define LTM4676_3_I2C_SLAVEADDR	0x4E
-#define LTM4676_4_I2C_SLAVEADDR	0x4F
+#define LTM4676_1_I2C_SLAVEADDR             0x40
+#define LTM4676_2_I2C_SLAVEADDR             0x4D
+#define LTM4676_3_I2C_SLAVEADDR             0x4E
+#define LTM4676_4_I2C_SLAVEADDR             0x4F
 
 unsigned char LTM4676_ADDR[] = {
-  LTM4676_1_I2C_SLAVEADDR,	// LTM4676A: Ch0:     +1.2V (MGT_AVTT), Ch1: +2.2V
-  LTM4676_2_I2C_SLAVEADDR,	// LTM4676A: Ch0+Ch1: +1.0V (MGT_AVCC)
-  LTM4676_3_I2C_SLAVEADDR,	// LTM4676A: Ch0+Ch1: +1.0V (VCCINT)
-  LTM4676_4_I2C_SLAVEADDR		// LTM4676A: Ch0:     +3.3V,            Ch1: +1.5V (VDD_DDR)
+  LTM4676_1_I2C_SLAVEADDR,  // LTM4676A: Ch0:     +1.2V (MGT_AVTT), Ch1: +2.2V
+  LTM4676_2_I2C_SLAVEADDR,  // LTM4676A: Ch0+Ch1: +1.0V (MGT_AVCC)
+  LTM4676_3_I2C_SLAVEADDR,  // LTM4676A: Ch0+Ch1: +1.0V (VCCINT)
+  LTM4676_4_I2C_SLAVEADDR   // LTM4676A: Ch0:     +3.3V,            Ch1: +1.5V (VDD_DDR)
 };
 
 const char *rail[] = {
@@ -54,7 +53,7 @@ const char *rail[] = {
 void exit_error(const char *func, int retval)
 {
   printf("  from %s errno = %d\n",
-	 func, retval);
+   func, retval);
 }
 
 void ltm4676_select_slave(int slaveAddr)
@@ -111,7 +110,7 @@ unsigned short ltm4676_read_word(unsigned char slaveAddr, int page, unsigned cha
     ltm4676_set_page(page);
 
   if((rval = vtpI2CRead16(I2C_BUS, cmd)) < 0)
-    exit_error(__func__, 1);	
+    exit_error(__func__, 1);  
 
   return (rval & 0xFFFF);
 }
@@ -126,7 +125,7 @@ void ltm4676_read_block(unsigned char slaveAddr, int page, unsigned char cmd, un
     ltm4676_set_page(page);
 
   if((rval = vtpI2CReadBlock(I2C_BUS, cmd, buf)) < 0)
-    exit_error(__func__, 1);	
+    exit_error(__func__, 1);  
 }
 
 float get_L11(unsigned short v)
@@ -134,11 +133,11 @@ float get_L11(unsigned short v)
   int N, Y;
   float result;
 
-  if(v & 0x8000)	N = ((v>>11) & 0x1F) | 0xFFFFFFE0;
-  else			N = ((v>>11) & 0x1F);
+  if(v & 0x8000)  N = ((v>>11) & 0x1F) | 0xFFFFFFE0;
+  else      N = ((v>>11) & 0x1F);
 
-  if(v & 0x0400)	Y = ((v>>0) & 0x7FF) | 0xFFFFF800;
-  else			Y = ((v>>0) & 0x7FF);
+  if(v & 0x0400)  Y = ((v>>0) & 0x7FF) | 0xFFFFF800;
+  else      Y = ((v>>0) & 0x7FF);
 
   result = (float)Y * powf(2.0, (float)N);
 
@@ -274,10 +273,8 @@ void ltm4676_print_status()
         unsigned char status_vout = get_status_vout(i, ch);
         unsigned char status_iout = get_status_iout(i, ch);
         
-        printf("      %s: VOUT = %5.3fV, IOUT = %5.3fA, TEMP = %5.3fC, IIN = %5.3fA, POWER = %5.3fW\n", rail[2*i+0],
-            get_vout_ch(i,0), get_iout_ch(i,0), get_temp_ch(i,0), get_iin_ch(i,0), get_power_ch(i,0));
-        printf("      %s: VOUT = %5.3fV, IOUT = %5.3fA, TEMP = %5.3fC, IIN = %5.3fA, POWER = %5.3fW\n",rail[2*i+1],
-            get_vout_ch(i,1), get_iout_ch(i,1), get_temp_ch(i,1), get_iin_ch(i,1), get_power_ch(i,1));
+        printf("      %s: VOUT = %5.3fV, IOUT = %5.3fA, TEMP = %5.3fC, IIN = %5.3fA, POWER = %5.3fW\n", rail[2*i+ch],
+            get_vout_ch(i,ch), get_iout_ch(i,ch), get_temp_ch(i,ch), get_iin_ch(i,ch), get_power_ch(i,ch));
             
         printf("          STATUS WORD (fault source): 0x%04X\n", status_word);
         if(status_word & 0x8000) printf("          VOUT\n");
@@ -344,9 +341,15 @@ void ltm4676_setup()
     for(ch = 0; ch < 2; ch++)
     {
       if( (i == 0) && (ch == 1) ) // 2.2v output
+      {
         ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x45, 0); // VOUT UV ignore fault
+        ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x41, 0); // VOUT OV ignore fault
+      }
       else
-        ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x45, 0xB8); // VOUT UV reset on fault
+      {
+//        ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x45, 0xB8); // VOUT UV reset on fault
+//        ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x41, 0x7A); // VOUT OV reset on fault
+      }
     }
   }
   
@@ -379,7 +382,7 @@ int main()
       goto CLOSE;
     }
 
-//ltm4676_setup();
+  ltm4676_setup();
     
   ltm4676_print_status();
 

@@ -27,7 +27,7 @@ clean:
 
 %: %.c
 	@echo "Building $@ from $<"
-	$(CC) $(CFLAGS) -o $@ $(@:%=%.c) -lrt -lvtp
+	$(CC) $(CFLAGS) -o $@ $(@:%=%.c) -lrt -lvtp -li2c
 
 %.d: %.c
 	@echo ""
