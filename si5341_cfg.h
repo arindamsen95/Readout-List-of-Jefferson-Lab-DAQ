@@ -1,8 +1,10 @@
 #ifndef __SI5341_CFG_H
 #define __SI5341_CFG_H
 
-#define SI5341_IN_SEL_VXS     1
-#define SI5341_IN_SEL_LOCAL   3
+#define SI5341_IN_SEL_VXS         0
+#define SI5341_IN_SEL_VXS_250     1
+#define SI5341_IN_SEL_VXS_125     2
+#define SI5341_IN_SEL_LOCAL       3
 
 void si5341_softReset();
 void si5341_hardReset();

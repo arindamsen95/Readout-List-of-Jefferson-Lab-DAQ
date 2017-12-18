@@ -19,9 +19,9 @@ AR                      = ar
 RANLIB                  = ranlib
 INCS			= -I. -I${VTPLIB_PATH} -I/usr/local/include
 CFLAGS			= -Wall -g ${INCS} \
-			  -L. -L${VTPLIB_PATH} -lrt -lvtp -li2c -lm
+			   -L/usr/local/lib -L. -L${VTPLIB_PATH} -lrt -lvtp -li2c -lm
 
-PROGS			= vtpLibTest i2cvtpmon vtpSPItest vtpI2Ctest
+PROGS			= vtpLibTest i2cvtpmon vtpSPItest vtpI2Ctest vtpDmaTest i2cvtpsetup vtpConfigTest vtpStatus
 SRC			= $(PROGS:%=%.c)
 DEPS			= $(SRC:%.c=%.d)
 

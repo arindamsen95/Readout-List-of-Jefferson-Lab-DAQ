@@ -1,0 +1,11 @@
+[Unit]
+Description=Zync FPGA Firmware Loading Service
+Wants=daqfs.mount
+After=daqfs.mount
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /daqfs/home/moffit/work/vtp/vtp/systemd/z7_fpga_load.sh
+
+[Install]
+WantedBy=multi-user.target

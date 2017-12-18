@@ -106,6 +106,24 @@ vtpI2CSelectSlave(int id, uint8_t slaveAddr)
   return OK;
 }
 
+int
+vtpI2CWriteCmd(int id, uint8_t cmd)
+{
+  int lerrno = 0;
+
+  CHECKI2CID(id);
+
+  if(i2c_smbus_write_byte(vtpI2CFD[id], cmd) < 0)
+    {
+      lerrno = errno;
+      printf("%s(%d, 0x%x): i2c write byte ERROR %d: %s\n", __func__,
+       id, cmd,
+       lerrno, strerror(lerrno));
+      return ERROR;
+    }
+
+  return OK;
+}
 
 uint8_t
 vtpI2CRead8(int id, uint8_t cmd)

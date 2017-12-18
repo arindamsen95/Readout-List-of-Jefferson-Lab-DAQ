@@ -24,17 +24,20 @@ KERNEL_VERSION=${shell uname -r}
 CC			= gcc
 AR                      = ar
 RANLIB                  = ranlib
-CFLAGS			= -L. 
-INCS			= -I. -I/usr/local/include
+CFLAGS			= -L.
+INCS			= -I. -I/usr/local/include -I$(CODA)/src/ipc/ipc.s -I$(CODA)/src/codautil/codautil.s
 
 LIBS			= lib${BASENAME}.a
+
+LIBNAMES        = $(CODA)/src/codautil/Linux_armv7l/lib/libcodautil.a
+LIBNAMES        = $(CODA)/src/ipc/Linux_armv7l/lib/libipc.a
 
 ifdef DEBUG
 CFLAGS			+= -Wall -g
 else
 CFLAGS			+= -O2
 endif
-SRC			= vtpLib.c vtp-i2c.c vtp-spi.c si5341_cfg.c
+SRC			= vtpLib.c vtpConfig.c vtp-i2c.c vtp-spi.c si5341_cfg.c
 HDRS			= $(SRC:.c=.h)
 OBJ			= $(SRC:.c=.o)
 DEPS			= $(SRC:.c=.d)
@@ -54,7 +57,7 @@ all: echoarch $(LIBS)
 
 $(LIBS): $(OBJ)
 	@echo " CC     $(@:%.a=%.so)"
-	$(Q)$(CC) -fpic -shared $(CFLAGS) $(INCS) -o $(@:%.a=%.so) $(SRC)
+	$(Q)$(CC) -fpic -shared $(CFLAGS) $(LIBNAMES) $(INCS) -o $(@:%.a=%.so) $(SRC)
 	@echo " AR     $(@)"
 	$(Q)$(AR) r $@ $(OBJ)
 	@echo " RANLIB $(@)"

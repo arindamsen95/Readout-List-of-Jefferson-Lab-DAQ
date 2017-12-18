@@ -343,8 +343,11 @@ void ltm4676_setup()
   {
     for(ch = 0; ch < 2; ch++)
     {
-      ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x41, 0); // VOUT OV ignore fault
-      ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x45, 0); // VOUT UV ignore fault
+  //    if( (i == 0) && (ch == 1) ) // 2.2v output
+        ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x45, 0); // VOUT UV ignore fault
+        ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x41, 0); // VOUT OV ignore fault
+//      else
+//        ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x45, 0xB8); // VOUT UV reset on fault
     }
   }
   
@@ -377,7 +380,10 @@ int main()
       goto CLOSE;
     }
 
-//ltm4676_setup();
+  
+  vtpZ7CfgLoad("../firmware/z7_top_wrapper.bin");
+
+  ltm4676_setup();
     
   ltm4676_print_status();
 
