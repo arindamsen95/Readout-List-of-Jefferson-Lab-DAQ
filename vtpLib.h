@@ -394,6 +394,15 @@ typedef struct HtccTrigger_Struct
  /** 0x0090 */ BLANK[(0x100-0x084)/4];
 } HTCCTRIGGER_REGS;
 
+typedef struct FtofTrigger_Struct
+{
+ /** 0x0000 */ volatile uint32_t Thresholds[3];
+ /** 0x000C */ volatile uint32_t NFrames;
+ /** 0x0020 */ BLANK[(0x080-0x010)/4];
+ /** 0x0080 */ volatile uint32_t ScalerHit;
+ /** 0x0090 */ BLANK[(0x100-0x084)/4];
+} FTOFTRIGGER_REGS;
+
 typedef struct GtBit_Struct
 {
   /** 0x0000 */ volatile uint32_t STrigger;
@@ -441,7 +450,22 @@ typedef struct v7_bridge_struct
 
   /** 0x43C12000 */ SERDES_REGS qsfp[4];
 
+
+#if 0
   /** 0x43C12400 */ BLANK[(0x4100 - 0x2400)/4];
+#endif
+
+
+
+
+
+  /** 0x43C12400 */ BLANK[(0x4000 - 0x2400)/4];
+
+  /** 0x43C14000 */ FTOFTRIGGER_REGS ftofTrigger;
+
+
+
+
 
   /** 0x43C14100 */ ECTRIGGER_REGS ecTrigger[2];
 
@@ -526,6 +550,7 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_ECS               8
 #define VTP_FW_TYPE_FTCAL             9
 #define VTP_FW_TYPE_FTHODO            10
+#define VTP_FW_TYPE_FTOF              11
 
 /* Routine prototypes */
 int  vtpInit(int iFlag);
@@ -669,6 +694,14 @@ int  vtpSetHTCC_thresholds(int thr0, int thr1, int thr2);
 int  vtpGetHTCC_thresholds(int *thr0, int *thr1, int *thr2);
 int  vtpSetHTCC_nframes(int nframes);
 int  vtpGetHTCC_nframes(int *nframes);
+
+// VTP_FT_TYPE_FTOF functions
+int  vtpFtofSendScalers(char *host);
+int  vtpFtofPrintScalers();
+int  vtpSetFTOF_thresholds(int thr0, int thr1, int thr2);
+int  vtpGetFTOF_thresholds(int *thr0, int *thr1, int *thr2);
+int  vtpSetFTOF_nframes(int nframes);
+int  vtpGetFTOF_nframes(int *nframes);
 
 // VTP_FW_TYPE_COMMON functions
 int  vtpSetFPBO(unsigned int val);

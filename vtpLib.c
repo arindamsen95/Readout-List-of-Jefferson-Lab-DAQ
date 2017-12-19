@@ -172,6 +172,7 @@ vtpInit(int iFlag)
       case VTP_FW_TYPE_HCAL:
       case VTP_FW_TYPE_PCS:
       case VTP_FW_TYPE_HTCC:
+      case VTP_FW_TYPE_FTOF:
       case VTP_FW_TYPE_ECS:
       case VTP_FW_TYPE_FTCAL:
       case VTP_FW_TYPE_FTHODO:
@@ -1043,6 +1044,8 @@ vtpSendScalers()
       break;
     case VTP_FW_TYPE_HTCC:
       r = vtpHtccSendScalers(host);
+      break;
+    case VTP_FW_TYPE_FTOF:
       break;
     case VTP_FW_TYPE_EC:
       break;
@@ -2148,6 +2151,147 @@ vtpHtccSendScalers(char *host)
   VUNLOCK;
 
   sprintf(name, "%s_VTPHTCC_CLUSTERS", host);
+  epics_json_msg_send(name, "float", 1, data);
+
+  return OK;
+}
+
+
+
+
+
+
+
+
+/* FTOF functions */
+
+int
+vtpSetFTOF_thresholds(int thr0, int thr1, int thr2)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FTOF);
+  
+  VLOCK;
+  vtp->v7.ftofTrigger.Thresholds[0] = thr0;
+  vtp->v7.ftofTrigger.Thresholds[1] = thr1;
+  vtp->v7.ftofTrigger.Thresholds[2] = thr2;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetFTOF_thresholds(int *thr0, int *thr1, int *thr2)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FTOF);
+  
+  VLOCK;
+  *thr0 = vtp->v7.ftofTrigger.Thresholds[0];
+  *thr1 = vtp->v7.ftofTrigger.Thresholds[1];
+  *thr2 = vtp->v7.ftofTrigger.Thresholds[2];
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpSetFTOF_nframes(int nframes)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FTOF);
+  
+  VLOCK;
+  vtp->v7.ftofTrigger.NFrames = nframes;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetFTOF_nframes(int *nframes)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FTOF);
+  
+  VLOCK;
+  *nframes = vtp->v7.ftofTrigger.NFrames;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpFtofPrintScalers()
+{
+  double ref, rate; 
+  int i; 
+  unsigned int scalers[2];
+  const char *scalers_name[2] = {
+    "BusClk",
+    "Hit"
+   };
+ 
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FTOF);
+ 
+  VLOCK;
+  vtp->v7.sd.ScalerLatch = 1;
+
+  scalers[0] = vtp->v7.sd.Scaler_BusClk;
+  scalers[1] = vtp->v7.ftofTrigger.ScalerHit;
+
+  vtp->v7.sd.ScalerLatch = 0;
+  VUNLOCK;
+
+ 
+  printf("%s - \n", __FUNCTION__); 
+  if(!scalers[0]) 
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__); 
+    ref = 1.0; 
+  } 
+  else 
+  { 
+    ref = (double)scalers[0] / (double)33330000;
+  } 
+
+  for(i=0; i<2; i++) 
+  { 
+    rate = (double)scalers[i]; 
+    rate = rate / ref; 
+    if(scalers[i] == 0xFFFFFFFF) 
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate); 
+    else 
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate); 
+  }
+  return OK;
+}
+
+int
+vtpFtofSendScalers(char *host)
+{
+  char name[100];
+  float ref, data[1];
+  unsigned int val;
+  CHECKINIT;
+
+  printf("%s...", __func__);
+
+  VLOCK;
+  vtp->v7.sd.ScalerLatch = 1;
+
+  //Read/normalize reference
+  val = vtp->v7.sd.Scaler_BusClk;
+  if(!val) val = 1;
+  ref = 33330000.0f / (float)val;
+
+  data[0] = ref * (float)vtp->v7.ftofTrigger.ScalerHit;
+
+  vtp->v7.sd.ScalerLatch = 0;
+  VUNLOCK;
+
+  sprintf(name, "%s_VTPFTOF_CLUSTERS", host);
   epics_json_msg_send(name, "float", 1, data);
 
   return OK;
