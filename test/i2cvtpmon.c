@@ -274,10 +274,10 @@ void ltm4676_print_status()
         unsigned char status_vout = get_status_vout(i, ch);
         unsigned char status_iout = get_status_iout(i, ch);
         
-        printf("      %s: VOUT = %5.3fV, IOUT = %5.3fA, TEMP = %5.3fC, IIN = %5.3fA, POWER = %5.3fW\n", rail[2*i+0],
-            get_vout_ch(i,0), get_iout_ch(i,0), get_temp_ch(i,0), get_iin_ch(i,0), get_power_ch(i,0));
-        printf("      %s: VOUT = %5.3fV, IOUT = %5.3fA, TEMP = %5.3fC, IIN = %5.3fA, POWER = %5.3fW\n",rail[2*i+1],
-            get_vout_ch(i,1), get_iout_ch(i,1), get_temp_ch(i,1), get_iin_ch(i,1), get_power_ch(i,1));
+      printf("      %s: VOUT = %5.3fV, IOUT = %5.3fA, TEMP = %5.3fC, IIN = %5.3fA, POWER = %5.3fW\n", rail[2*i+0],
+	     get_vout_ch(i,0), get_iout_ch(i,0), get_temp_ch(i,0), get_iin_ch(i,0), get_power_ch(i,0));
+      printf("      %s: VOUT = %5.3fV, IOUT = %5.3fA, TEMP = %5.3fC, IIN = %5.3fA, POWER = %5.3fW\n",rail[2*i+1],
+	     get_vout_ch(i,1), get_iout_ch(i,1), get_temp_ch(i,1), get_iin_ch(i,1), get_power_ch(i,1));
             
         printf("          STATUS WORD (fault source): 0x%04X\n", status_word);
         if(status_word & 0x8000) printf("          VOUT\n");
@@ -363,7 +363,7 @@ void ltm4676_setup()
   {
     vtpI2CSelectSlave(I2C_BUS, LTM4676_ADDR[i]);
     vtpI2CWriteCmd(I2C_BUS, 0x15);
-  }  
+    }
 }
 
 int main()
@@ -377,8 +377,6 @@ int main()
       goto CLOSE;
     }
 
-//ltm4676_setup();
-    
   ltm4676_print_status();
 
  CLOSE:

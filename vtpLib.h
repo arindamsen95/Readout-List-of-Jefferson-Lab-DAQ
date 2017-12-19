@@ -428,8 +428,6 @@ typedef struct Hcal_Struct
 
 typedef struct v7_bridge_struct
 {
-  /* almost all 256 bytes */
-
   /** 0x43C10000 */ BLANK[0x100/4];
 
   /** 0x43C10100 */ V7CLK_REGS clk;
@@ -437,7 +435,7 @@ typedef struct v7_bridge_struct
   /** 0x43C10200 */ SD_REGS sd;
 
   /** 0x43C10300 */ FADCDECODER_REGS fadcDec;
-  
+
   /** 0x43C10400 */ SSPDECODER_REGS sspDec;
 
   /** 0x43C10500 */ DCRBDECODER_REGS dcrbDec;
@@ -450,10 +448,7 @@ typedef struct v7_bridge_struct
 
   /** 0x43C12000 */ SERDES_REGS qsfp[4];
 
-
-#if 0
   /** 0x43C12400 */ BLANK[(0x4100 - 0x2400)/4];
-#endif
 
 
 
@@ -551,7 +546,7 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_FTCAL             9
 #define VTP_FW_TYPE_FTHODO            10
 #define VTP_FW_TYPE_FTOF              11
-
+					     
 /* Routine prototypes */
 int  vtpInit(int iFlag);
 int  vtpBReady();
