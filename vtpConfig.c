@@ -126,6 +126,12 @@ vtpInitGlobals()
   vtpConf.htcc.threshold[2] = 0;
   vtpConf.htcc.nframes = 0;
 
+  // FTOF configuration
+  vtpConf.ftof.threshold[0] = 0;
+  vtpConf.ftof.threshold[1] = 0;
+  vtpConf.ftof.threshold[2] = 0;
+  vtpConf.ftof.nframes = 0;
+
   // EC configuration
   for(i=0; i<16; i++)
     vtpConf.ec.fadcsum_ch_en[i] = 0;
@@ -514,6 +520,19 @@ vtpReadConfigFile(char *filename_in)
           vtpConf.htcc.nframes = i1;
         }
 
+        else if(!strcmp(keyword,"VTP_FTOF_THRESHOLDS"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
+          vtpConf.ftof.threshold[0] = i1;
+          vtpConf.ftof.threshold[1] = i2;
+          vtpConf.ftof.threshold[2] = i3;
+        }
+        else if(!strcmp(keyword,"VTP_FTOF_NFRAMES"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ftof.nframes = i1;
+        }
+
         else if(!strcmp(keyword,"VTP_PCS_THRESHOLDS"))
         {
           sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
@@ -879,6 +898,13 @@ vtpDownloadAll()
     vtpSetHTCC_nframes(vtpConf.htcc.nframes);
   }
 
+  if(vtpConf.fw_type == VTP_FW_TYPE_FTOF)
+  {
+    // FTOF configuration
+    vtpSetFTOF_thresholds(vtpConf.ftof.threshold[0], vtpConf.ftof.threshold[1], vtpConf.ftof.threshold[2]);
+    vtpSetFTOF_nframes(vtpConf.ftof.nframes);
+  }
+
   if(vtpConf.fw_type == VTP_FW_TYPE_PCS)
   {
     // PCS configuration
@@ -1017,6 +1043,13 @@ vtpUploadAll(char *string, int length)
     // HTCC configuration
     vtpGetHTCC_thresholds(&vtpConf.htcc.threshold[0], &vtpConf.htcc.threshold[1], &vtpConf.htcc.threshold[2]);
     vtpGetHTCC_nframes(&vtpConf.htcc.nframes);
+  }
+
+  if(vtpConf.fw_type == VTP_FW_TYPE_FTOF)
+  {
+    // FTOF configuration
+    vtpGetFTOF_thresholds(&vtpConf.ftof.threshold[0], &vtpConf.ftof.threshold[1], &vtpConf.ftof.threshold[2]);
+    vtpGetFTOF_nframes(&vtpConf.ftof.nframes);
   }
 
   if(vtpConf.fw_type == VTP_FW_TYPE_PCS)
@@ -1166,6 +1199,12 @@ vtpUploadAll(char *string, int length)
     {
       sprintf(sss, "VTP_HTCC_THRESHOLDS %d %d %d\n", vtpConf.htcc.threshold[0], vtpConf.htcc.threshold[1], vtpConf.htcc.threshold[2]); ADD_TO_STRING;
       sprintf(sss, "VTP_HTCC_NFRAMES %d\n", vtpConf.htcc.nframes); ADD_TO_STRING;      
+	}
+
+    if(vtpConf.fw_type == VTP_FW_TYPE_FTOF)
+    {
+      sprintf(sss, "VTP_FTOF_THRESHOLDS %d %d %d\n", vtpConf.ftof.threshold[0], vtpConf.ftof.threshold[1], vtpConf.ftof.threshold[2]); ADD_TO_STRING;
+      sprintf(sss, "VTP_FTOF_NFRAMES %d\n", vtpConf.ftof.nframes); ADD_TO_STRING;      
 	}
 
     if(vtpConf.fw_type == VTP_FW_TYPE_PCS)

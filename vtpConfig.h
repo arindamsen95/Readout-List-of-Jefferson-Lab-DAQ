@@ -94,6 +94,12 @@ typedef struct {
 
   struct
   {
+    int threshold[3];
+    int nframes;
+  } ftof;
+
+  struct
+  {
     unsigned int fadcsum_ch_en[16];
     int threshold[3];
     int nframes;
