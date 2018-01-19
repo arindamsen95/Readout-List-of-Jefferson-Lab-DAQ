@@ -146,7 +146,7 @@ vtpInit(int iFlag)
   }
   
   vtpLock();
-
+  
   vtpV7SetReset(1);
   vtpV7SetResetSoft(1);
 
@@ -191,7 +191,7 @@ vtpInit(int iFlag)
         return ERROR;
     }
   }
-
+  
   vtpV7PllReset(1);
   vtpV7PllReset(0);
 
@@ -199,7 +199,7 @@ vtpInit(int iFlag)
 
   vtpSetTrig1Source(trig1Src);
   vtpSetSyncSource(syncSrc);
-  
+
   vtpTiLinkInit();
   
   vtpEbResetFifo();
@@ -217,7 +217,7 @@ vtpInit(int iFlag)
 
 int
 vtpSetBlockLevel(int level)
-{
+  {
   CHECKINIT;
 
   VLOCK;
@@ -225,7 +225,7 @@ vtpSetBlockLevel(int level)
   VUNLOCK;
   
   return(OK);
-}
+  }
 
 int
 vtpGetBlockLevel()
@@ -300,7 +300,7 @@ vtpGetWindowWidth()
 
   return(rval);
 }
-
+  
 int
 vtpCheckAddresses()
 {
@@ -441,7 +441,7 @@ vtpCheckAddresses()
   }									\
 
 #define VTP_SERDES_MAX_TRIES  10
-  
+
 int
 vtpSerdesCheckLinks()
 {
@@ -452,7 +452,7 @@ vtpSerdesCheckLinks()
   {
     printf("Waiting on links:");
     pass = 1;
-    
+  
     for(i=0; i<20; i++)
     {
       VLOCK;
@@ -467,7 +467,7 @@ vtpSerdesCheckLinks()
         status = vtp->v7.qsfp[i-16].Status;
       }
       VUNLOCK;
-      
+
       if(!(ctrl & VTP_SERDES_CTRL_GT_RESET))
       {
         if(!(status & VTP_SERDES_STATUS_CHUP))
@@ -476,12 +476,12 @@ vtpSerdesCheckLinks()
             printf(" PP%d", i+1);
           else
             printf(" FB%d", i-15);
-          
+
           pass = 0;
         }
       }
     }
-    
+
     if(pass)
     {
       printf(" none. All links up!\n");
@@ -493,13 +493,13 @@ vtpSerdesCheckLinks()
       sleep(1);
     }
   }
-  
+
   if(tries>=VTP_SERDES_MAX_TRIES)
     printf("%s: ERROR - all serdes links not up!\n", __func__);
-  
+
   return pass;
 }
-  
+
 int
 vtpSerdesStatus(int type, uint16_t dev, int pflag)
 {
@@ -519,7 +519,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag)
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_FTOF:
     case VTP_FW_TYPE_FTHODO:
-      ctrl = vtp->v7.fadcDec.Ctrl;
+  ctrl = vtp->v7.fadcDec.Ctrl;
       break;
     case VTP_FW_TYPE_GT:
       ctrl = vtp->v7.sspDec.Ctrl;
@@ -537,7 +537,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag)
   VUNLOCK;
 
   if(pflag)
-  {
+    {
       printf("\n");
       if(type == VTP_SERDES_VXS)
       {
@@ -550,7 +550,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag)
         printf("FB  0 1 2 3    Ch Count  Reset En  RX     TX\n");
       }
       printf("------------------------------------------------------------------------------\n");
-  }
+    }
   
   printf("%2d  ", dev);
   printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(0))?"U":"D");
@@ -561,7 +561,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag)
   printf("%3d    ", (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>24);
   printf("%s     ", (ctrl2 & VTP_SERDES_CTRL_GT_RESET)?"1":"0");
   if(type == VTP_SERDES_VXS)
-    printf("%s", (ctrl & (1<<dev)) ? "1   ":"0   ");
+  printf("%s", (ctrl & (1<<dev)) ? "1   ":"0   ");
   else
     printf("%s", (ctrl & (1<<(dev+16))) ?  "1   ":"0   ");
   printf("%5d ", ((latency>>16)&0xFFFF)*4);
@@ -577,7 +577,7 @@ vtpSerdesStatusAll()
   int i;
   for(i = 0; i < 16; i++)
     vtpSerdesStatus(VTP_SERDES_VXS, i, (i==0));
-  
+
   for(i = 0; i < 4; i++)
     vtpSerdesStatus(VTP_SERDES_QSFP, i, (i==0));
 
@@ -589,25 +589,25 @@ vtpSerdesEnable(int type, uint16_t idx, int enable)
 {
   CHECKINIT;
   volatile SERDES_REGS *pSerdes;
-  
+
   if( (type == VTP_SERDES_VXS) && (idx >= 0) && (idx < 16) )
     pSerdes = &vtp->v7.vxs[idx];
   else if( (type == VTP_SERDES_QSFP) && (idx >= 0) && (idx < 4) )
     pSerdes = &vtp->v7.qsfp[idx];
   else
-  {
+{
     printf("%s: Error - invalid serdes selection(type=%d, idx=%d)\n", __func__, type, idx);
     return ERROR;
-  }
+}
 
   VLOCK;
   if(enable)
-  {
+{
     pSerdes->Ctrl = VTP_SERDES_CTRL_GT_RESET;
     usleep(10);
     pSerdes->Ctrl = 0;
     usleep(10000);
-  }
+}
   else
     pSerdes->Ctrl = VTP_SERDES_CTRL_GT_RESET;
   VUNLOCK;
@@ -620,16 +620,16 @@ vtpSerdesSettings(int type, uint16_t idx, int txpre, int txpost, int txswing, in
 {
   CHECKINIT;
   volatile SERDES_REGS *pSerdes;
-  
+
   if( (type == VTP_SERDES_VXS) && (idx >= 0) && (idx < 16) )
     pSerdes = &vtp->v7.vxs[idx];
   else if( (type == VTP_SERDES_QSFP) && (idx >= 0) && (idx < 4) )
     pSerdes = &vtp->v7.qsfp[idx];
   else
-  {
+{
     printf("%s: Error - invalid serdes selection(type=%d, idx=%d)\n", __func__, type, idx);
     return ERROR;
-  }
+}
 
   VLOCK;
   pSerdes->TrxCtrl =
@@ -904,30 +904,30 @@ vtpV7CfgLoad(char *filename)
   printf("%s: Opening file: %s...", __func__, filename);
   f = fopen(filename, "rb");
   if(!f)
-  {
-    printf("FAILED\r\n");
+    {
+      printf("FAILED\r\n");
     vtpUnlock();
-    return ERROR;
-  }
+      return ERROR;
+    }
   printf("Opened successfully\r\n");
 
   while(1)
-  {
-    bytesRead = fread(&buf[0], 1, sizeof(buf), f);
+    {
+      bytesRead = fread(&buf[0], 1, sizeof(buf), f);
 
-    if(bytesRead < 0)
-	  {
-	    printf("ERROR: fread() returned %d\r\n", bytesRead);
+      if(bytesRead < 0)
+	{
+	  printf("ERROR: fread() returned %d\r\n", bytesRead);
       vtpUnlock();
-	    return ERROR;
-	  }
+	  return ERROR;
+	}
 
-    vtpV7WriteCfgData(buf, (bytesRead+1)>>1);
-    i+= bytesRead;
-    
-    if(feof(f))
-	    break;
-  }
+      vtpV7WriteCfgData(buf, (bytesRead+1)>>1);
+      i+= bytesRead;
+
+      if(feof(f))
+	break;
+    }
 
   fclose(f);
 
@@ -1112,7 +1112,7 @@ vtpEnableTriggerPayloadMask(int pp_mask)
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_FTOF:
     case VTP_FW_TYPE_FTHODO:
-      vtp->v7.fadcDec.Ctrl = pp_mask;
+  vtp->v7.fadcDec.Ctrl = pp_mask;
       break;
     case VTP_FW_TYPE_GT:
       vtp->v7.sspDec.Ctrl = pp_mask;
@@ -1137,13 +1137,13 @@ vtpEnableTriggerPayloadMask(int pp_mask)
 
 int
 vtpGetTriggerPayloadMask()
-{
+  {
   int pp_mask = 0;
   CHECKINIT;
   
   VLOCK;
   switch(VTP_FW_Type)
-  {
+    {
     case VTP_FW_TYPE_ECS:
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_PC:
@@ -1163,7 +1163,7 @@ vtpGetTriggerPayloadMask()
     case VTP_FW_TYPE_FTCAL:
       pp_mask = vtp->v7.ftcalDec.Ctrl;
       break;
-  }
+    }
   VUNLOCK;
   
   return pp_mask;
@@ -1171,7 +1171,7 @@ vtpGetTriggerPayloadMask()
 
 int
 vtpEnableTriggerFiberMask(int fiber_mask)
-{
+    {
   int i, mask;
   CHECKINIT;
 
@@ -1182,15 +1182,15 @@ vtpEnableTriggerFiberMask(int fiber_mask)
       mask = (vtp->v7.ftcalDec.Ctrl & 0xFFFF) | (fiber_mask<<16);
       vtp->v7.ftcalDec.Ctrl = mask;
       break;
-  }  
+    }
   VUNLOCK;
 
   for(i = 0; i < 4; i++)
     vtpSerdesEnable(VTP_SERDES_QSFP, i, fiber_mask & (1<<i));
   
   return OK;
-}
-
+  }
+  
 int
 vtpGetTriggerFiberMask()
 {
@@ -3917,7 +3917,7 @@ vtpClose(int dev_mask)
 	}
 
     }
-
+  
   vtpKillLockShm(0);
   
   return vtpDevOpenMASK;

@@ -428,8 +428,6 @@ typedef struct Hcal_Struct
 
 typedef struct v7_bridge_struct
 {
-  /* almost all 256 bytes */
-
   /** 0x43C10000 */ BLANK[0x100/4];
 
   /** 0x43C10100 */ V7CLK_REGS clk;
@@ -450,22 +448,9 @@ typedef struct v7_bridge_struct
 
   /** 0x43C12000 */ SERDES_REGS qsfp[4];
 
-
-#if 0
-  /** 0x43C12400 */ BLANK[(0x4100 - 0x2400)/4];
-#endif
-
-
-
-
-
   /** 0x43C12400 */ BLANK[(0x4000 - 0x2400)/4];
 
   /** 0x43C14000 */ FTOFTRIGGER_REGS ftofTrigger;
-
-
-
-
 
   /** 0x43C14100 */ ECTRIGGER_REGS ecTrigger[2];
 
