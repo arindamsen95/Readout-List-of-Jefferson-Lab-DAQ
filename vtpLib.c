@@ -1110,6 +1110,7 @@ vtpEnableTriggerPayloadMask(int pp_mask)
     case VTP_FW_TYPE_ECS:
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_HTCC:
     case VTP_FW_TYPE_FTOF:
     case VTP_FW_TYPE_FTHODO:
   vtp->v7.fadcDec.Ctrl = pp_mask;
@@ -1147,6 +1148,7 @@ vtpGetTriggerPayloadMask()
     case VTP_FW_TYPE_ECS:
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_HTCC:
     case VTP_FW_TYPE_FTOF:
     case VTP_FW_TYPE_FTHODO:
       pp_mask = vtp->v7.fadcDec.Ctrl;
@@ -2100,15 +2102,73 @@ vtpGetHTCC_nframes(int *nframes)
   return OK;
 }
 
+/* CTOF functions */
+int
+vtpSetCTOF_thresholds(int thr0, int thr1, int thr2)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  
+  VLOCK;
+  vtp->v7.ctofTrigger.Thresholds[0] = thr0;
+  vtp->v7.ctofTrigger.Thresholds[1] = thr1;
+  vtp->v7.ctofTrigger.Thresholds[2] = thr2;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetCTOF_thresholds(int *thr0, int *thr1, int *thr2)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  
+  VLOCK;
+  *thr0 = vtp->v7.ctofTrigger.Thresholds[0];
+  *thr1 = vtp->v7.ctofTrigger.Thresholds[1];
+  *thr2 = vtp->v7.ctofTrigger.Thresholds[2];
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpSetCTOF_nframes(int nframes)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  
+  VLOCK;
+  vtp->v7.ctofTrigger.NFrames = nframes;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetCTOF_nframes(int *nframes)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  
+  VLOCK;
+  *nframes = vtp->v7.ctofTrigger.NFrames;
+  VUNLOCK;
+
+  return OK;
+}
+
 int
 vtpHtccPrintScalers()
 {
   double ref, rate; 
   int i; 
-  unsigned int scalers[2];
-  const char *scalers_name[2] = {
+  unsigned int scalers[3];
+  const char *scalers_name[3] = {
     "BusClk",
-    "Hit"
+    "HTCCHit",
+    "CTOFHit"
    };
  
   CHECKINIT;
@@ -2119,6 +2179,7 @@ vtpHtccPrintScalers()
 
   scalers[0] = vtp->v7.sd.Scaler_BusClk;
   scalers[1] = vtp->v7.htccTrigger.ScalerHit;
+  scalers[2] = vtp->v7.ctofTrigger.ScalerHit;
 
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
@@ -2135,7 +2196,7 @@ vtpHtccPrintScalers()
     ref = (double)scalers[0] / (double)33330000;
   } 
 
-  for(i=0; i<2; i++) 
+  for(i=0; i<3; i++) 
   { 
     rate = (double)scalers[i]; 
     rate = rate / ref; 
@@ -2151,7 +2212,7 @@ int
 vtpHtccSendScalers(char *host)
 {
   char name[100];
-  float ref, data[1];
+  float ref, data[2];
   unsigned int val;
   CHECKINIT;
 
@@ -2166,11 +2227,15 @@ vtpHtccSendScalers(char *host)
   ref = 33330000.0f / (float)val;
 
   data[0] = ref * (float)vtp->v7.htccTrigger.ScalerHit;
+  data[1] = ref * (float)vtp->v7.ctofTrigger.ScalerHit;
 
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
 
   sprintf(name, "%s_VTPHTCC_CLUSTERS", host);
+  epics_json_msg_send(name, "float", 1, data);
+
+  sprintf(name, "%s_VTPCTOF_CLUSTERS", host);
   epics_json_msg_send(name, "float", 1, data);
 
   return OK;

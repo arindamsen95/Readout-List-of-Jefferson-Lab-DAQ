@@ -90,6 +90,8 @@ typedef struct {
   {
     int threshold[3];
     int nframes;
+    int ctof_threshold[3];
+    int ctof_nframes;
   } htcc;
 
   struct
