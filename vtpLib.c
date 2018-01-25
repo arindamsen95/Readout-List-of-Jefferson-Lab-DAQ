@@ -33,6 +33,8 @@
 #include "ipc.h"
 #include "vtpLib.h"
 
+#define VTP_FT_SENDHODOSCALERS     1
+
 /* Shared Robust Mutex for vme bus access */
 char* shm_name_vtp = "/vtp";
 
@@ -173,6 +175,7 @@ vtpInit(int iFlag)
       case VTP_FW_TYPE_PCS:
       case VTP_FW_TYPE_HTCC:
       case VTP_FW_TYPE_FTOF:
+      case VTP_FW_TYPE_CND:
       case VTP_FW_TYPE_ECS:
       case VTP_FW_TYPE_FTCAL:
       case VTP_FW_TYPE_FTHODO:
@@ -518,6 +521,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag)
     case VTP_FW_TYPE_ECS:
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_FTOF:
+    case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
   ctrl = vtp->v7.fadcDec.Ctrl;
       break;
@@ -1048,11 +1052,15 @@ vtpSendScalers()
       break;
     case VTP_FW_TYPE_FTOF:
       break;
+    case VTP_FW_TYPE_CND:
+      r = vtpCndSendScalers(host);
+      break;
     case VTP_FW_TYPE_EC:
       break;
     case VTP_FW_TYPE_PC:
       break;
     case VTP_FW_TYPE_FTHODO:
+      r = vtpFTHodoSendScalers(host);
       break;
     case VTP_FW_TYPE_GT:
       r = vtpGtSendScalers(host);
@@ -1112,6 +1120,7 @@ vtpEnableTriggerPayloadMask(int pp_mask)
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_HTCC:
     case VTP_FW_TYPE_FTOF:
+    case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
   vtp->v7.fadcDec.Ctrl = pp_mask;
       break;
@@ -1150,6 +1159,7 @@ vtpGetTriggerPayloadMask()
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_HTCC:
     case VTP_FW_TYPE_FTOF:
+    case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
       pp_mask = vtp->v7.fadcDec.Ctrl;
       break;
@@ -1971,6 +1981,20 @@ vtpFTSendScalers(char *host)
   printf("%s...", __func__);
 
   VLOCK;
+#if VTP_FT_SENDHODOSCALERS
+  vtp->v7.sd.ScalerLatch = 1;
+  //Read/normalize reference
+  val = vtp->v7.sd.Scaler_BusClk;
+  if(!val) val = 1;
+  ref = 33330000.0f / (float)val;
+
+  for(i=0;i<256;i++)
+    data[i] = ref * (float)vtp->v7.fthodoScalers.Scalers[i];
+  vtp->v7.sd.ScalerLatch = 0;
+  sprintf(name, "%s_VTPFT_HODOSCALERS", host);
+  epics_json_msg_send(name, "float", 256, data);
+#endif
+
   vtp->v7.ftcalTrigger.HistCtrl = 0x80000000;
   printf("Start - Setting ftcalTrigger.HistCtrl, read back 0x%08X\n",
     vtp->v7.ftcalTrigger.HistCtrl);
@@ -2023,6 +2047,35 @@ vtpFTSendScalers(char *host)
   return OK;
 }
 
+int
+vtpFTHodoSendScalers(char *host)
+{
+  char name[100];
+  float ref, data[1024];
+  unsigned int val;
+  int i;
+  CHECKINIT;
+
+  printf("%s...", __func__);
+
+  VLOCK;
+#if VTP_FT_SENDHODOSCALERS
+  vtp->v7.sd.ScalerLatch = 1;
+  //Read/normalize reference
+  val = vtp->v7.sd.Scaler_BusClk;
+  if(!val) val = 1;
+  ref = 33330000.0f / (float)val;
+
+  for(i=0;i<256;i++)
+    data[i] = ref * (float)vtp->v7.fthodoScalers.Scalers[i];
+  vtp->v7.sd.ScalerLatch = 0;
+  sprintf(name, "%s_VTPFT_HODOSCALERS", host);
+  epics_json_msg_send(name, "float", 256, data);
+#endif
+  VUNLOCK;
+
+  return OK;
+}
 /*
  *
  sel = 0: clusters, no hodo tag
@@ -2377,6 +2430,145 @@ vtpFtofSendScalers(char *host)
   VUNLOCK;
 
   sprintf(name, "%s_VTPFTOF_CLUSTERS", host);
+  epics_json_msg_send(name, "float", 1, data);
+
+  return OK;
+}
+
+
+
+
+
+
+/* CND functions */
+
+int
+vtpSetCND_thresholds(int thr0, int thr1, int thr2)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_CND);
+  
+  VLOCK;
+  vtp->v7.cndTrigger.Thresholds[0] = thr0;
+  vtp->v7.cndTrigger.Thresholds[1] = thr1;
+  vtp->v7.cndTrigger.Thresholds[2] = thr2;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetCND_thresholds(int *thr0, int *thr1, int *thr2)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_CND);
+  
+  VLOCK;
+  *thr0 = vtp->v7.cndTrigger.Thresholds[0];
+  *thr1 = vtp->v7.cndTrigger.Thresholds[1];
+  *thr2 = vtp->v7.cndTrigger.Thresholds[2];
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpSetCND_nframes(int nframes)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_CND);
+  
+  VLOCK;
+  vtp->v7.cndTrigger.NFrames = nframes;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetCND_nframes(int *nframes)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_CND);
+  
+  VLOCK;
+  *nframes = vtp->v7.cndTrigger.NFrames;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpCndPrintScalers()
+{
+  double ref, rate; 
+  int i; 
+  unsigned int scalers[2];
+  const char *scalers_name[2] = {
+    "BusClk",
+    "Hit"
+   };
+ 
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_CND);
+ 
+  VLOCK;
+  vtp->v7.sd.ScalerLatch = 1;
+
+  scalers[0] = vtp->v7.sd.Scaler_BusClk;
+  scalers[1] = vtp->v7.cndTrigger.ScalerHit;
+
+  vtp->v7.sd.ScalerLatch = 0;
+  VUNLOCK;
+
+ 
+  printf("%s - \n", __FUNCTION__); 
+  if(!scalers[0]) 
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__); 
+    ref = 1.0; 
+  } 
+  else 
+  { 
+    ref = (double)scalers[0] / (double)33330000;
+  } 
+
+  for(i=0; i<2; i++) 
+  { 
+    rate = (double)scalers[i]; 
+    rate = rate / ref; 
+    if(scalers[i] == 0xFFFFFFFF) 
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate); 
+    else 
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate); 
+  }
+  return OK;
+}
+
+int
+vtpCndSendScalers(char *host)
+{
+  char name[100];
+  float ref, data[1];
+  unsigned int val;
+  CHECKINIT;
+
+  printf("%s...", __func__);
+
+  VLOCK;
+  vtp->v7.sd.ScalerLatch = 1;
+
+  //Read/normalize reference
+  val = vtp->v7.sd.Scaler_BusClk;
+  if(!val) val = 1;
+  ref = 33330000.0f / (float)val;
+
+  data[0] = ref * (float)vtp->v7.cndTrigger.ScalerHit;
+
+  vtp->v7.sd.ScalerLatch = 0;
+  VUNLOCK;
+
+  sprintf(name, "%s_VTPCND_CLUSTERS", host);
   epics_json_msg_send(name, "float", 1, data);
 
   return OK;

@@ -349,6 +349,11 @@ typedef struct FTHODOTrigger_Struct
   /** 0x0004 */ BLANK[(0x100-0x004)/4];
 } FTHODOTRIGGER_REGS;
 
+typedef struct FTHODOScalers_Struct
+{
+  /** 0x0000 */ volatile uint32_t Scalers[256];
+} FTHODOSCALERS_REGS;
+
 typedef struct DcrbSegment_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
@@ -411,6 +416,15 @@ typedef struct FtofTrigger_Struct
  /** 0x0080 */ volatile uint32_t ScalerHit;
  /** 0x0090 */ BLANK[(0x100-0x084)/4];
 } FTOFTRIGGER_REGS;
+
+typedef struct CndTrigger_Struct
+{
+ /** 0x0000 */ volatile uint32_t Thresholds[3];
+ /** 0x000C */ volatile uint32_t NFrames;
+ /** 0x0020 */ BLANK[(0x080-0x010)/4];
+ /** 0x0080 */ volatile uint32_t ScalerHit;
+ /** 0x0090 */ BLANK[(0x100-0x084)/4];
+} CNDTRIGGER_REGS;
 
 typedef struct GtBit_Struct
 {
@@ -491,7 +505,13 @@ typedef struct v7_bridge_struct
 
   /** 0x43C15100 */ V7_EB_REGS eb;
 
-  /** 0x43C15200 */ BLANK[(0x6000 - 0x5200)/4];
+  /** 0x43C15200 */ BLANK[(0x5300 - 0x5200)/4];
+
+  /** 0x43C15300 */ CNDTRIGGER_REGS cndTrigger;
+
+  /** 0x43C15400 */ FTHODOSCALERS_REGS fthodoScalers;
+
+  /** 0x43C15800 */ BLANK[(0x6000 - 0x5800)/4];
 
   /** 0x43C16000 */ GTBIT_REGS gtBit[16]; /* 128 bytes */
   
@@ -547,6 +567,7 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_FTCAL             9
 #define VTP_FW_TYPE_FTHODO            10
 #define VTP_FW_TYPE_FTOF              11
+#define VTP_FW_TYPE_CND               12
 
 /* Routine prototypes */
 int  vtpInit(int iFlag);
@@ -702,6 +723,14 @@ int  vtpSetFTOF_thresholds(int thr0, int thr1, int thr2);
 int  vtpGetFTOF_thresholds(int *thr0, int *thr1, int *thr2);
 int  vtpSetFTOF_nframes(int nframes);
 int  vtpGetFTOF_nframes(int *nframes);
+
+// VTP_FT_TYPE_CND functions
+int  vtpCndSendScalers(char *host);
+int  vtpCndPrintScalers();
+int  vtpSetCND_thresholds(int thr0, int thr1, int thr2);
+int  vtpGetCND_thresholds(int *thr0, int *thr1, int *thr2);
+int  vtpSetCND_nframes(int nframes);
+int  vtpGetCND_nframes(int *nframes);
 
 // VTP_FW_TYPE_COMMON functions
 int  vtpSetFPBO(unsigned int val);

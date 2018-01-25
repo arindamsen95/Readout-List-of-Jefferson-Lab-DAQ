@@ -137,6 +137,12 @@ vtpInitGlobals()
   vtpConf.ftof.threshold[2] = 0;
   vtpConf.ftof.nframes = 0;
 
+  // CND configuration
+  vtpConf.cnd.threshold[0] = 0;
+  vtpConf.cnd.threshold[1] = 0;
+  vtpConf.cnd.threshold[2] = 0;
+  vtpConf.cnd.nframes = 0;
+
   // EC configuration
   for(i=0; i<16; i++)
     vtpConf.ec.fadcsum_ch_en[i] = 0;
@@ -211,7 +217,7 @@ vtpInitGlobals()
   vtpConf.gt.trig_latency = 1000;
   vtpConf.gt.trig_width = 100;
   
-  for(i=0; i<16; i++)
+  for(i=0; i<32; i++)
   {
     vtpConf.gt.trgbits[i].ssp_strigger_bit_mask = 0;
     vtpConf.gt.trgbits[i].ssp_sector_mask = 0;
@@ -549,6 +555,19 @@ vtpReadConfigFile(char *filename_in)
         {
           sscanf (str_tmp, "%*s %d", &i1);
           vtpConf.ftof.nframes = i1;
+        }
+
+        else if(!strcmp(keyword,"VTP_CND_THRESHOLDS"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
+          vtpConf.cnd.threshold[0] = i1;
+          vtpConf.cnd.threshold[1] = i2;
+          vtpConf.cnd.threshold[2] = i3;
+        }
+        else if(!strcmp(keyword,"VTP_CND_NFRAMES"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.cnd.nframes = i1;
         }
 
         else if(!strcmp(keyword,"VTP_PCS_THRESHOLDS"))
@@ -926,6 +945,13 @@ vtpDownloadAll()
     vtpSetFTOF_nframes(vtpConf.ftof.nframes);
   }
 
+  if(vtpConf.fw_type == VTP_FW_TYPE_CND)
+  {
+    // CND configuration
+    vtpSetCND_thresholds(vtpConf.cnd.threshold[0], vtpConf.cnd.threshold[1], vtpConf.cnd.threshold[2]);
+    vtpSetCND_nframes(vtpConf.cnd.nframes);
+  }
+
   if(vtpConf.fw_type == VTP_FW_TYPE_PCS)
   {
     // PCS configuration
@@ -1074,6 +1100,13 @@ vtpUploadAll(char *string, int length)
     // FTOF configuration
     vtpGetFTOF_thresholds(&vtpConf.ftof.threshold[0], &vtpConf.ftof.threshold[1], &vtpConf.ftof.threshold[2]);
     vtpGetFTOF_nframes(&vtpConf.ftof.nframes);
+  }
+
+  if(vtpConf.fw_type == VTP_FW_TYPE_CND)
+  {
+    // CND configuration
+    vtpGetCND_thresholds(&vtpConf.cnd.threshold[0], &vtpConf.cnd.threshold[1], &vtpConf.cnd.threshold[2]);
+    vtpGetCND_nframes(&vtpConf.cnd.nframes);
   }
 
   if(vtpConf.fw_type == VTP_FW_TYPE_PCS)
@@ -1232,6 +1265,12 @@ vtpUploadAll(char *string, int length)
     {
       sprintf(sss, "VTP_FTOF_THRESHOLDS %d %d %d\n", vtpConf.ftof.threshold[0], vtpConf.ftof.threshold[1], vtpConf.ftof.threshold[2]); ADD_TO_STRING;
       sprintf(sss, "VTP_FTOF_NFRAMES %d\n", vtpConf.ftof.nframes); ADD_TO_STRING;      
+	}
+
+    if(vtpConf.fw_type == VTP_FW_TYPE_CND)
+    {
+      sprintf(sss, "VTP_CND_THRESHOLDS %d %d %d\n", vtpConf.cnd.threshold[0], vtpConf.cnd.threshold[1], vtpConf.cnd.threshold[2]); ADD_TO_STRING;
+      sprintf(sss, "VTP_CND_NFRAMES %d\n", vtpConf.cnd.nframes); ADD_TO_STRING;      
 	}
 
     if(vtpConf.fw_type == VTP_FW_TYPE_PCS)
