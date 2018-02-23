@@ -22,6 +22,7 @@ typedef struct
   int sector_mult_min;
   int sector_coin_width;
   int ssp_ctrigger_bit_mask;
+  int delay;
   float pulser_freq;
 } trgbit;
 
@@ -84,6 +85,7 @@ typedef struct {
     int dalitz_max;
     int nstrip_min;
     int nstrip_max;
+    int pcu_threshold[3];
   } pcs;
 
   struct

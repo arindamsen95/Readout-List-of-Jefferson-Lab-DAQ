@@ -517,10 +517,12 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag)
   latency = sdev->Latency;
   switch(VTP_FW_Type)
   {
-    case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_ECS:
+    case VTP_FW_TYPE_PCS:
+    case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_FTOF:
+    case VTP_FW_TYPE_HTCC:
     case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
   ctrl = vtp->v7.fadcDec.Ctrl;
@@ -1066,6 +1068,7 @@ vtpSendScalers()
       r = vtpGtSendScalers(host);
       break;
     case VTP_FW_TYPE_DC:
+      r = vtpDcSendScalers(host);
       break;
     case VTP_FW_TYPE_HCAL:
       break;
@@ -1116,13 +1119,14 @@ vtpEnableTriggerPayloadMask(int pp_mask)
   switch(VTP_FW_Type)
   {
     case VTP_FW_TYPE_ECS:
+    case VTP_FW_TYPE_PCS:
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_HTCC:
     case VTP_FW_TYPE_FTOF:
     case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
-  vtp->v7.fadcDec.Ctrl = pp_mask;
+      vtp->v7.fadcDec.Ctrl = pp_mask;
       break;
     case VTP_FW_TYPE_GT:
       vtp->v7.sspDec.Ctrl = pp_mask;
@@ -1155,6 +1159,7 @@ vtpGetTriggerPayloadMask()
   switch(VTP_FW_Type)
     {
     case VTP_FW_TYPE_ECS:
+    case VTP_FW_TYPE_PCS:
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_HTCC:
@@ -1194,7 +1199,10 @@ vtpEnableTriggerFiberMask(int fiber_mask)
       mask = (vtp->v7.ftcalDec.Ctrl & 0xFFFF) | (fiber_mask<<16);
       vtp->v7.ftcalDec.Ctrl = mask;
       break;
-    }
+    case VTP_FW_TYPE_DC:
+      vtp->v7.dcrbRoadFind.Ctrl = (fiber_mask>>1) & 0x3;
+      break;
+  }
   VUNLOCK;
 
   for(i = 0; i < 4; i++)
@@ -1214,6 +1222,9 @@ vtpGetTriggerFiberMask()
   {
     case VTP_FW_TYPE_FTCAL:
       val = (vtp->v7.ftcalDec.Ctrl>>16) & 0xF;
+      break;
+    case VTP_FW_TYPE_DC:
+      val = (vtp->v7.dcrbRoadFind.Ctrl & 0x3)<<1;
       break;
   }
   VUNLOCK;
@@ -1989,13 +2000,16 @@ vtpFTSendScalers(char *host)
   ref = 33330000.0f / (float)val;
 
   for(i=0;i<256;i++)
+  {
     data[i] = ref * (float)vtp->v7.fthodoScalers.Scalers[i];
+    printf("vtp->v7.fthodoScalers.Scalers[%3d]=%9d\n", i, vtp->v7.fthodoScalers.Scalers[i]);
+  }
   vtp->v7.sd.ScalerLatch = 0;
   sprintf(name, "%s_VTPFT_HODOSCALERS", host);
   epics_json_msg_send(name, "float", 256, data);
 #endif
 
-  vtp->v7.ftcalTrigger.HistCtrl = 0x80000000;
+  vtp->v7.ftcalTrigger.HistCtrl = 0x60000000;
   printf("Start - Setting ftcalTrigger.HistCtrl, read back 0x%08X\n",
     vtp->v7.ftcalTrigger.HistCtrl);
   val = vtp->v7.ftcalTrigger.HistTime;
@@ -2039,7 +2053,7 @@ vtpFTSendScalers(char *host)
   sprintf(name, "%s_VTPFT_CLUSTERNHITS_HODO", host);
   epics_json_msg_send(name, "float", 9, data);
 
-  vtp->v7.ftcalTrigger.HistCtrl = 0x80000000 | 0x7F;
+  vtp->v7.ftcalTrigger.HistCtrl = 0x60000000 | 0x7F;
   printf("Stop - Setting ftcalTrigger.HistCtrl, read back 0x%08X\n",
     vtp->v7.ftcalTrigger.HistCtrl);
   VUNLOCK;
@@ -2733,7 +2747,7 @@ int
 vtpPcsSendScalers(char *host)
 {
   char name[100];
-  float ref, data[4];
+  float ref, data[4], pcudata[1];
   unsigned int val;
   CHECKINIT;
 
@@ -2752,15 +2766,49 @@ vtpPcsSendScalers(char *host)
   data[2] = ref * (float)vtp->v7.pcsTrigger.ScalerPeakW;
   data[3] = ref * (float)vtp->v7.pcsTrigger.ScalerHit;
 
+  pcudata[0] = ref * (float)vtp->v7.pcuTrigger.ScalerHit;
+
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
 
   sprintf(name, "%s_VTPPCS_CLUSTERS", host);
   epics_json_msg_send(name, "float", 4, data);
 
+  sprintf(name, "%s_VTPPCU_SCALER", host);
+  epics_json_msg_send(name, "float", 1, pcudata);
+
   return OK;
 }
 
+int
+vtpSetPCU_thresholds(int thr0, int thr1, int thr2)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_PCS);
+  
+  VLOCK;
+  vtp->v7.pcuTrigger.Thresholds[0] = thr0;
+  vtp->v7.pcuTrigger.Thresholds[1] = thr1;
+  vtp->v7.pcuTrigger.Thresholds[2] = thr2;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetPCU_thresholds(int *thr0, int *thr1, int *thr2)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_PCS);
+  
+  VLOCK;
+  *thr0 = vtp->v7.pcuTrigger.Thresholds[0];
+  *thr1 = vtp->v7.pcuTrigger.Thresholds[1];
+  *thr2 = vtp->v7.pcuTrigger.Thresholds[2];
+  VUNLOCK;
+
+  return OK;
+}
 
 /* ECS functions */
 
@@ -3144,7 +3192,7 @@ vtpPrintGtTriggerBitRegs()
 }
 
 int
-vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, float pulser_freq)
+vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, int delay, float pulser_freq)
 {
   float f;
   int strig, strigmask, ctrig, pulser;
@@ -3161,7 +3209,8 @@ vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, i
 
   strig = ((mult_min      & 0x7) <<4) |
           ((sector_mask   & 0x3F)<<8) |
-          ((coin_width    & 0xFF)<<16);
+          ((coin_width    & 0xFF)<<16) |
+          ((delay         & 0xFF)<<24);
 
   strigmask = ((strigger_mask & 0xFFFF) <<0);
 
@@ -3185,7 +3234,7 @@ vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, i
 }
 
 int
-vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, float *pulser_freq)
+vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq)
 {
   int strig, strigmask, ctrig, pulser;
   CHECKINIT;
@@ -3207,6 +3256,7 @@ vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min
   *mult_min      = (strig>>4)&0x7;
   *sector_mask   = (strig>>8)&0x3F;
   *coin_width    = (strig>>16)&0xFF;
+  *delay         = (strig>>24)&0xFF;
 
   *strigger_mask = (strigmask>>0)&0xFFFF;
 
@@ -3345,13 +3395,14 @@ vtpPcsPrintScalers()
 {
   double ref, rate; 
   int i; 
-  unsigned int scalers[5];
-  const char *scalers_name[5] = {
+  unsigned int scalers[6];
+  const char *scalers_name[6] = {
     "BusClk",
     "PeakU",
     "PeakV",
     "PeakW",
-    "Hit"
+    "Hit",
+    "Pcu"
    };
  
   CHECKINIT;
@@ -3365,6 +3416,7 @@ vtpPcsPrintScalers()
   scalers[2] = vtp->v7.pcsTrigger.ScalerPeakV;
   scalers[3] = vtp->v7.pcsTrigger.ScalerPeakW;
   scalers[4] = vtp->v7.pcsTrigger.ScalerHit;
+  scalers[5] = vtp->v7.pcuTrigger.ScalerHit;
 
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
@@ -3381,7 +3433,7 @@ vtpPcsPrintScalers()
     ref = (double)scalers[0] / (double)33330000;
   } 
 
-  for(i = 0; i < 5; i++) 
+  for(i = 0; i < 6; i++) 
   { 
     rate = (double)scalers[i]; 
     rate = rate / ref; 
@@ -3565,6 +3617,92 @@ vtpGetHcal_ClusterThreshold(int *thr)
   
   return OK;
 }
+
+
+int
+vtpDcPrintScalers()
+{
+  double ref, rate; 
+  int i; 
+  unsigned int scalers[7];
+  const char *scalers_name[7] = {
+    "BusClk",
+    "SL1",
+    "SL2",
+    "SL3",
+    "SL4",
+    "SL5",
+    "SL6"
+   };
+ 
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_DC);
+ 
+  VLOCK;
+  vtp->v7.sd.ScalerLatch = 1;
+
+  scalers[0] = vtp->v7.sd.Scaler_BusClk;
+  for(i=0;i<6;i++)
+    scalers[i+1] = vtp->v7.dcrbRoadFind.Scalers[i];
+
+  vtp->v7.sd.ScalerLatch = 0;
+  VUNLOCK;
+
+ 
+  printf("%s - \n", __FUNCTION__); 
+  if(!scalers[0]) 
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__); 
+    ref = 1.0; 
+  } 
+  else 
+  { 
+    ref = (double)scalers[0] / (double)33330000;
+  } 
+
+  for(i=0; i<7; i++) 
+  { 
+    rate = (double)scalers[i]; 
+    rate = rate / ref; 
+    if(scalers[i] == 0xFFFFFFFF) 
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate); 
+    else 
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate); 
+  }
+  return OK;
+}
+
+int
+vtpDcSendScalers(char *host)
+{
+  char name[100];
+  float ref, data[6];
+  int i;
+  unsigned int val;
+  CHECKINIT;
+
+  printf("%s...", __func__);
+
+  VLOCK;
+  vtp->v7.sd.ScalerLatch = 1;
+
+  //Read/normalize reference
+  val = vtp->v7.sd.Scaler_BusClk;
+  if(!val) val = 1;
+  ref = 33330000.0f / (float)val;
+
+  for(i=0;i<6;i++)
+    data[i] = ref * (float)vtp->v7.dcrbRoadFind.Scalers[i];
+
+  vtp->v7.sd.ScalerLatch = 0;
+  VUNLOCK;
+
+  sprintf(name, "%s_VTPDC_SUPERLAYER", host);
+  epics_json_msg_send(name, "float", 6, data);
+
+  return OK;
+}
+
 
 int
 vtpTiAck(int clearsync)

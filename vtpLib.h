@@ -360,6 +360,14 @@ typedef struct DcrbSegment_Struct
   /** 0x0004 */ BLANK[(0x100-0x004)/4];
 } DCRBSEGFIND_REGS;
 
+typedef struct DcrbRoad_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x020-0x004)/4];
+  /** 0x0020 */ volatile uint32_t Scalers[6];
+  /** 0x0038 */ BLANK[(0x100-0x038)/4];
+} DCRBROADFIND_REGS;
+
 typedef struct Trigger_Output_Struct
 {
   /** 0x0000 */ volatile uint32_t Latency;
@@ -398,6 +406,15 @@ typedef struct HtccTrigger_Struct
  /** 0x0080 */ volatile uint32_t ScalerHit;
  /** 0x0090 */ BLANK[(0x100-0x084)/4];
 } HTCCTRIGGER_REGS;
+
+typedef struct PcuTrigger_Struct
+{
+ /** 0x0000 */ volatile uint32_t Thresholds[3];
+ /** 0x000C */ volatile uint32_t NFrames;
+ /** 0x0020 */ BLANK[(0x080-0x010)/4];
+ /** 0x0080 */ volatile uint32_t ScalerHit;
+ /** 0x0090 */ BLANK[(0x100-0x084)/4];
+} PCUTRIGGER_REGS;
 
 typedef struct CtofTrigger_Struct
 {
@@ -471,7 +488,9 @@ typedef struct v7_bridge_struct
 
   /** 0x43C12000 */ SERDES_REGS qsfp[4];
 
-  /** 0x43C12400 */ BLANK[(0x3F00 - 0x2400)/4];
+  /** 0x43C12400 */ BLANK[(0x3E00 - 0x2400)/4];
+
+  /** 0x43C13E00 */ PCUTRIGGER_REGS pcuTrigger;
 
   /** 0x43C13F00 */ CTOFTRIGGER_REGS ctofTrigger;
 
@@ -505,7 +524,7 @@ typedef struct v7_bridge_struct
 
   /** 0x43C15100 */ V7_EB_REGS eb;
 
-  /** 0x43C15200 */ BLANK[(0x5300 - 0x5200)/4];
+  /** 0x43C15200 */ DCRBROADFIND_REGS dcrbRoadFind;
 
   /** 0x43C15300 */ CNDTRIGGER_REGS cndTrigger;
 
@@ -653,6 +672,8 @@ int  vtpSetPCS_dalitz(int dalitz_min, int dalitz_max);
 int  vtpGetPCS_dalitz(int *dalitz_min, int *dalitz_max);
 int  vtpPcsPrintScalers();
 int  vtpPcsSendScalers(char *host);
+int  vtpSetPCU_thresholds(int thr0, int thr1, int thr2);
+int  vtpGetPCU_thresholds(int *thr0, int *thr1, int *thr2);
 
 // VTP_FW_TYPE_ECS functions
 //int  vtpSetFadcSum_MaskEn(unsigned int mask[16]);
@@ -675,13 +696,14 @@ int  vtpSetGt_latency(int latency);
 int  vtpGetGt_latency();
 int  vtpSetGt_width(int width);
 int  vtpGetGt_width();
-int  vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, float pulser_freq);
-int  vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, float *pulser_freq);
+int  vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, int delay, float pulser_freq);
+int  vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq);
 int  vtpGtSendScalers(char *host);
 
 // VTP_FW_TYPE_DC functions
 int  vtpSetDc_SegmentThresholdMin(int inst, int threshold);
 int  vtpGetDc_SegmentThresholdMin(int inst, int *threshold);
+int  vtpDcSendScalers(char *host);
 
 // VTP_FW_TYPE_HCAL functions
 int  vtpSetHcal_ClusterCoincidence(int coin);
@@ -703,6 +725,7 @@ int  vtpFTSendScalers(char *host);
 // VTP_FW_TYPE_FTHODO functions
 int  vtpSetFTHODOemin(int emin);
 int  vtpGetFTHODOemin(int *emin);
+int  vtpFTHodoSendScalers(char *host);
 
 // VTP_FT_TYPE_HTCC functions
 int  vtpHtccSendScalers(char *host);

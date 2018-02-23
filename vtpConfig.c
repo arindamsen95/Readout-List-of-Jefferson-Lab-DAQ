@@ -187,6 +187,9 @@ vtpInitGlobals()
   vtpConf.pcs.dalitz_max = 0;
   vtpConf.pcs.nstrip_min = 0;
   vtpConf.pcs.nstrip_max = 0;
+  vtpConf.pcs.pcu_threshold[0] = 0;
+  vtpConf.pcs.pcu_threshold[1] = 0;
+  vtpConf.pcs.pcu_threshold[2] = 0;
 
   // ECS configuration
   for(i=0; i<16; i++)
@@ -225,6 +228,7 @@ vtpInitGlobals()
     vtpConf.gt.trgbits[i].sector_coin_width = 0;
     vtpConf.gt.trgbits[i].ssp_ctrigger_bit_mask = 0;
     vtpConf.gt.trgbits[i].pulser_freq = 0;
+    vtpConf.gt.trgbits[i].delay = 0;
   }
   
   // DC configuration
@@ -254,7 +258,7 @@ vtpReadConfigFile(char *filename_in)
   int    jj, ch;
   char   str_tmp[STRLEN], keyword[ROCLEN];
   char   host[ROCLEN], ROC_name[ROCLEN];
-  int    args,i1,i2,i3,i4,i5,i6,msk[16],trg_bit;
+  int    args,i1,i2,i3,i4,i5,i6,i7,msk[16],trg_bit;
   float  f1;
   unsigned int  ui1;
   char *clonparms;
@@ -331,6 +335,7 @@ vtpReadConfigFile(char *filename_in)
     do_parsing = 0; /* will parse only one file specified above, unless it changed during parsing */
     while ((ch = getc(fd)) != EOF)
     {
+      i1=i2=i3=i4=i5=i6=i7=0;
       if ( ch == '#' || ch == ' ' || ch == '\t' )
       {
         while ( getc(fd)!='\n' /*&& getc(fd)!=!= EOF*/ ) {} /*ERROR !!!*/
@@ -599,6 +604,13 @@ vtpReadConfigFile(char *filename_in)
           vtpConf.pcs.dalitz_min = i1;
           vtpConf.pcs.dalitz_max = i2;
         }
+        else if(!strcmp(keyword,"VTP_PCU_THRESHOLDS"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
+          vtpConf.pcs.pcu_threshold[0] = i1;
+          vtpConf.pcs.pcu_threshold[1] = i2;
+          vtpConf.pcs.pcu_threshold[2] = i3;
+        }
 
 
 
@@ -768,10 +780,21 @@ vtpReadConfigFile(char *filename_in)
           }
           vtpConf.gt.trgbits[trg_bit].pulser_freq = f1;
         }
+
+        else if(!strcmp(keyword,"VTP_GT_TRG_DELAY"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          if(trg_bit<0 || trg_bit>=32)
+          {
+            printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
+            return(-4);
+          }
+          vtpConf.gt.trgbits[trg_bit].delay = i1;
+        }
         
         else if(!strcmp(keyword,"VTP_GT_TRGBIT"))
         {
-          sscanf (str_tmp, "%*s %d %d %d %d %d %d", &i1, &i2, &i3, &i4, &i5, &i6);
+          sscanf (str_tmp, "%*s %d %d %d %d %d %d %d", &i1, &i2, &i3, &i4, &i5, &i6, &i7);
           if(i1<0 || i1>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",i1);
@@ -782,6 +805,7 @@ vtpReadConfigFile(char *filename_in)
           vtpConf.gt.trgbits[i1].sector_mult_min = i4;
           vtpConf.gt.trgbits[i1].sector_coin_width = i5;
           vtpConf.gt.trgbits[i1].ssp_ctrigger_bit_mask = i6;
+          vtpConf.gt.trgbits[i1].delay = i7;
         }
 
         else if(!strcmp(keyword,"VTP_DC_SEGTHR"))
@@ -960,6 +984,7 @@ vtpDownloadAll()
     vtpSetPCS_dipfactor(vtpConf.pcs.dipfactor);
     vtpSetPCS_nstrip(vtpConf.pcs.nstrip_min, vtpConf.pcs.nstrip_max);
     vtpSetPCS_dalitz(vtpConf.pcs.dalitz_min, vtpConf.pcs.dalitz_max);
+    vtpSetPCU_thresholds(vtpConf.pcs.pcu_threshold[0], vtpConf.pcs.pcu_threshold[1], vtpConf.pcs.pcu_threshold[2]);
   }
      
   if(vtpConf.fw_type == VTP_FW_TYPE_ECS)
@@ -999,6 +1024,7 @@ vtpDownloadAll()
           vtpConf.gt.trgbits[ii].sector_mult_min,
           vtpConf.gt.trgbits[ii].sector_coin_width,
           vtpConf.gt.trgbits[ii].ssp_ctrigger_bit_mask,
+          vtpConf.gt.trgbits[ii].delay,
           vtpConf.gt.trgbits[ii].pulser_freq
         );
     }
@@ -1117,6 +1143,7 @@ vtpUploadAll(char *string, int length)
     vtpGetPCS_dipfactor(&vtpConf.pcs.dipfactor);
     vtpGetPCS_nstrip(&vtpConf.pcs.nstrip_min, &vtpConf.pcs.nstrip_max);
     vtpGetPCS_dalitz(&vtpConf.pcs.dalitz_min, &vtpConf.pcs.dalitz_max);
+    vtpGetPCU_thresholds(&vtpConf.pcs.pcu_threshold[0], &vtpConf.pcs.pcu_threshold[1], &vtpConf.pcs.pcu_threshold[2]);
   }
   
   if(vtpConf.fw_type == VTP_FW_TYPE_ECS)
@@ -1155,6 +1182,7 @@ vtpUploadAll(char *string, int length)
           &vtpConf.gt.trgbits[i].sector_mult_min,
           &vtpConf.gt.trgbits[i].sector_coin_width,
           &vtpConf.gt.trgbits[i].ssp_ctrigger_bit_mask,
+          &vtpConf.gt.trgbits[i].delay, 
           &vtpConf.gt.trgbits[i].pulser_freq
         );
     }
@@ -1280,6 +1308,7 @@ vtpUploadAll(char *string, int length)
       sprintf(sss, "VTP_PCS_DIPFACTOR %d\n", vtpConf.pcs.dipfactor); ADD_TO_STRING;
       sprintf(sss, "VTP_PCS_NSTRIP %d %d\n", vtpConf.pcs.nstrip_min, vtpConf.pcs.nstrip_max); ADD_TO_STRING;
       sprintf(sss, "VTP_PCS_DALITZ %d %d\n", vtpConf.pcs.dalitz_min, vtpConf.pcs.dalitz_max); ADD_TO_STRING;
+      sprintf(sss, "VTP_PCU_THRESHOLDS %d %d %d\n", vtpConf.pcs.pcu_threshold[0], vtpConf.pcs.pcu_threshold[1], vtpConf.pcs.pcu_threshold[2]); ADD_TO_STRING;
     }
     
     if(vtpConf.fw_type == VTP_FW_TYPE_ECS)
@@ -1326,6 +1355,7 @@ vtpUploadAll(char *string, int length)
         sprintf(sss, "VTP_GT_TRG_SSP_SECTOR_MULT_MIN %d\n", vtpConf.gt.trgbits[i].sector_mult_min); ADD_TO_STRING;
         sprintf(sss, "VTP_GT_TRG_SSP_SECTOR_WIDTH %d\n", vtpConf.gt.trgbits[i].sector_coin_width); ADD_TO_STRING;
         sprintf(sss, "VTP_GT_TRG_PULSER_FREQ %.3f\n", vtpConf.gt.trgbits[i].pulser_freq); ADD_TO_STRING;
+        sprintf(sss, "VTP_GT_TRG_DELAY %d\n", vtpConf.gt.trgbits[i].delay); ADD_TO_STRING;
       }
     }
     
