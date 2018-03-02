@@ -158,6 +158,8 @@ typedef struct {
     int seed_emin;
     int seed_dt;
     int hodo_dt;
+    int deadtime;
+    int deadtime_emin;
   } ftcal;
 
   struct

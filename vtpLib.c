@@ -525,7 +525,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag)
     case VTP_FW_TYPE_HTCC:
     case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
-  ctrl = vtp->v7.fadcDec.Ctrl;
+      ctrl = vtp->v7.fadcDec.Ctrl;
       break;
     case VTP_FW_TYPE_GT:
       ctrl = vtp->v7.sspDec.Ctrl;
@@ -1975,6 +1975,67 @@ vtpGetFTHODOemin(int *emin)
   
   VLOCK;
   *emin = (vtp->v7.fthodoTrigger.Ctrl & VTP_FTHODO_CTRL_EMIN_MASK)>>0;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpSetFTCALcluster_deadtime(int deadtime)
+{
+  uint32_t val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  
+  VLOCK;
+  deadtime = deadtime/4;
+  val = vtp->v7.ftcalTrigger.DeadtimeCtrl;
+  val = (val & ~VTP_FTCAL_DEADTIMECTRL_DEADTIME_MASK) | ((deadtime&0x3f)<<16);
+  vtp->v7.ftcalTrigger.DeadtimeCtrl = val;
+  VUNLOCK;
+  
+  return OK;
+
+}
+
+int
+vtpGetFTCALcluster_deadtime(int *deadtime)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  
+  VLOCK;
+  *deadtime = ((vtp->v7.ftcalTrigger.DeadtimeCtrl & VTP_FTCAL_DEADTIMECTRL_DEADTIME_MASK)>>16)*4;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpSetFTCALcluster_emin(int emin)
+{
+  uint32_t val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  
+  VLOCK;
+  val = vtp->v7.ftcalTrigger.DeadtimeCtrl;
+  val = (emin & VTP_FTCAL_DEADTIMECTRL_EMIN_MASK)<<0;
+  vtp->v7.ftcalTrigger.DeadtimeCtrl = val;
+  VUNLOCK;
+  
+  return OK;
+
+}
+
+int
+vtpGetFTCALcluster_emin(int *emin)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  
+  VLOCK;
+  *emin = (vtp->v7.ftcalTrigger.DeadtimeCtrl & VTP_FTCAL_DEADTIMECTRL_EMIN_MASK)>>0;
   VUNLOCK;
 
   return OK;

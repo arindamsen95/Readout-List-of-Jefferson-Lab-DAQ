@@ -322,15 +322,18 @@ typedef struct ECSTrigger_Struct
  /** 0x0090 */ BLANK[(0x100-0x090)/4];
 } ECSTRIGGER_REGS;
 
-#define VTP_FTCAL_CTRL_SEEDTHR_MASK   0x00001FFF
-#define VTP_FTCAL_CTRL_SEEDDT_MASK    0x00070000
-#define VTP_FTCAL_CTRL_HODODT_MASK    0x07000000
+#define VTP_FTCAL_CTRL_SEEDTHR_MASK           0x00001FFF
+#define VTP_FTCAL_CTRL_SEEDDT_MASK            0x00070000
+#define VTP_FTCAL_CTRL_HODODT_MASK            0x07000000
+#define VTP_FTCAL_DEADTIMECTRL_DEADTIME_MASK  0x003F0000
+#define VTP_FTCAL_DEADTIMECTRL_EMIN_MASK      0x00003FFF
 
 typedef struct FTCALTrigger_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
   /** 0x0004 */ volatile uint32_t HistCtrl;
-  /** 0x0008 */ BLANK[(0x010-0x008)/4];
+  /** 0x0008 */ volatile uint32_t DeadtimeCtrl;
+  /** 0x000C */ BLANK[(0x010-0x00C)/4];
   /** 0x0010 */ volatile uint32_t HistTime;
   /** 0x0014 */ volatile uint32_t HistPosHodo;
   /** 0x0018 */ volatile uint32_t HistEnergyHodo;
@@ -720,6 +723,10 @@ int  vtpSetFTCALseed_dt(int dt);
 int  vtpGetFTCALseed_dt(int *dt);
 int  vtpSetFTCALhodo_dt(int dt);
 int  vtpGetFTCALhodo_dt(int *dt);
+int  vtpSetFTCALcluster_deadtime(int deadtime);
+int  vtpGetFTCALcluster_deadtime(int *deadtime);
+int  vtpSetFTCALcluster_deadtime_emin(int emin);
+int  vtpGetFTCALcluster_deadtime_emin(int *emin);
 int  vtpFTSendScalers(char *host);
 
 // VTP_FW_TYPE_FTHODO functions

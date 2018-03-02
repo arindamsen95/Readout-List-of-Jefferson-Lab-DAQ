@@ -245,6 +245,8 @@ vtpInitGlobals()
 
   vtpConf.ftcal.seed_emin = 0;
   vtpConf.ftcal.seed_dt = 0;
+  vtpConf.ftcal.deadtime = 0;
+  vtpConf.ftcal.deadtime_emin = 0x3FFF;
 }
 
 
@@ -863,6 +865,16 @@ vtpReadConfigFile(char *filename_in)
           sscanf (str_tmp, "%*s %d", &i1);
           vtpConf.fthodo.hit_emin = i1;
         }
+        else if(!strcmp(keyword,"VTP_FTCAL_CLUSTER_DEADTIME_EMIN"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ftcal.deadtime_emin = i1;
+        }
+        else if(!strcmp(keyword,"VTP_FTCAL_CLUSTER_DEADTIME"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.ftcal.deadtime = i1;
+        }
         else
         {
           printf("Error: VTP unknown line: fgets returns %s so keyword=%s\n\n",str_tmp,keyword);
@@ -880,7 +892,7 @@ vtpReadConfigFile(char *filename_in)
 int
 vtpDownloadAll()
 {
-  int ii, status;  
+  int ii;  
 //  char fname[FNLEN];
 //  char *clonparms;
   
@@ -1048,6 +1060,8 @@ vtpDownloadAll()
     vtpSetFTCALseed_emin(vtpConf.ftcal.seed_emin);
     vtpSetFTCALseed_dt(vtpConf.ftcal.seed_dt);
     vtpSetFTCALhodo_dt(vtpConf.ftcal.hodo_dt);
+    vtpSetFTCALcluster_deadtime(vtpConf.ftcal.deadtime);
+    vtpSetFTCALcluster_deadtime_emin(vtpConf.ftcal.deadtime_emin);
   }
 
   if(vtpConf.fw_type == VTP_FW_TYPE_FTHODO)
@@ -1205,6 +1219,8 @@ vtpUploadAll(char *string, int length)
     vtpGetFadcSum_MaskEn(vtpConf.ftcal.fadcsum_ch_en);
     vtpGetFTCALseed_emin(&vtpConf.ftcal.seed_emin);
     vtpGetFTCALseed_dt(&vtpConf.ftcal.seed_dt);
+    vtpGetFTCALcluster_deadtime(&vtpConf.ftcal.deadtime);
+    vtpGetFTCALcluster_deadtime_emin(&vtpConf.ftcal.deadtime_emin);
   } 
 
   if(vtpConf.fw_type == VTP_FW_TYPE_FTHODO)
@@ -1387,6 +1403,8 @@ vtpUploadAll(char *string, int length)
       sprintf(sss, "VTP_FTCAL_SEED_EMIN %d\n", vtpConf.ftcal.seed_emin); ADD_TO_STRING;
       sprintf(sss, "VTP_FTCAL_SEED_DT %d\n", vtpConf.ftcal.seed_dt); ADD_TO_STRING;
       sprintf(sss, "VTP_FTCAL_HODO_DT %d\n", vtpConf.ftcal.hodo_dt); ADD_TO_STRING;
+      sprintf(sss, "VTP_FTCAL_CLUSTER_DEADTIME_EMIN %d\n", vtpConf.ftcal.deadtime_emin); ADD_TO_STRING;
+      sprintf(sss, "VTP_FTCAL_CLUSTER_DEADTIME %d\n", vtpConf.ftcal.deadtime); ADD_TO_STRING;
     }
  
     if(vtpConf.fw_type == VTP_FW_TYPE_FTHODO)
