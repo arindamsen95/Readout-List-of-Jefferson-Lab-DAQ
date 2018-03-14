@@ -86,6 +86,11 @@ typedef struct {
     int nstrip_min;
     int nstrip_max;
     int pcu_threshold[3];
+    int cosmic_emin;
+    int cosmic_multmax;
+    int cosmic_hitwidth;
+    int cosmic_evaldelay;
+    int cosmic_pixelen;
   } pcs;
 
   struct

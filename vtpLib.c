@@ -1706,14 +1706,23 @@ vtpSetPCcosmic_emin(int emin)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
-  
+  /*CHECKTYPE();*/
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_PCS:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type\n",__func__);
+      return ERROR;
+  }
+
   VLOCK;
   val = vtp->v7.pcCosmic.Ctrl;
   val = (val & ~VTP_PCCOSMIC_CTRL_EMIN_MASK) | emin;
   vtp->v7.pcCosmic.Ctrl = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -1722,7 +1731,16 @@ int
 vtpGetPCcosmic_emin(int *emin)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  /*CHECKTYPE();*/
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_PCS:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type\n",__func__);
+      return ERROR;
+  }
   
   VLOCK;
   *emin = vtp->v7.pcCosmic.Ctrl & VTP_PCCOSMIC_CTRL_EMIN_MASK;
@@ -1736,7 +1754,16 @@ vtpSetPCcosmic_multmax(int multmax)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  /*CHECKTYPE();*/
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_PCS:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type\n",__func__);
+      return ERROR;
+  }
   
   VLOCK;
   val = vtp->v7.pcCosmic.Ctrl;
@@ -1752,7 +1779,16 @@ int
 vtpGetPCcosmic_multmax(int *multmax)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  /*CHECKTYPE();*/
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_PCS:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type\n",__func__);
+      return ERROR;
+  }
   
   VLOCK;
   *multmax = (vtp->v7.pcCosmic.Ctrl & VTP_PCCOSMIC_CTRL_MULTMAX_MASK)>>24;
@@ -1766,7 +1802,16 @@ vtpSetPCcosmic_width(int hitwidth)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  /*CHECKTYPE();*/
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_PCS:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type\n",__func__);
+      return ERROR;
+  }
   
   VLOCK;
   val = vtp->v7.pcCosmic.Delay;
@@ -1782,7 +1827,16 @@ int
 vtpGetPCcosmic_width(int *hitwidth)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  /*CHECKTYPE();*/
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_PCS:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type\n",__func__);
+      return ERROR;
+  }
   
   VLOCK;
   *hitwidth = (vtp->v7.pcCosmic.Delay & VTP_PCCOSMIC_DELAY_WIDTH_MASK)>>0;
@@ -1796,14 +1850,23 @@ vtpSetPCcosmic_delay(int evaldelay)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  /*CHECKTYPE();*/
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_PCS:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type\n",__func__);
+      return ERROR;
+  }
   
   VLOCK;
   val = vtp->v7.pcCosmic.Delay;
   val = (val & ~VTP_PCCOSMIC_DELAY_EVAL_MASK) | (evaldelay<<16);
   vtp->v7.pcCosmic.Delay = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -1812,7 +1875,16 @@ int
 vtpGetPCcosmic_delay(int *evaldelay)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  /*CHECKTYPE();*/
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_PCS:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type\n",__func__);
+      return ERROR;
+  }
   
   VLOCK;
   *evaldelay = (vtp->v7.pcCosmic.Delay & VTP_PCCOSMIC_DELAY_EVAL_MASK)>>16;
@@ -1828,7 +1900,16 @@ vtpSetPCcosmic_pixel(int enable)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  /*CHECKTYPE();*/
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_PCS:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type\n",__func__);
+      return ERROR;
+  }
   
   if(enable)
     enable = 1;
@@ -1836,9 +1917,10 @@ vtpSetPCcosmic_pixel(int enable)
   VLOCK;
   val = vtp->v7.pcCosmic.Ctrl;
   val = (val & ~VTP_PCCOSMIC_CTRL_PIXEL_MASK) | (enable<<16);
-  vtp->v7.pcCosmic.Delay = val;
+  vtp->v7.pcCosmic.Ctrl = val;
   VUNLOCK;
   
+printf("%s(%d): 0x%08X, 0x%08X\n", __func__, enable, val, vtp->v7.pcCosmic.Ctrl);
   return OK;
 
 }
@@ -1847,7 +1929,16 @@ int
 vtpGetPCcosmic_pixel(int *enable)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  /*CHECKTYPE();*/
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_PCS:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type\n",__func__);
+      return ERROR;
+  }
   
   VLOCK;
   *enable = (vtp->v7.pcCosmic.Ctrl & VTP_PCCOSMIC_CTRL_PIXEL_MASK)>>16;
@@ -2012,7 +2103,7 @@ vtpGetFTCALcluster_deadtime(int *deadtime)
 }
 
 int
-vtpSetFTCALcluster_emin(int emin)
+vtpSetFTCALcluster_deadtime_emin(int emin)
 {
   uint32_t val;
   CHECKINIT;
@@ -2029,7 +2120,7 @@ vtpSetFTCALcluster_emin(int emin)
 }
 
 int
-vtpGetFTCALcluster_emin(int *emin)
+vtpGetFTCALcluster_deadtime_emin(int *emin)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);

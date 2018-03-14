@@ -190,6 +190,11 @@ vtpInitGlobals()
   vtpConf.pcs.pcu_threshold[0] = 0;
   vtpConf.pcs.pcu_threshold[1] = 0;
   vtpConf.pcs.pcu_threshold[2] = 0;
+  vtpConf.pcs.cosmic_emin = 0;
+  vtpConf.pcs.cosmic_multmax = 0;
+  vtpConf.pcs.cosmic_hitwidth = 0;
+  vtpConf.pcs.cosmic_evaldelay = 0;
+  vtpConf.pcs.cosmic_pixelen = 0;
 
   // ECS configuration
   for(i=0; i<16; i++)
@@ -606,6 +611,31 @@ vtpReadConfigFile(char *filename_in)
           vtpConf.pcs.dalitz_min = i1;
           vtpConf.pcs.dalitz_max = i2;
         }
+        else if(!strcmp(keyword,"VTP_PCS_COSMIC_EMIN"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pcs.cosmic_emin = i1;
+        }
+        else if(!strcmp(keyword,"VTP_PCS_COSMIC_MULTMAX"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pcs.cosmic_multmax = i1;
+        }
+        else if(!strcmp(keyword,"VTP_PCS_COSMIC_HITWIDTH"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pcs.cosmic_hitwidth = i1;
+        }
+        else if(!strcmp(keyword,"VTP_PCS_COSMIC_EVALDELAY"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pcs.cosmic_evaldelay = i1;
+        }
+        else if(!strcmp(keyword,"VTP_PCS_COSMIC_PIXELEN"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          vtpConf.pcs.cosmic_pixelen = i1;
+        }
         else if(!strcmp(keyword,"VTP_PCU_THRESHOLDS"))
         {
           sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
@@ -997,6 +1027,11 @@ vtpDownloadAll()
     vtpSetPCS_nstrip(vtpConf.pcs.nstrip_min, vtpConf.pcs.nstrip_max);
     vtpSetPCS_dalitz(vtpConf.pcs.dalitz_min, vtpConf.pcs.dalitz_max);
     vtpSetPCU_thresholds(vtpConf.pcs.pcu_threshold[0], vtpConf.pcs.pcu_threshold[1], vtpConf.pcs.pcu_threshold[2]);
+    vtpSetPCcosmic_emin(vtpConf.pcs.cosmic_emin);
+    vtpSetPCcosmic_multmax(vtpConf.pcs.cosmic_multmax);
+    vtpSetPCcosmic_width(vtpConf.pcs.cosmic_hitwidth);
+    vtpSetPCcosmic_delay(vtpConf.pcs.cosmic_evaldelay);
+    vtpSetPCcosmic_pixel(vtpConf.pcs.cosmic_pixelen);
   }
      
   if(vtpConf.fw_type == VTP_FW_TYPE_ECS)
@@ -1158,6 +1193,11 @@ vtpUploadAll(char *string, int length)
     vtpGetPCS_nstrip(&vtpConf.pcs.nstrip_min, &vtpConf.pcs.nstrip_max);
     vtpGetPCS_dalitz(&vtpConf.pcs.dalitz_min, &vtpConf.pcs.dalitz_max);
     vtpGetPCU_thresholds(&vtpConf.pcs.pcu_threshold[0], &vtpConf.pcs.pcu_threshold[1], &vtpConf.pcs.pcu_threshold[2]);
+    vtpGetPCcosmic_emin(&vtpConf.pcs.cosmic_emin);
+    vtpGetPCcosmic_multmax(&vtpConf.pcs.cosmic_multmax);
+    vtpGetPCcosmic_width(&vtpConf.pcs.cosmic_hitwidth);
+    vtpGetPCcosmic_delay(&vtpConf.pcs.cosmic_evaldelay);
+    vtpGetPCcosmic_pixel(&vtpConf.pcs.cosmic_pixelen);
   }
   
   if(vtpConf.fw_type == VTP_FW_TYPE_ECS)
@@ -1325,6 +1365,11 @@ vtpUploadAll(char *string, int length)
       sprintf(sss, "VTP_PCS_NSTRIP %d %d\n", vtpConf.pcs.nstrip_min, vtpConf.pcs.nstrip_max); ADD_TO_STRING;
       sprintf(sss, "VTP_PCS_DALITZ %d %d\n", vtpConf.pcs.dalitz_min, vtpConf.pcs.dalitz_max); ADD_TO_STRING;
       sprintf(sss, "VTP_PCU_THRESHOLDS %d %d %d\n", vtpConf.pcs.pcu_threshold[0], vtpConf.pcs.pcu_threshold[1], vtpConf.pcs.pcu_threshold[2]); ADD_TO_STRING;
+      sprintf(sss, "VTP_PCS_COSMIC_EMIN %d\n", vtpConf.pcs.cosmic_emin); ADD_TO_STRING;
+      sprintf(sss, "VTP_PCS_COSMIC_MULTMAX %d\n", vtpConf.pcs.cosmic_multmax); ADD_TO_STRING;      
+      sprintf(sss, "VTP_PCS_COSMIC_HITWIDTH %d\n", vtpConf.pcs.cosmic_hitwidth); ADD_TO_STRING;
+      sprintf(sss, "VTP_PCS_COSMIC_EVALDELAY %d\n", vtpConf.pcs.cosmic_evaldelay); ADD_TO_STRING;
+      sprintf(sss, "VTP_PCS_COSMIC_PIXELEN %d\n", vtpConf.pcs.cosmic_pixelen); ADD_TO_STRING;
     }
     
     if(vtpConf.fw_type == VTP_FW_TYPE_ECS)
