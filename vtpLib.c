@@ -3955,16 +3955,17 @@ vtpEbResetFifo()
 int
 vtpDmaStatus()
 {
-  uint32_t cr, sr, len;
+  uint32_t cr, sr, len, da;
   CHECKINIT;
   
   VLOCK;
   cr = vtp->dma.S2MM_DMACR;
   sr = vtp->dma.S2MM_DMASR;
   len = vtp->dma.S2MM_LENGTH;
+  da = vtp->dma.S2MM_DA;
   VUNLOCK;
   
-  printf("%s: cr=0x%08X, sr=0x%08X, len=%d\n", __func__,  cr, sr, len);
+  printf("%s: cr=0x%08X, sr=0x%08X, len=%d, da=0x%08X\n", __func__,  cr, sr, len, da);
   return OK;
 }
 
@@ -3978,16 +3979,6 @@ vtpDmaInit()
   vtpDmaStatus();
   
   VLOCK;
-  vtp->dma.MM2S_DMACR =
-    (0<<0)  |   // 0-stops, 1-starts DMA engine
-    (1<<1)  |   // reserved, defaults to 1
-    (1<<2);     // 1-reset DMA engine
-    
-  vtp->dma.MM2S_DMACR =
-    (0<<0)  |   // 0-stops, 1-starts DMA engine
-    (1<<1)  |   // reserved, defaults to 1
-    (0<<2);     // 1-reset DMA engine
-
   vtp->dma.S2MM_DMACR =
     (0<<0)  |   // 0-stops, 1-starts DMA engine
     (1<<1)  |   // reserved, defaults to 1
@@ -4008,6 +3999,7 @@ vtpDmaInit()
 int
 vtpDmaStart(unsigned int destAddr, int maxLength)
 {
+  int i;
   CHECKINIT;
   
   printf("%s: start", __func__);
@@ -4015,19 +4007,10 @@ vtpDmaStart(unsigned int destAddr, int maxLength)
   
   VLOCK;
   vtp->dma.S2MM_DMACR =
-    (1<<1)  |   // 0-stops, 1-starts DMA engine
+    (1<<0)  |   // 0-stops, 1-starts DMA engine
     (1<<1)  |   // reserved, defaults to 1
     (0<<2);     // 1-reset DMA engine
-  VUNLOCK;
-  
-  printf("%s: 1    ", __func__);
-  vtpDmaStatus();
-  printf("%s: 2    ", __func__);
-  vtpDmaStatus();
-  printf("%s: 3    ", __func__);
-  vtpDmaStatus();
-  
-  VLOCK;
+
   vtp->dma.S2MM_DA_MSB = 0;
   vtp->dma.S2MM_DA = destAddr;
   vtp->dma.S2MM_LENGTH = maxLength;
@@ -4035,7 +4018,10 @@ vtpDmaStart(unsigned int destAddr, int maxLength)
   VUNLOCK;
   
   printf("%s: end  ", __func__);
+  for(i=0;i<10;i++)
+  {
   vtpDmaStatus();
+  }
   
   return OK;
 }
@@ -4073,13 +4059,10 @@ vtpDmaWaitDone()
 int
 vtpEbBuildTestEvent(int len)
 {
-//  unsigned int val;
-  
   CHECKINIT;
   
   VLOCK;
-  vtp->eb.EbCtrl = 0x4 | (len<<8);
-//  val = vtp->eb.EbCtrl;
+  vtp->eb.EbCtrl = 0x8 | 0x4 | (len<<8);
   VUNLOCK;
   
   return OK;
