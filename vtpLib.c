@@ -4095,17 +4095,17 @@ vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
     VUNLOCK;
     
     if(status & 0x1)
-	{
+    {
       if(retry-- > 0)
-	  {
+      {
         continue;
-	  }
+      }
       else
-	  {
+      {
         printf("vtpEbTiReadEvent: TIMEOUT ERROR\n");
         break;
-	  }
-	}    
+      }
+    }    
 
     VLOCK;
     *pBuf++ = vtp->eb.TiFifo;
@@ -4130,6 +4130,7 @@ vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize)
   int status, cnt = 0;
   CHECKINIT;
   
+  int retry=100;
   while(cnt < maxsize)
   {
     VLOCK;
@@ -4137,7 +4138,53 @@ vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize)
     VUNLOCK;
     
     if(status & 0x2)
+    {
+      if(retry-- > 0)
+      {
+        continue;
+      }
+      else
+      {
+        printf("vtpEbReadEvent: TIMEOUT ERROR\n");
+        break;
+      }
+    }    
+    
+    VLOCK;
+    *pBuf++ = vtp->eb.VtpFifo;
+    VUNLOCK;
+
+    if(status & 0x20000)
       break;
+    
+    if(++cnt > maxsize)
+    {
+      printf("too many event words...exitting\n");
+      break;
+    }
+  }
+  
+  return cnt;
+}
+
+int
+vtpEbReadEvent_test(uint32_t *pBuf, uint32_t maxsize)
+{
+  int status, cnt = 0;
+  CHECKINIT;
+  
+  while(cnt < maxsize)
+  {
+    VLOCK;
+    status = vtp->eb.EbStatus;
+    VUNLOCK;
+   
+    // if buffer is empty, try again until data is ready 
+    if(status & 0x2)
+    {
+      printf("{cnt=%d}", cnt);
+      continue;
+    }
     
     VLOCK;
     *pBuf++ = vtp->eb.VtpFifo;
