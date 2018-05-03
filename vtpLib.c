@@ -66,6 +66,9 @@ static int VTP_FW_Type = 0;
 
 static volatile ZYNC_REGS *vtp = NULL;
 
+static int vtpEbTiEventReadErrors;
+static int vtpEbEventReadErrors;
+
 /* Mutex to guard VTP read/writes */
 pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
 #define VLOCK     if(pthread_mutex_lock(&vtpMutex)<0) perror("pthread_mutex_lock");
@@ -214,6 +217,9 @@ vtpInit(int iFlag)
   VUNLOCK;
 
   printf("VTP SD Daughtercard ID = 0x%08X\n", sdStatus);
+
+  vtpEbTiEventReadErrors = 0;
+  vtpEbEventReadErrors = 0;
 
   return rval;
 }
@@ -504,10 +510,11 @@ vtpSerdesCheckLinks()
 }
 
 int
-vtpSerdesStatus(int type, uint16_t dev, int pflag)
+vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
 {
   volatile SERDES_REGS *sdev;
   uint32_t status = 0, ctrl = 0, ctrl2, latency = 0;
+  int index;
   CHECKINIT;
   CHECKTYPEDEV;
   
@@ -542,7 +549,10 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag)
   }
   VUNLOCK;
 
-  if(pflag)
+
+  if(pflag==1) /* print */
+  {
+    if(dev==0)
     {
       printf("\n");
       if(type == VTP_SERDES_VXS)
@@ -558,22 +568,58 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag)
       printf("------------------------------------------------------------------------------\n");
     }
   
-  printf("%2d  ", dev);
-  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(0))?"U":"D");
-  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(1))?"U":"D");
-  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(2))?"U":"D");
-  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(3))?"U":"D");
-  printf("%s  ", (status & VTP_SERDES_STATUS_CHUP)?"U":"D");
-  printf("%3d    ", (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>24);
-  printf("%s     ", (ctrl2 & VTP_SERDES_CTRL_GT_RESET)?"1":"0");
-  if(type == VTP_SERDES_VXS)
-  printf("%s", (ctrl & (1<<dev)) ? "1   ":"0   ");
-  else
-    printf("%s", (ctrl & (1<<(dev+16))) ?  "1   ":"0   ");
-  printf("%5d ", ((latency>>16)&0xFFFF)*4);
-  printf("%5d ", ((latency>>0)&0xFFFF)*4);
-  printf("\n");
-  
+    printf("%2d  ", dev);
+    printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(0))?"U":"D");
+    printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(1))?"U":"D");
+    printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(2))?"U":"D");
+    printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(3))?"U":"D");
+    printf("%s  ", (status & VTP_SERDES_STATUS_CHUP)?"U":"D");
+    printf("%3d    ", (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>24);
+    printf("%s     ", (ctrl2 & VTP_SERDES_CTRL_GT_RESET)?"1":"0");
+    if(type == VTP_SERDES_VXS)
+      printf("%s", (ctrl & (1<<dev)) ? "1   ":"0   ");
+    else
+      printf("%s", (ctrl & (1<<(dev+16))) ?  "1   ":"0   ");
+    printf("%5d ", ((latency>>16)&0xFFFF)*4);
+    printf("%5d ", ((latency>>0)&0xFFFF)*4);
+    printf("\n");
+  }
+  else /* send */
+  {
+    index = 0;
+
+    data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(0)) ? 1 : 0;
+    if(index>NSERDES) return(OK);
+
+    data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(1)) ? 1 : 0;
+    if(index>NSERDES) return(OK);
+
+    data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(2)) ? 1 : 0;
+    if(index>NSERDES) return(OK);
+
+    data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(3)) ? 1 : 0;
+    if(index>NSERDES) return(OK);
+
+    data[index++] = (status & VTP_SERDES_STATUS_CHUP) ? 1 : 0;
+    if(index>NSERDES) return(OK);
+
+    data[index++] = (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>24;
+    if(index>NSERDES) return(OK);
+
+    data[index++] = (ctrl2 & VTP_SERDES_CTRL_GT_RESET) ? 1 : 0;
+    if(index>NSERDES) return(OK);
+
+    if(type == VTP_SERDES_VXS) data[index++] = (ctrl & (1<<dev)) ? 1 : 0;
+    else                       data[index++] = (ctrl & (1<<(dev+16))) ? 1 : 0;
+    if(index>NSERDES) return(OK);
+
+    data[index++] = ((latency>>16)&0xFFFF)*4;
+    if(index>NSERDES) return(OK);
+
+    data[index++] = ((latency>>0)&0xFFFF)*4;
+    if(index>NSERDES) return(OK);
+  }
+
   return OK;
 }
 
@@ -581,11 +627,13 @@ int
 vtpSerdesStatusAll()
 {
   int i;
+  int data[NSERDES];
+
   for(i = 0; i < 16; i++)
-    vtpSerdesStatus(VTP_SERDES_VXS, i, (i==0));
+    vtpSerdesStatus(VTP_SERDES_VXS, i, 1, data);
 
   for(i = 0; i < 4; i++)
-    vtpSerdesStatus(VTP_SERDES_QSFP, i, (i==0));
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 1, data);
 
   return OK;
 }
@@ -1076,6 +1124,47 @@ vtpSendScalers()
       r = vtpFTSendScalers(host);
       break;
   }
+  vtpUnlock();
+
+  return r;
+}
+
+int
+vtpSendSerdes()
+{
+  int i, r = OK;
+  char host[100];
+  char name[100];
+  int data[NSERDES+1];
+  int vxs_2_vmeslot[16] = {10,13,9,14,8,15,7,16,6,17,5,18,4,19,3,20};
+  CHECKINIT;
+
+  gethostname(host,sizeof(host));
+  for(i=0; i<strlen(host); i++)
+  {
+    if(host[i] == '.')
+    {
+      host[i] = '\0';
+      break;
+    }
+  }
+
+  vtpLock();
+
+  for(i = 0; i < 16; i++)
+  {
+    sprintf(name, "%s_VTP_SERDES_SLOT%d", host, vxs_2_vmeslot[i]);
+    vtpSerdesStatus(VTP_SERDES_VXS, i, 0, data);
+    epics_json_msg_send(name, "int", NSERDES, data);
+  }
+
+  for(i = 0; i < 4; i++)
+  {
+    sprintf(name, "%s_VTP_SERDES_QSFP%d", host, i);
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 0, data);
+    epics_json_msg_send(name, "int", NSERDES, data);
+  }
+
   vtpUnlock();
 
   return r;
@@ -4102,7 +4191,8 @@ vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
       }
       else
       {
-        printf("vtpEbTiReadEvent: TIMEOUT ERROR\n");
+        vtpEbTiEventReadErrors++;
+        printf("vtpEbTiReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpEbTiEventReadErrors);
         break;
       }
     }    
@@ -4124,13 +4214,15 @@ vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
   return cnt;
 }
 
+#define VTP_EB_NRETRIES   10000
+
 int
 vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize)
 {
   int status, cnt = 0;
   CHECKINIT;
   
-  int retry=100;
+  int retry=VTP_EB_NRETRIES;
   while(cnt < maxsize)
   {
     VLOCK;
@@ -4145,7 +4237,8 @@ vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize)
       }
       else
       {
-        printf("vtpEbReadEvent: TIMEOUT ERROR\n");
+        vtpEbEventReadErrors++;
+        printf("vtpEbReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpEbEventReadErrors);
         break;
       }
     }    

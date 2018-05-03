@@ -597,10 +597,12 @@ int  vtpBReady();
 int  vtpV7GetFW_Version();
 int  vtpV7GetFW_Type();
 int  vtpSendScalers();
+int  vtpSendSerdes();
 					     
 int  vtpCheckAddresses();
 
-int  vtpSerdesStatus(int type, uint16_t pp, int pflag);
+#define NSERDES 10
+int  vtpSerdesStatus(int type, uint16_t pp, int pflag, int data[NSERDES]);
 int  vtpSerdesEnable(int type, uint16_t idx, int enable);
 int  vtpSerdesStatusAll();
 int  vtpSerdesCheckLinks();
