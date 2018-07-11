@@ -10,28 +10,38 @@
 # $Rev$
 #
 
+USE_IPC=0
+USE_ACTIVEMQ=0
+USE_CODA=0
+
 VTPLIB_PATH		= ../
 ARCH			= ${shell uname -m}
 KERNEL_VERSION		= ${shell uname -r}
 
-CC				= g++
+CC				= gcc
 AR				= ar
 RANLIB		= ranlib
 INCS			= -I. -I${VTPLIB_PATH} -I/usr/local/include -I$(CODA)/Linux_armv7l/include
 CFLAGS		= -Wall -g ${INCS} \
-            -L. -lrt -li2c -lm
+            -L. -lrt -li2c -lm -DLinux_armv7l
 
 #LIBNAMES	= $(CODA)/src/mysql4.1.20/$(OSTYPE_MACHINE)/lib/libmysql4.1.20.a
-LIBNAMES  = $(CODA)/src/codautil/$(OSTYPE_MACHINE)/lib/libcodautil.a
-LIBNAMES += /usr/local/lib/libactivemq-cpp.so
+ifeq ($(USE_CODA),1)
+	LIBNAMES  = $(CODA)/src/codautil/$(OSTYPE_MACHINE)/lib/libcodautil.a
+endif
+ifeq ($(USE_ACTIVEMQ),1)
+	LIBNAMES += /usr/local/lib/libactivemq-cpp.so
+endif
 LIBNAMES += -lapr-1
 LIBNAMES += -lcrypt -lssl -lcrypto -ldl -lz
-LIBNAMES += -L/usr/kerberos/lib -lpthread -pthread -Wl,-rpath -Wl,/usr/local/lib
+LIBNAMES += -L/usr/kerberos/lib -lpthread -pthread -Wl,-rpath -l/usr/local/lib
 
 #LIBNAMES	= $(CODA)/src/codautil/Linux_armv7l/lib/libcodautil.a
-LIBNAMES	+= $(CODA)/src/ipc/Linux_armv7l/lib/libipc.a
+ifeq ($(USE_IPC),1)
+	LIBNAMES	+= $(CODA)/src/ipc/Linux_armv7l/lib/libipc.a
+endif
 #LIBNAMES	+= /usr/local/lib/libactivemq-cpp.so
-LIBNAMES	+= ../libvtp.a
+LIBNAMES	+= -lvtp
 
 PROGS			= vtpLibTest i2cvtpmon vtpSPItest vtpI2Ctest vtpDmaTest i2cvtpsetup vtpConfigTest vtpStatus
 SRC			= $(PROGS:%=%.c)
@@ -40,7 +50,7 @@ DEPS			= $(SRC:%.c=%.d)
 all: $(PROGS)
 
 clean distclean:
-	@rm -f $(PROGS) *~ 
+	@rm -f $(PROGS) *~
 
 %: %.c
 	@echo "Making $@"
@@ -50,7 +60,7 @@ clean distclean:
 	@echo ""
 	@echo "Building $@ from $<"
 	@set -e; rm -f $@; \
-	$(CC) -MM -shared ${CFLAGS} $(LIBNAMES) $(INCS) $< > $@.$$$$; \
+	$(CC) -MM -shared ${CFLAGS} $(INCS) $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,\1 $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 

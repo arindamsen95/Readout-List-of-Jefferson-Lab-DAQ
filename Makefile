@@ -12,6 +12,9 @@
 #
 #
 
+USE_IPC  ?= 0
+USE_CODA ?= 0
+
 # Uncomment DEBUG line, to include some debugging info ( -g and -Wall)
 DEBUG   ?= 1
 QUIET	?= 1
@@ -29,8 +32,12 @@ INCS			= -I. -I/usr/local/include -I$(CODA)/src/ipc/ipc.s -I$(CODA)/src/codautil
 
 LIBS			= lib${BASENAME}.a
 
+ifeq ($(USE_CODA),1)
 LIBNAMES        = $(CODA)/src/codautil/Linux_armv7l/lib/libcodautil.a
+endif
+ifeq ($(USE_IPC),1)
 LIBNAMES        = $(CODA)/src/ipc/Linux_armv7l/lib/libipc.a
+endif
 
 ifdef DEBUG
 CFLAGS			+= -Wall -g

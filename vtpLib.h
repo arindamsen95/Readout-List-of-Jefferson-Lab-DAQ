@@ -27,7 +27,7 @@
 #ifndef ERROR
 #define ERROR -1
 #endif
-#ifndef OK 
+#ifndef OK
 #define OK 0
 #endif
 
@@ -478,11 +478,11 @@ typedef struct v7_bridge_struct
   /** 0x43C10200 */ SD_REGS sd;
 
   /** 0x43C10300 */ FADCDECODER_REGS fadcDec;
-  
+
   /** 0x43C10400 */ SSPDECODER_REGS sspDec;
 
   /** 0x43C10500 */ DCRBDECODER_REGS dcrbDec;
-  
+
   /** 0x43C10600 */ FTCALDECODER_REGS ftcalDec;
 
   /** 0x43C10700 */ BLANK[(0x1000 - 0x700)/4];
@@ -502,19 +502,19 @@ typedef struct v7_bridge_struct
   /** 0x43C14100 */ ECTRIGGER_REGS ecTrigger[2];
 
   /** 0x43C14300 */ FADCSUM_REGS fadcSum;
-  
+
   /** 0x43C14400 */ DCRBSEGFIND_REGS dcrbSegFind[2];
-  
+
   /** 0x43C14600 */ ECCOSMIC_REGS ecCosmic[2];
 
   /** 0x43C14800 */ HCAL_REGS hcal;
-  
+
   /** 0x43C14900 */ BLANK[(0x4A00 - 0x4900)/4];
-  
+
   /** 0x43C14A00 */ PCCOSMIC_REGS pcCosmic;
-  
+
   /** 0x43C14B00 */ FTCALTRIGGER_REGS ftcalTrigger;
-  
+
   /** 0x43C14C00 */ PCSTRIGGER_REGS pcsTrigger;
 
   /** 0x43C14D00 */ ECSTRIGGER_REGS ecsTrigger;
@@ -536,9 +536,9 @@ typedef struct v7_bridge_struct
   /** 0x43C15800 */ BLANK[(0x6000 - 0x5800)/4];
 
   /** 0x43C16000 */ GTBIT_REGS gtBit[16]; /* 128 bytes */
-  
+
   /** 0x43C16800 */ BLANK[(0xFFF4 - 0x6800)/4];
-  
+
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
   /** 0x43C1FFFC */ volatile uint32_t Cfg;
@@ -566,9 +566,9 @@ typedef struct zync_reg_struct
 } ZYNC_REGS;
 
 /* Open/Close argument (device mask bits) */
-#define VTP_FPGA_OPEN  (1<<0)					     
-#define VTP_I2C_OPEN   (1<<1)					     
-#define VTP_SPI_OPEN   (1<<2)					     
+#define VTP_FPGA_OPEN  (1<<0)
+#define VTP_I2C_OPEN   (1<<1)
+#define VTP_SPI_OPEN   (1<<2)
 
 /* Initialization Flags */
 #define VTP_INIT_CLK_MASK            0x0000000F
@@ -596,8 +596,10 @@ int  vtpInit(int iFlag);
 int  vtpBReady();
 int  vtpV7GetFW_Version();
 int  vtpV7GetFW_Type();
+#ifdef IPC
 int  vtpSendScalers();
-					     
+#endif
+
 int  vtpCheckAddresses();
 
 int  vtpSerdesStatus(int type, uint16_t pp, int pflag);
@@ -674,7 +676,9 @@ int  vtpGetPCS_nstrip(int *nstripmin, int *nstripmax);
 int  vtpSetPCS_dalitz(int dalitz_min, int dalitz_max);
 int  vtpGetPCS_dalitz(int *dalitz_min, int *dalitz_max);
 int  vtpPcsPrintScalers();
+#ifdef IPC
 int  vtpPcsSendScalers(char *host);
+#endif
 int  vtpSetPCU_thresholds(int thr0, int thr1, int thr2);
 int  vtpGetPCU_thresholds(int *thr0, int *thr1, int *thr2);
 
@@ -692,7 +696,9 @@ int  vtpGetECS_nstrip(int *nstripmin, int *nstripmax);
 int  vtpSetECS_dalitz(int dalitz_min, int dalitz_max);
 int  vtpGetECS_dalitz(int *dalitz_min, int *dalitz_max);
 int  vtpEcsPrintScalers();
+#ifdef IPC
 int  vtpEcsSendScalers(char *host);
+#endif
 
 // VTP_FW_TYPE_GT functions
 int  vtpSetGt_latency(int latency);
@@ -701,12 +707,16 @@ int  vtpSetGt_width(int width);
 int  vtpGetGt_width();
 int  vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, int delay, float pulser_freq);
 int  vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq);
+#ifdef IPC
 int  vtpGtSendScalers(char *host);
+#endif
 
 // VTP_FW_TYPE_DC functions
 int  vtpSetDc_SegmentThresholdMin(int inst, int threshold);
 int  vtpGetDc_SegmentThresholdMin(int inst, int *threshold);
+#ifdef IPC
 int  vtpDcSendScalers(char *host);
+#endif
 
 // VTP_FW_TYPE_HCAL functions
 int  vtpSetHcal_ClusterCoincidence(int coin);
@@ -727,15 +737,21 @@ int  vtpSetFTCALcluster_deadtime(int deadtime);
 int  vtpGetFTCALcluster_deadtime(int *deadtime);
 int  vtpSetFTCALcluster_deadtime_emin(int emin);
 int  vtpGetFTCALcluster_deadtime_emin(int *emin);
+#ifdef IPC
 int  vtpFTSendScalers(char *host);
+#endif
 
 // VTP_FW_TYPE_FTHODO functions
 int  vtpSetFTHODOemin(int emin);
 int  vtpGetFTHODOemin(int *emin);
+#ifdef IPC
 int  vtpFTHodoSendScalers(char *host);
+#endif
 
 // VTP_FT_TYPE_HTCC functions
+#ifdef IPC
 int  vtpHtccSendScalers(char *host);
+#endif
 int  vtpHtccPrintScalers();
 int  vtpSetHTCC_thresholds(int thr0, int thr1, int thr2);
 int  vtpGetHTCC_thresholds(int *thr0, int *thr1, int *thr2);
@@ -747,7 +763,9 @@ int  vtpSetCTOF_nframes(int nframes);
 int  vtpGetCTOF_nframes(int *nframes);
 
 // VTP_FT_TYPE_FTOF functions
+#ifdef IPC
 int  vtpFtofSendScalers(char *host);
+#endif
 int  vtpFtofPrintScalers();
 int  vtpSetFTOF_thresholds(int thr0, int thr1, int thr2);
 int  vtpGetFTOF_thresholds(int *thr0, int *thr1, int *thr2);
@@ -755,7 +773,9 @@ int  vtpSetFTOF_nframes(int nframes);
 int  vtpGetFTOF_nframes(int *nframes);
 
 // VTP_FT_TYPE_CND functions
+#ifdef IPC
 int  vtpCndSendScalers(char *host);
+#endif
 int  vtpCndPrintScalers();
 int  vtpSetCND_thresholds(int thr0, int thr1, int thr2);
 int  vtpGetCND_thresholds(int *thr0, int *thr1, int *thr2);
@@ -781,6 +801,12 @@ int  vtpEbReadAndDecodeEvent();
 int  vtpSetWindow(int, int);
 int  vtpTiLinkInit();
 int  vtpEbResetFifo();
+int  vtpDmaStatus();
+int  vtpDmaInit();
+int  vtpDmaStart(unsigned int destAddr, int maxLength);
+int  vtpDmaWaitDone();
+int  vtpEbBuildTestEvent(int len);
+int  vtpEbReset();
 int  vtpSetBlockLevel(int level);
 int  vtpTiLinkGetBlockLevel(int print);
 int  vtpTiAck(int clearsync);
@@ -792,5 +818,10 @@ int  vtpTryLock();
 int  vtpTimedLock(int time_seconds);
 int  vtpUnlock();
 int  vtpCheckMutexHealth(int time_seconds);
+
+int  vtpDmaMemOpen(int nbuffers, int size);
+int  vtpDmaMemClose();
+unsigned long vtpDmaMemGetPhysAddress(int buffer_id);
+unsigned long vtpDmaMemGetLocalAddress(int buffer_id);
 
 #endif /* VTPLIB_H */

@@ -51,7 +51,7 @@ int
 vtpSPIOpen()
 {
   int iid, ret;
-  
+
   for(iid = 0; iid < nVTPSPIFD; iid++)
     {
       if(vtpSPIFD[iid] > 0)
@@ -60,16 +60,16 @@ vtpSPIOpen()
 		 __func__);
 	  return ERROR;
 	}
-      
+
       vtpSPIFD[iid] = open(vtpSPIDev[iid], O_RDWR | O_SYNC);
-      
+
       if(vtpSPIFD[iid] < 0)
 	{
-	  printf("%s: ERROR from open: %s (%d)",
+	  printf("%s: ERROR from open: %s (%d)\n",
 		 __func__, strerror(errno), errno);
 	  return ERROR;
 	}
-      
+
       /*
        * spi vtpSpiMode
        */
@@ -78,11 +78,11 @@ vtpSPIOpen()
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_MODE32, &vtpSpiMode[iid]);
       if (ret == -1)
         perror("can't set spi mode");
-#endif      
+#endif
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_RD_MODE32, &vtpSpiMode[iid]);
       if (ret == -1)
 	perror("can't get spi mode");
-      
+
       /*
        * bits per word
        */
@@ -90,11 +90,11 @@ vtpSPIOpen()
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_BITS_PER_WORD, &vtpSpiBits);
       if (ret == -1)
         perror("can't set bits per word");
-#endif            
+#endif
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_RD_BITS_PER_WORD, &vtpSpiBits[iid]);
       if (ret == -1)
 	perror("can't get bits per word");
-      
+
       /*
        * max speed hz
        */
@@ -102,18 +102,18 @@ vtpSPIOpen()
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_MAX_SPEED_HZ, &vtpSpiSpeed);
       if (ret == -1)
         perror("can't set max speed hz");
-#endif      
+#endif
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_RD_MAX_SPEED_HZ, &vtpSpiSpeed[iid]);
       if (ret == -1)
 	perror("can't get max speed hz");
-      
+
       printf("%s: \n",__func__);
       printf("\tspi mode:      0x%x\n", vtpSpiMode[iid]);
       printf("\tbits per word: %d\n", vtpSpiBits[iid]);
       printf("\tmax speed:     %d Hz (%d KHz)\n",
 	     vtpSpiSpeed[iid], vtpSpiSpeed[iid]/1000);
     }
-  
+
   return OK;
 }
 
@@ -121,7 +121,7 @@ int
 vtpSPIClose()
 {
   int iid;
-  
+
   for(iid = 0; iid < nVTPSPIFD; iid++)
     {
       CHECKSPIID(iid);
@@ -147,7 +147,7 @@ vtpSpiTransfer(int id, uint8_t const *tx, uint8_t const *rx, size_t len)
       .speed_hz = vtpSpiSpeed[id],
       .bits_per_word = vtpSpiBits[id],
     };
-  
+
   if (vtpSpiMode[id] & SPI_TX_QUAD)
     tr.tx_nbits = 4;
   else if (vtpSpiMode[id] & SPI_TX_DUAL)
@@ -163,7 +163,7 @@ vtpSpiTransfer(int id, uint8_t const *tx, uint8_t const *rx, size_t len)
       else if (vtpSpiMode[id] & (SPI_RX_QUAD | SPI_RX_DUAL))
 	tr.tx_buf = 0;
     }
-  
+
   if(ioctl(vtpSPIFD[id], SPI_IOC_MESSAGE(1), &tr) < 1)
     {
       lerrno = errno;
@@ -171,7 +171,7 @@ vtpSpiTransfer(int id, uint8_t const *tx, uint8_t const *rx, size_t len)
 	     lerrno, strerror(lerrno));
       return;
     }
-  
+
 }
 
 #ifdef DONTUSE
@@ -181,7 +181,7 @@ vtpSPIRead(int id, unsigned int addr)
 {
   uint8_t rval = 0;
   uint8_t tx_buf[4], rx_buf[4];
-  
+
   CHECKSPIID(id);
 
   tx_buf[0] = SI5341_CMD_SETADDR;
@@ -190,7 +190,7 @@ vtpSPIRead(int id, unsigned int addr)
   tx_buf[3] = 0;
 
   vtpSpiTransfer(id, tx_buf, rx_buf, sizeof(tx_buf);
-  
+
   return rval;
 }
 

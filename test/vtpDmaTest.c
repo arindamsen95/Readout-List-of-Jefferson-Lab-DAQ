@@ -17,48 +17,67 @@
 
 #define BUILD_TEST_LEN  100
 
-int 
-main(int argc, char *argv[]) 
+int
+main(int argc, char *argv[])
 {
   int result, i;
-  unsigned int buf[BUILD_TEST_LEN];
-  
+  volatile unsigned int *buf;
+
   if(vtpCheckAddresses() == ERROR)
     exit(-1);
-  vtpOpen(VTP_FPGA_OPEN | VTP_I2C_OPEN | VTP_SPI_OPEN);
-//  if(vtpOpen(VTP_FPGA_OPEN | VTP_I2C_OPEN | VTP_SPI_OPEN) != OK)
-//    goto CLOSE;
-  
-//  vtpZ7CfgLoad("/usr/clas12/release/1.3.0/parms/firmwares/fe_vtp_hallb_z7.bin");
-  
-//  vtpV7CfgStart();
-//  vtpV7CfgLoad("/usr/clas12/release/1.3.0/parms/firmwares/fe_vtp_hallb_v7_ec.bin");
-//  vtpV7CfgEnd();
-  
+
+  int openmask = VTP_FPGA_OPEN;
+  if(vtpOpen(openmask) != openmask)
+    {
+      printf("burp\n");
+      goto CLOSE;
+    }
+
+  /* vtpZ7CfgLoad("../firmware/fe_vtp_hallb_z7.bin"); */
+
+  /* vtpV7CfgStart(); */
+  /* vtpV7CfgLoad("../firmware/fe_vtp_hallb_v7_ec.bin"); */
+  /* vtpV7CfgEnd(); */
+
 //  vtpInit(1);
   vtpInit(VTP_INIT_SKIP);
   vtpSetBlockLevel(1);
+  vtpDmaMemOpen(1, 0x1000);
   vtpDmaInit();
 
-  vtpEbReset();  
+  vtpEbReset();
   vtpEbBuildTestEvent(BUILD_TEST_LEN);      // BUILD_TEST_LEN 32bit word test event size
-  
-  vtpDmaStart(0x20000000, 1000);  // write @ 50% point in system memory, maximum 10000 bytes
-  result = vtpDmaWaitDone();
-  printf("result = %d\n", result);
-/*
-  result = vtpEbReadTestEvent(buf, BUILD_TEST_LEN);
-  printf("result = %d\n", result);
-  for(i=0; i<result; i++)
+  buf = (volatile unsigned int *)vtpDmaMemGetLocalAddress(0);
+
+  for(i=0; i<(BUILD_TEST_LEN); i++)
+  {
+    buf[i] = 0;
+  }
+  for(i=0; i<(BUILD_TEST_LEN); i++)
   {
     if(!(i%4))
       printf("\n%08X:", i*4);
     printf(" %08X", buf[i]);
   }
   printf("\n");
-  */
+
+  vtpDmaStart(vtpDmaMemGetBusAddress(0), 1000);
+  result = vtpDmaWaitDone();
+  printf("result = %d\n", result);
+
+  buf = (volatile unsigned int *)vtpDmaMemGetLocalAddress(0);
+
+  for(i=0; i<(result>>2); i++)
+  {
+    if(!(i%4))
+      printf("\n%08X:", i*4);
+    printf(" %08X", buf[i]);
+  }
+
+  printf("\n");
  CLOSE:
-  vtpClose(VTP_FPGA_OPEN | VTP_I2C_OPEN | VTP_SPI_OPEN);
+  vtpDmaMemClose();
+  vtpClose(openmask);
 
   exit(0);
 }
@@ -71,4 +90,3 @@ main()
 }
 
 #endif
-
