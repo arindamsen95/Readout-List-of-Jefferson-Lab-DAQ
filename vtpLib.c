@@ -5140,7 +5140,7 @@ vtpDmaBuffer vtpData[MEMALLOC_BUFFER_MAX_NUMBER];
 int
 vtpDmaMemOpen(int nbuffer, int size)
 {
-  int ibuf;
+  int rval = OK, ibuf;
 
   if(vtpDmaMemFD > 0)
     {
@@ -5182,13 +5182,14 @@ vtpDmaMemOpen(int nbuffer, int size)
 	{
 	  printf("%s: Error allocating for buffer %d\n",
 		 __func__, ibuf);
+	  rval = ERROR;
 	  continue;
 	}
       vtpData[ibuf].data =
 	(volatile unsigned int *) vtpData[ibuf].info.virt_addr;
     }
 
-  return 0;
+  return rval;
 }
 
 int
@@ -5218,6 +5219,8 @@ vtpDmaMemClose()
 	     __func__);
       return ERROR;
     }
+
+  vtpDmaMemFD = -1;
 
   return OK;
 }
