@@ -4973,8 +4973,6 @@ vtpCheckMutexHealth(int time_seconds)
   return rval;
 }
 
-#define VTPDMAMEM
-#ifdef VTPDMAMEM
 #define MEMALLOC_BUFFER_MAX_NUMBER 16
 
 #define MEMALLOC_IOCTL_BASE 1
@@ -4994,6 +4992,11 @@ typedef struct memalloc_ioctl_arg_t
   unsigned long virt_addr;	/* userspace (mmap result) */
 } DMA_BUF_INFO;
 
+
+/* Routine to handle ioctl access to memalloc driver
+   cmd:  0 for allocation, 1 for free
+   *info: Pointer to memalloc structure that defines the allocated memory
+*/
 static int
 vtpDmaMem(int cmd, DMA_BUF_INFO *info)
 {
@@ -5047,7 +5050,6 @@ vtpDmaMem(int cmd, DMA_BUF_INFO *info)
       return ERROR;
     }
 
-#define DEBUGMEM
 #ifdef DEBUGMEM
   printf("            cmd = %d\n",cmd);
   printf("             id = %d\n",(int)info->buffer_id);
@@ -5059,6 +5061,11 @@ vtpDmaMem(int cmd, DMA_BUF_INFO *info)
   return OK;
 }
 
+/*
+  static DMA memory allocator.
+  size: size of individual buffer to allocate (in bytes)
+  returns a valid DMA_BUF_INFO structure (buffer_id > 0) if successful.
+ */
 static DMA_BUF_INFO
 vtpAllocDmaMemory(int size)
 {
@@ -5078,7 +5085,7 @@ vtpAllocDmaMemory(int size)
       rval.buffer_id = -1;
       rval.phys_addr = 0;
       rval.virt_addr = 0;
-      rval.buffer_size      = 0;
+      rval.buffer_size = 0;
 
       return rval;
     }
@@ -5096,19 +5103,24 @@ vtpAllocDmaMemory(int size)
       rval.buffer_id = -1;
       rval.phys_addr = 0;
       rval.virt_addr = 0;
-      rval.buffer_size      = 0;
+      rval.buffer_size = 0;
     }
   else
     {
       rval.buffer_id = info.buffer_id;
       rval.phys_addr = info.phys_addr;
       rval.virt_addr = (unsigned long)tmp_addr;
-      rval.buffer_size      = info.buffer_size;
+      rval.buffer_size = info.buffer_size;
     }
 
   return rval;
 }
 
+/*
+  static DMA memory free'r.
+  mapInfo: valid DMA_BUF_INFO structure
+  returns OK if successful, otherwise ERROR
+ */
 static int
 vtpFreeDmaMemory(DMA_BUF_INFO mapInfo)
 {
@@ -5123,6 +5135,7 @@ vtpFreeDmaMemory(DMA_BUF_INFO mapInfo)
       if(stat != 0)
 	{
 	  perror("munmap");
+	  stat = ERROR;
 	}
     }
 
@@ -5136,6 +5149,14 @@ typedef struct vtpDmaBuffer_t
 } vtpDmaBuffer;
 
 vtpDmaBuffer vtpData[MEMALLOC_BUFFER_MAX_NUMBER];
+
+/* User routine to allocate DMA memory
+
+   nbuffer: How many buffers to allocate
+   size: size of individual buffers (in bytes)
+
+   returns OK if successful, otherwise error
+*/
 
 int
 vtpDmaMemOpen(int nbuffer, int size)
@@ -5161,7 +5182,6 @@ vtpDmaMemOpen(int nbuffer, int size)
     {
       vtpData[ibuf].info.buffer_id = -1;
     }
-  /* memset(vtpData, 0, MEMALLOC_BUFFER_MAX_NUMBER*sizeof(vtpData)); */
 
   vtpDmaMemFD = open(vtpDmaMemDev, O_RDWR);
   if(vtpDmaMemFD < 0)
@@ -5191,6 +5211,11 @@ vtpDmaMemOpen(int nbuffer, int size)
 
   return rval;
 }
+
+/* User routine to free DMA memory
+
+   returns OK if successful, otherwise error
+*/
 
 int
 vtpDmaMemClose()
@@ -5225,16 +5250,28 @@ vtpDmaMemClose()
   return OK;
 }
 
+/* User routine to return the Physical (Bus) address of specified memory buffer
+
+   buffer_id: ID of buffer
+
+   returns Physical Memory address, if successful.  Otherwise, ERROR.
+*/
+
 unsigned long
 vtpDmaMemGetPhysAddress(int buffer_id)
 {
   return vtpData[buffer_id].info.phys_addr;
 }
 
+/* User routine to return the Local (Userspace) address of specified memory buffer
+
+   buffer_id: ID of buffer
+
+   returns Local Memory address, if successful.  Otherwise, ERROR.
+*/
+
 unsigned long
 vtpDmaMemGetLocalAddress(int buffer_id)
 {
   return vtpData[buffer_id].info.virt_addr;
 }
-
-#endif /* VTPDMAMEM */
