@@ -61,7 +61,7 @@ main(int argc, char *argv[])
   }
   printf("\n");
 
-  vtpDmaStart(vtpDmaMemGetBusAddress(0), 1000);
+  vtpDmaStart(vtpDmaMemGetPhysAddress(0), 1000);
   result = vtpDmaWaitDone();
   printf("result = %d\n", result);
 
