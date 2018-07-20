@@ -4176,6 +4176,9 @@ vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
   int status, cnt = 0;
   CHECKINIT;
 
+  if(vtpEbTiEventReadErrors)
+    printf("{vtpEbTiEventReadErrors=%d}\n", vtpEbTiEventReadErrors);
+
   int retry=100;
   while(cnt < maxsize)
   {
@@ -4221,7 +4224,10 @@ vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize)
 {
   int status, cnt = 0;
   CHECKINIT;
-  
+
+  if(vtpEbEventReadErrors)
+    printf("{vtpEbEventReadErrors=%d}\n", vtpEbEventReadErrors);
+ 
   int retry=VTP_EB_NRETRIES;
   while(cnt < maxsize)
   {
@@ -4263,7 +4269,7 @@ vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize)
 int
 vtpEbReadEvent_test(uint32_t *pBuf, uint32_t maxsize)
 {
-  int status, cnt = 0;
+  int status, cnt = 0, tries = 0;
   CHECKINIT;
   
   while(cnt < maxsize)
@@ -4275,9 +4281,13 @@ vtpEbReadEvent_test(uint32_t *pBuf, uint32_t maxsize)
     // if buffer is empty, try again until data is ready 
     if(status & 0x2)
     {
+      tries++;
       printf("{cnt=%d}", cnt);
+      if(tries > 20)
+        return cnt;
       continue;
     }
+    tries = 0;
     
     VLOCK;
     *pBuf++ = vtp->eb.VtpFifo;
