@@ -30,7 +30,9 @@
 #include <errno.h>
 #include <pthread.h>
 #include <string.h>
+#ifdef IPC
 #include "ipc.h"
+#endif
 #include "vtpLib.h"
 
 #define VTP_FT_SENDHODOSCALERS     1
@@ -568,21 +570,21 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
       printf("------------------------------------------------------------------------------\n");
     }
   
-    printf("%2d  ", dev);
-    printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(0))?"U":"D");
-    printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(1))?"U":"D");
-    printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(2))?"U":"D");
-    printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(3))?"U":"D");
-    printf("%s  ", (status & VTP_SERDES_STATUS_CHUP)?"U":"D");
-    printf("%3d    ", (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>24);
-    printf("%s     ", (ctrl2 & VTP_SERDES_CTRL_GT_RESET)?"1":"0");
-    if(type == VTP_SERDES_VXS)
-      printf("%s", (ctrl & (1<<dev)) ? "1   ":"0   ");
-    else
-      printf("%s", (ctrl & (1<<(dev+16))) ?  "1   ":"0   ");
-    printf("%5d ", ((latency>>16)&0xFFFF)*4);
-    printf("%5d ", ((latency>>0)&0xFFFF)*4);
-    printf("\n");
+  printf("%2d  ", dev);
+  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(0))?"U":"D");
+  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(1))?"U":"D");
+  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(2))?"U":"D");
+  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(3))?"U":"D");
+  printf("%s  ", (status & VTP_SERDES_STATUS_CHUP)?"U":"D");
+  printf("%3d    ", (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>24);
+  printf("%s     ", (ctrl2 & VTP_SERDES_CTRL_GT_RESET)?"1":"0");
+  if(type == VTP_SERDES_VXS)
+  printf("%s", (ctrl & (1<<dev)) ? "1   ":"0   ");
+  else
+    printf("%s", (ctrl & (1<<(dev+16))) ?  "1   ":"0   ");
+  printf("%5d ", ((latency>>16)&0xFFFF)*4);
+  printf("%5d ", ((latency>>0)&0xFFFF)*4);
+  printf("\n");
   }
   else /* send */
   {
@@ -619,7 +621,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
     data[index++] = ((latency>>0)&0xFFFF)*4;
     if(index>NSERDES) return(OK);
   }
-
+  
   return OK;
 }
 
@@ -1071,6 +1073,7 @@ vtpZ7CfgLoad(char *filename)
 /* send_daq_message_to_epics(expid,session,myname,chname,chtype,nelem,data_array) */
 int send_daq_message_to_epics(const char *expid, const char *session, const char *myname, const char *caname, const char *catype, int nelem, void *data);
 
+#ifdef IPC
 int
 vtpSendScalers()
 {
@@ -1169,6 +1172,7 @@ vtpSendSerdes()
 
   return r;
 }
+#endif
 
 int
 vtpWrite32(volatile unsigned int *addr, unsigned int val)
@@ -2221,6 +2225,7 @@ vtpGetFTCALcluster_deadtime_emin(int *emin)
   return OK;
 }
 
+#ifdef IPC
 int
 vtpFTSendScalers(char *host)
 {
@@ -2331,6 +2336,9 @@ vtpFTHodoSendScalers(char *host)
 
   return OK;
 }
+#endif
+
+
 /*
  *
  sel = 0: clusters, no hodo tag
@@ -2516,6 +2524,7 @@ vtpHtccPrintScalers()
   return OK;
 }
 
+#ifdef IPC
 int
 vtpHtccSendScalers(char *host)
 {
@@ -2548,7 +2557,7 @@ vtpHtccSendScalers(char *host)
 
   return OK;
 }
-
+#endif
 
 
 
@@ -2661,6 +2670,7 @@ vtpFtofPrintScalers()
   return OK;
 }
 
+#ifdef IPC
 int
 vtpFtofSendScalers(char *host)
 {
@@ -2689,7 +2699,7 @@ vtpFtofSendScalers(char *host)
 
   return OK;
 }
-
+#endif
 
 
 
@@ -2800,6 +2810,7 @@ vtpCndPrintScalers()
   return OK;
 }
 
+#ifdef IPC
 int
 vtpCndSendScalers(char *host)
 {
@@ -2828,7 +2839,7 @@ vtpCndSendScalers(char *host)
 
   return OK;
 }
-
+#endif
 
 
 
@@ -2984,6 +2995,7 @@ vtpGetPCS_dalitz(int *dalitz_min, int *dalitz_max)
   return OK;
 }
 
+#ifdef IPC
 int
 vtpPcsSendScalers(char *host)
 {
@@ -3020,6 +3032,7 @@ vtpPcsSendScalers(char *host)
 
   return OK;
 }
+#endif
 
 int
 vtpSetPCU_thresholds(int thr0, int thr1, int thr2)
@@ -3248,6 +3261,7 @@ vtpEcsPrintScalers()
   return OK;
 }
 
+#ifdef IPC
 int
 vtpEcsSendScalers(char *host)
 {
@@ -3279,6 +3293,7 @@ vtpEcsSendScalers(char *host)
 
   return OK;
 }
+#endif
 
 /**********************/
 
@@ -3515,6 +3530,7 @@ vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min
   return OK;  
 }
 
+#ifdef IPC
 int
 vtpGtSendScalers(char *host)
 {
@@ -3545,6 +3561,7 @@ vtpGtSendScalers(char *host)
 
   return OK;
 }
+#endif
 
 int
 vtpGtPrintScalers()
@@ -3913,6 +3930,7 @@ vtpDcPrintScalers()
   return OK;
 }
 
+#ifdef IPC
 int
 vtpDcSendScalers(char *host)
 {
@@ -3943,7 +3961,7 @@ vtpDcSendScalers(char *host)
 
   return OK;
 }
-
+#endif
 
 int
 vtpTiAck(int clearsync)
@@ -4187,18 +4205,18 @@ vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
     VUNLOCK;
     
     if(status & 0x1)
-    {
+	{
       if(retry-- > 0)
-      {
+	  {
         continue;
-      }
+	  }
       else
-      {
+	  {
         vtpEbTiEventReadErrors++;
         printf("vtpEbTiReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpEbTiEventReadErrors);
         break;
-      }
-    }    
+	  }
+	}    
 
     VLOCK;
     *pBuf++ = vtp->eb.TiFifo;
@@ -4224,7 +4242,7 @@ vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize)
 {
   int status, cnt = 0;
   CHECKINIT;
-
+  
   if(vtpEbEventReadErrors)
     printf("{vtpEbEventReadErrors=%d}\n", vtpEbEventReadErrors);
  
@@ -4245,7 +4263,7 @@ vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize)
       {
         vtpEbEventReadErrors++;
         printf("vtpEbReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpEbEventReadErrors);
-        break;
+      break;
       }
     }    
     
@@ -4473,12 +4491,12 @@ vtpFPGAOpen()
   
   if(vtpFPGAFD < 0)
     {
-      printf("%s: ERROR from open: %s (%d)",
+      printf("%s: ERROR from open: %s (%d)\n",
 	     __func__, strerror(errno), errno);
       return ERROR;
     }
 
-  printf(" size = %d\n", sizeof(ZYNC_REGS)); /* should be 131072 */
+  printf(" size = %d\n", (int)sizeof(ZYNC_REGS)); /* should be 131072 */
   
   vtp = (volatile ZYNC_REGS *) mmap((void *)VTP_ZYNC_PHYSMEM_BASE, sizeof(ZYNC_REGS),
 				    PROT_READ|PROT_WRITE, MAP_SHARED,
@@ -4717,7 +4735,7 @@ vtpCreateLockShm()
 	  printf("%s: ERROR: Inconsistency in size of shared memory structure!\n",
 		 __func__);
 	  printf("\t File = %d  Library = %d\n",
-		 p_sync->shmSize, sizeof(struct shared_memory_struct));
+		 p_sync->shmSize, (int)sizeof(struct shared_memory_struct));
 	  printf("\t Possible version mismatch!\n");
 	  return ERROR;
 	}
@@ -5103,4 +5121,307 @@ vtpCheckMutexHealth(int time_seconds)
     }
 
   return rval;
+}
+
+#define MEMALLOC_BUFFER_MAX_NUMBER 16
+
+#define MEMALLOC_IOCTL_BASE 1
+#define MEMALLOC_RESERVE_CMD         _IO(MEMALLOC_IOCTL_BASE, 0)
+#define MEMALLOC_RELEASE_CMD         _IO(MEMALLOC_IOCTL_BASE, 1)
+#define MEMALLOC_GET_PHYSICAL_CMD    _IO(MEMALLOC_IOCTL_BASE, 2)
+#define MEMALLOC_ACTIVATE_BUFFER_CMD _IO(MEMALLOC_IOCTL_BASE, 3)
+
+static int vtpDmaMemFD = -1;
+const char vtpDmaMemDev[256] = "/dev/memalloc";
+
+typedef struct memalloc_ioctl_arg_t
+{
+  size_t        buffer_size;	/* in */
+  int           buffer_id;	/* in, out */
+  unsigned long phys_addr;	/* out */
+  unsigned long virt_addr;	/* userspace (mmap result) */
+} DMA_BUF_INFO;
+
+
+/* Routine to handle ioctl access to memalloc driver
+   cmd:  0 for allocation, 1 for free
+   *info: Pointer to memalloc structure that defines the allocated memory
+*/
+static int
+vtpDmaMem(int cmd, DMA_BUF_INFO *info)
+{
+  int rval=0;
+
+  if(cmd == 0) /* Allocate */
+    {
+      rval = ioctl(vtpDmaMemFD, MEMALLOC_RESERVE_CMD, info);
+      if(rval == -1)
+	{
+	  perror("ioctl");
+	  printf("%s: ERROR reserving memory\n",
+		 __func__);
+	  return ERROR;
+	}
+
+      rval = ioctl(vtpDmaMemFD, MEMALLOC_ACTIVATE_BUFFER_CMD, info);
+      if(rval == -1)
+	{
+	  perror("ioctl");
+	  printf("%s: ERROR activating memory (id = %d)\n",
+		 __func__, info->buffer_id);
+	  return ERROR;
+	}
+
+      rval = ioctl(vtpDmaMemFD, MEMALLOC_GET_PHYSICAL_CMD, info);
+      if(rval == -1)
+	{
+	  perror("ioctl");
+	  printf("%s: ERROR getting physical address (id = %d)\n",
+		 __func__, info->buffer_id);
+	  return ERROR;
+	}
+
+    }
+  else if (cmd == 1) /* Release */
+    {
+      rval = ioctl(vtpDmaMemFD, MEMALLOC_RELEASE_CMD, info);
+      if(rval == -1)
+	{
+	  perror("ioctl");
+	  printf("%s: ERROR releasing memory (id = %d)\n",
+		 __func__, info->buffer_id);
+	  return ERROR;
+	}
+    }
+  else
+    {
+      printf("%s: ERROR: Invalid cmd (%d)\n",
+	     __func__, cmd);
+      return ERROR;
+    }
+
+#ifdef DEBUGMEM
+  printf("            cmd = %d\n",cmd);
+  printf("             id = %d\n",(int)info->buffer_id);
+  printf("      phys_addr = %#lx\n",(unsigned long)info->phys_addr);
+  printf("      virt_addr = %#lx\n",(unsigned long)info->virt_addr);
+  printf("           size = %d\n",(int)info->buffer_size);
+#endif
+
+  return OK;
+}
+
+/*
+  static DMA memory allocator.
+  size: size of individual buffer to allocate (in bytes)
+  returns a valid DMA_BUF_INFO structure (buffer_id > 0) if successful.
+ */
+static DMA_BUF_INFO
+vtpAllocDmaMemory(int size)
+{
+  int stat=OK;
+  DMA_BUF_INFO rval, info =
+    {
+      .buffer_size    = size,
+      .buffer_id      = -1,
+      .phys_addr      = 0,
+      .virt_addr      = 0,
+    };
+  volatile char *tmp_addr;
+
+  stat = vtpDmaMem(0, &info);
+  if(stat == -1)
+    {
+      rval.buffer_id = -1;
+      rval.phys_addr = 0;
+      rval.virt_addr = 0;
+      rval.buffer_size = 0;
+
+      return rval;
+    }
+
+  /* Do an mmap here */
+  tmp_addr = (volatile char *)mmap(0, size, PROT_READ | PROT_WRITE,
+		  MAP_SHARED, vtpDmaMemFD, 0);
+
+  if(tmp_addr == (void*) -1)
+    {
+      perror("mmap");
+      printf("%s: ERROR: mmap failed\n",
+	     __func__);
+
+      rval.buffer_id = -1;
+      rval.phys_addr = 0;
+      rval.virt_addr = 0;
+      rval.buffer_size = 0;
+    }
+  else
+    {
+      rval.buffer_id = info.buffer_id;
+      rval.phys_addr = info.phys_addr;
+      rval.virt_addr = (unsigned long)tmp_addr;
+      rval.buffer_size = info.buffer_size;
+    }
+
+  return rval;
+}
+
+/*
+  static DMA memory free'r.
+  mapInfo: valid DMA_BUF_INFO structure
+  returns OK if successful, otherwise ERROR
+ */
+static int
+vtpFreeDmaMemory(DMA_BUF_INFO mapInfo)
+{
+  int stat=OK;
+
+  stat = vtpDmaMem(1, &mapInfo);
+
+  /* Do an munmap here */
+  if(stat != -1)
+    {
+      stat = munmap((char*)mapInfo.virt_addr, mapInfo.buffer_size);
+      if(stat != 0)
+	{
+	  perror("munmap");
+	  stat = ERROR;
+	}
+    }
+
+  return stat;
+}
+
+typedef struct vtpDmaBuffer_t
+{
+  DMA_BUF_INFO info;
+  volatile unsigned int *data;
+} vtpDmaBuffer;
+
+vtpDmaBuffer vtpData[MEMALLOC_BUFFER_MAX_NUMBER];
+
+/* User routine to allocate DMA memory
+
+   nbuffer: How many buffers to allocate
+   size: size of individual buffers (in bytes)
+
+   returns OK if successful, otherwise error
+*/
+
+int
+vtpDmaMemOpen(int nbuffer, int size)
+{
+  int rval = OK, ibuf;
+
+  if(vtpDmaMemFD > 0)
+    {
+      printf("%s: ERROR: Memory device already open\n",
+	     __func__);
+      return ERROR;
+    }
+
+  if(nbuffer > MEMALLOC_BUFFER_MAX_NUMBER)
+    {
+      printf("%s: ERROR: Invalid nbuffer (%d). Max = %d\n",
+	     __func__, nbuffer, MEMALLOC_BUFFER_MAX_NUMBER);
+      return ERROR;
+    }
+
+  /* Init */
+  for(ibuf = 0; ibuf < MEMALLOC_BUFFER_MAX_NUMBER; ibuf++)
+    {
+      vtpData[ibuf].info.buffer_id = -1;
+    }
+
+  vtpDmaMemFD = open(vtpDmaMemDev, O_RDWR);
+  if(vtpDmaMemFD < 0)
+    {
+      perror("open");
+      printf("%s: ERROR opening memory device\n",
+	     __func__);
+      return ERROR;
+    }
+
+  for(ibuf = 0; ibuf < nbuffer; ibuf++)
+    {
+      vtpData[ibuf].info.buffer_id = -1;
+
+      vtpData[ibuf].info = vtpAllocDmaMemory(size);
+
+      if(vtpData[ibuf].info.buffer_id == -1)
+	{
+	  printf("%s: Error allocating for buffer %d\n",
+		 __func__, ibuf);
+	  rval = ERROR;
+	  continue;
+	}
+      vtpData[ibuf].data =
+	(volatile unsigned int *) vtpData[ibuf].info.virt_addr;
+    }
+
+  return rval;
+}
+
+/* User routine to free DMA memory
+
+   returns OK if successful, otherwise error
+*/
+
+int
+vtpDmaMemClose()
+{
+  int stat = 0, ibuf;
+
+  if(vtpDmaMemFD < 0)
+    {
+      printf("%s: ERROR: memory device not open\n",
+	     __func__);
+      return ERROR;
+    }
+
+  for(ibuf = 0; ibuf < MEMALLOC_BUFFER_MAX_NUMBER; ibuf++)
+    {
+      if(vtpData[ibuf].info.buffer_id != -1)
+	vtpFreeDmaMemory(vtpData[ibuf].info);
+    }
+
+
+  stat = close(vtpDmaMemFD);
+  if(stat < 0)
+    {
+      perror("close");
+      printf("%s: ERROR closing memory device\n",
+	     __func__);
+      return ERROR;
+    }
+
+  vtpDmaMemFD = -1;
+
+  return OK;
+}
+
+/* User routine to return the Physical (Bus) address of specified memory buffer
+
+   buffer_id: ID of buffer
+
+   returns Physical Memory address, if successful.  Otherwise, ERROR.
+*/
+
+unsigned long
+vtpDmaMemGetPhysAddress(int buffer_id)
+{
+  return vtpData[buffer_id].info.phys_addr;
+}
+
+/* User routine to return the Local (Userspace) address of specified memory buffer
+
+   buffer_id: ID of buffer
+
+   returns Local Memory address, if successful.  Otherwise, ERROR.
+*/
+
+unsigned long
+vtpDmaMemGetLocalAddress(int buffer_id)
+{
+  return vtpData[buffer_id].info.virt_addr;
 }
