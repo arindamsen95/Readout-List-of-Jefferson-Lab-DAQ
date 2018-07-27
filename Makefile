@@ -12,7 +12,7 @@
 #
 #
 
-USE_IPC  ?= 0
+USE_IPC  ?= 1
 USE_CODA ?= 0
 
 # Uncomment DEBUG line, to include some debugging info ( -g and -Wall)
@@ -44,6 +44,10 @@ CFLAGS			+= -Wall -g
 else
 CFLAGS			+= -O2
 endif
+ifeq ($(USE_IPC),1)
+CFLAGS			+= -DIPC
+endif
+
 SRC			= vtpLib.c vtpConfig.c vtp-i2c.c vtp-spi.c si5341_cfg.c
 HDRS			= $(SRC:.c=.h)
 OBJ			= $(SRC:.c=.o)

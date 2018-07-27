@@ -23,7 +23,7 @@ AR				= ar
 RANLIB		= ranlib
 INCS			= -I. -I${VTPLIB_PATH} -I/usr/local/include -I$(CODA)/Linux_armv7l/include
 CFLAGS		= -Wall -g ${INCS} \
-            -L. -lrt -li2c -lm -DLinux_armv7l
+            -L. -L${VTPLIB_PATH} -lrt -li2c -lm -DLinux_armv7l
 
 #LIBNAMES	= $(CODA)/src/mysql4.1.20/$(OSTYPE_MACHINE)/lib/libmysql4.1.20.a
 ifeq ($(USE_CODA),1)

@@ -71,6 +71,7 @@ typedef struct EventBuilder_Struct
 #define VTP_EB_TISTATUS_NEXT_BL_MASK 0xFF00
 #define VTP_EB_TISTATUS_CUR_BL       0x00FF
 
+#define VTP_EB_EBCTRL_BUILD_TEST (1<<2)
 #define VTP_EB_EBCTRL_BUILD_VTP  (1<<1)
 #define VTP_EB_EBCTRL_BUILD_TI   (1<<0)
 
@@ -560,8 +561,9 @@ typedef struct zync_reg_struct
 {
   /** 0x43C00000 */ EB_REGS eb;
   /** 0x43C00100 */ BLANK[(0x1000-0x100)/4];
-  /** 0x43C01000 */ AXI_DMA_REGS dma;
-  /** 0x43C02000 */ BLANK[(0x10000-0x2000)/4];
+  /** 0x43C01000 */ AXI_DMA_REGS dma_ti;
+  /** 0x43C02000 */ AXI_DMA_REGS dma_vtp;
+  /** 0x43C03000 */ BLANK[(0x10000-0x3000)/4];
   /** 0x43C10000 */ V7_REGS v7;
 } ZYNC_REGS;
 
@@ -803,15 +805,19 @@ int  vtpEbReadAndDecodeEvent();
 int  vtpSetWindow(int, int);
 int  vtpTiLinkInit();
 int  vtpEbResetFifo();
-int  vtpDmaStatus();
-int  vtpDmaInit();
-int  vtpDmaStart(unsigned int destAddr, int maxLength);
-int  vtpDmaWaitDone();
 int  vtpEbBuildTestEvent(int len);
 int  vtpEbReset();
 int  vtpSetBlockLevel(int level);
 int  vtpTiLinkGetBlockLevel(int print);
 int  vtpTiAck(int clearsync);
+
+#define VTP_DMA_TI  0
+#define VTP_DMA_VTP 1
+
+int  vtpDmaStatus(int id);
+int  vtpDmaInit(int id);
+int  vtpDmaStart(int id, unsigned int destAddr, int maxLength);
+int  vtpDmaWaitDone(int id);
 
 int  vtpCreateLockShm();
 int  vtpKillLockShm(int kflag);
@@ -827,3 +833,4 @@ unsigned long vtpDmaMemGetPhysAddress(int buffer_id);
 unsigned long vtpDmaMemGetLocalAddress(int buffer_id);
 
 #endif /* VTPLIB_H */
+

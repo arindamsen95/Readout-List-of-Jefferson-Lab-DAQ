@@ -61,7 +61,7 @@ main(int argc, char *argv[])
   }
   printf("\n");
 
-  vtpDmaStart(vtpDmaMemGetPhysAddress(0), 1000);
+  vtpDmaStart(vtpDmaMemGetPhysAddress(0), 1000, VTP_EB_EBCTRL_BUILD_TEST);
   result = vtpDmaWaitDone();
   printf("result = %d\n", result);
 

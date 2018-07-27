@@ -4059,107 +4059,123 @@ vtpEbResetFifo()
   return OK;
 }
 
-int
-vtpDmaStatus()
+AXI_DMA_REGS *vtpDmaGet(int id)
 {
+  if(id == VTP_DMA_TI)
+    return &vtp->dma_ti;
+  else if(id == VTP_DMA_VTP)
+    return &vtp->dma_vtp;
+  
+  return NULL;
+}
+
+int
+vtpDmaStatus(int id)
+{
+  AXI_DMA_REGS *pDma = vtpDmaGet(id);
   uint32_t cr, sr, len, da;
   CHECKINIT;
-  
+
+  if(!pDma)
+    return ERROR; 
+
   VLOCK;
-  cr = vtp->dma.S2MM_DMACR;
-  sr = vtp->dma.S2MM_DMASR;
-  len = vtp->dma.S2MM_LENGTH;
-  da = vtp->dma.S2MM_DA;
+  cr  = pDma->S2MM_DMACR;
+  sr  = pDma->S2MM_DMASR;
+  len = pDma->S2MM_LENGTH;
+  da  = pDma->S2MM_DA;
   VUNLOCK;
   
   printf("%s: cr=0x%08X, sr=0x%08X, len=%d, da=0x%08X\n", __func__,  cr, sr, len, da);
+  printf("%s: eb status=0x%08X, ctrl=0x%08X\n", __func__, vtp->eb.EbStatus, vtp->eb.EbCtrl);
   return OK;
 }
 
 
 int
-vtpDmaInit()
+vtpDmaInit(int id)
 {
+  AXI_DMA_REGS *pDma = vtpDmaGet(id);
   CHECKINIT;
+
+  if(!pDma)
+    return ERROR; 
   
   printf("%s: start", __func__);
-  vtpDmaStatus();
+  vtpDmaStatus(id);
   
   VLOCK;
-  vtp->dma.S2MM_DMACR =
+  pDma->S2MM_DMACR =
     (0<<0)  |   // 0-stops, 1-starts DMA engine
     (1<<1)  |   // reserved, defaults to 1
     (1<<2);     // 1-reset DMA engine
-    
-  vtp->dma.S2MM_DMACR =
+      
+  pDma->S2MM_DMACR =
     (0<<0)  |   // 0-stops, 1-starts DMA engine
     (1<<1)  |   // reserved, defaults to 1
     (0<<2);     // 1-reset DMA engine
   VUNLOCK;
   
   printf("%s: end  ", __func__);
-  vtpDmaStatus();
+  vtpDmaStatus(id);
   
   return OK;
 }
 
 int
-vtpDmaStart(unsigned int destAddr, int maxLength)
+vtpDmaStart(int id, unsigned int destAddr, int maxLength)
 {
-  int i;
+  AXI_DMA_REGS *pDma = vtpDmaGet(id);
+  int ctrl;
   CHECKINIT;
   
-  printf("%s: start", __func__);
-  vtpDmaStatus();
-  
+  if(!pDma)
+    return ERROR; 
+
   VLOCK;
-  vtp->dma.S2MM_DMACR =
+  pDma->S2MM_DMACR =
     (1<<0)  |   // 0-stops, 1-starts DMA engine
     (1<<1)  |   // reserved, defaults to 1
     (0<<2);     // 1-reset DMA engine
 
-  vtp->dma.S2MM_DA_MSB = 0;
-  vtp->dma.S2MM_DA = destAddr;
-  vtp->dma.S2MM_LENGTH = maxLength;
+  pDma->S2MM_DA_MSB = 0;
+  pDma->S2MM_DA = destAddr;
+  pDma->S2MM_LENGTH = maxLength;
 
   VUNLOCK;
-  
-  printf("%s: end  ", __func__);
-  for(i=0;i<10;i++)
-  {
-  vtpDmaStatus();
-  }
   
   return OK;
 }
 
 int
-vtpDmaWaitDone()
+vtpDmaWaitDone(int id)
 {
+  AXI_DMA_REGS *pDma = vtpDmaGet(id);
   int rval = 0;
   unsigned int cnt = 0;
   CHECKINIT;
 
-  printf("%s: start", __func__);
-  vtpDmaStatus();
+  if(!pDma)
+    return ERROR;
+
   
   VLOCK;
   while(1)
   {
-    if((vtp->dma.S2MM_DMASR & 0x3) == 0x2)
+    if((pDma->S2MM_DMASR & 0x3) == 0x2)
     {
-      rval = vtp->dma.S2MM_LENGTH;
+      rval = pDma->S2MM_LENGTH;
       break;
     }
     else if(++cnt > 1000000)
+    {
+      printf("%s(%d): *** timeout ***\n", __func__, id);
+      vtpDmaStatus(id);
       break;
+    }
   }
   VUNLOCK;
  
-  
-  printf("%s: end  ", __func__);
-  vtpDmaStatus();
-
   return rval;
 }
 
@@ -4169,7 +4185,7 @@ vtpEbBuildTestEvent(int len)
   CHECKINIT;
   
   VLOCK;
-  vtp->eb.EbCtrl = 0x8 | 0x4 | (len<<8);
+  vtp->eb.EbCtrl = 0x8 | (len<<8);
   VUNLOCK;
   
   return OK;
@@ -4181,6 +4197,7 @@ vtpEbReset()
   CHECKINIT;
   
   VLOCK;
+  vtp->eb.EbCtrl = 0x0;
   vtp->eb.LinkCtrl = 0x8;
   vtp->eb.LinkCtrl = 0x0;
   VUNLOCK;
