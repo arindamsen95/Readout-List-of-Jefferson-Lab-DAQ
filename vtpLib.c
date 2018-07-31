@@ -4062,9 +4062,9 @@ vtpEbResetFifo()
 AXI_DMA_REGS *vtpDmaGet(int id)
 {
   if(id == VTP_DMA_TI)
-    return &vtp->dma_ti;
+    return (AXI_DMA_REGS *)&vtp->dma_ti;
   else if(id == VTP_DMA_VTP)
-    return &vtp->dma_vtp;
+    return (AXI_DMA_REGS *)&vtp->dma_vtp;
   
   return NULL;
 }
@@ -4126,7 +4126,6 @@ int
 vtpDmaStart(int id, unsigned int destAddr, int maxLength)
 {
   AXI_DMA_REGS *pDma = vtpDmaGet(id);
-  int ctrl;
   CHECKINIT;
   
   if(!pDma)

@@ -43,7 +43,7 @@ main(int argc, char *argv[])
   vtpInit(VTP_INIT_SKIP);
   vtpSetBlockLevel(1);
   vtpDmaMemOpen(1, 0x1000);
-  vtpDmaInit();
+  vtpDmaInit(VTP_DMA_VTP);
 
   vtpEbReset();
   vtpEbBuildTestEvent(BUILD_TEST_LEN);      // BUILD_TEST_LEN 32bit word test event size
@@ -61,8 +61,8 @@ main(int argc, char *argv[])
   }
   printf("\n");
 
-  vtpDmaStart(vtpDmaMemGetPhysAddress(0), 1000, VTP_EB_EBCTRL_BUILD_TEST);
-  result = vtpDmaWaitDone();
+  vtpDmaStart(VTP_DMA_VTP, vtpDmaMemGetPhysAddress(0), 1000);
+  result = vtpDmaWaitDone(VTP_DMA_VTP);
   printf("result = %d\n", result);
 
   buf = (volatile unsigned int *)vtpDmaMemGetLocalAddress(0);
