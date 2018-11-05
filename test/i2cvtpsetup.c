@@ -369,7 +369,7 @@ void ltm4676_setup()
   }  
 }
 
-int main()
+int main(int argc, char *argv[])
 {
   if(vtpCheckAddresses() == ERROR)
     exit(-1);
@@ -380,8 +380,8 @@ int main()
       goto CLOSE;
     }
 
-  
-  vtpZ7CfgLoad("../firmware/z7_top_wrapper.bin");
+  if(argc == 2)  
+    vtpZ7CfgLoad("../firmware/z7_top_wrapper.bin");
 
   ltm4676_setup();
     

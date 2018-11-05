@@ -35,7 +35,7 @@
 #endif
 #include "vtpLib.h"
 
-#define VTP_FT_SENDHODOSCALERS     1
+#define VTP_FT_SENDHODOSCALERS     0
 
 /* Shared Robust Mutex for vme bus access */
 char* shm_name_vtp = "/vtp";
@@ -89,6 +89,30 @@ pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
       return ERROR;           \
     }               \
   }
+
+typedef struct
+{
+  int serdes_chup[20];
+  int serdes_txlatency_max[20];
+  int serdes_rxlatency_max[20];
+  char host[100];
+} vtp_Limit;
+
+vtp_Limit vtpLimits[] = {
+//                            Payload Port                                           |
+//      1    2    3    4    5    6    7    8    9   10   11   12   13   14   15   16 |
+//                                                                                   |
+//                            VME SLOT                                               |   Fiber
+//     10   13    9   14    8   15    7   16    6   17    5   18    4   19    3   20 |  1    2    3    4
+    {
+      {   1,   1,   1,   1,   1,   1,   1,  -1,   1,  -1,   1,  -1,   1,  -1,   1,  -1,   1,   1,   1,   1},
+      {  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,1500,1000,  -1,  -1},
+      { 300, 300, 300, 300, 300, 300, 300,  -1, 300,  -1, 300,  -1, 300,  -1, 300,  -1,  -1,1100,1100,1100},
+      "adcft1vtp"
+    }
+  };
+
+
       
 
 /*******************************************************************************
@@ -277,10 +301,22 @@ int
 vtpSetWindow(int lookback, int width)
 {
   CHECKINIT;
+  
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_DC:
+      lookback/=8;
+      width/=8;
+      break;
+    default:
+      lookback/=4;
+      width/=4;
+      break;
+  }
 
   VLOCK;
-  vtp->v7.eb.Lookback = lookback/4;
-  vtp->v7.eb.WindowWidth = width/4;
+  vtp->v7.eb.Lookback = lookback;
+  vtp->v7.eb.WindowWidth = width;
   VUNLOCK;
 
   return(OK);
@@ -293,8 +329,18 @@ vtpGetWindowLookback()
   CHECKINIT;
 
   VLOCK;
-  rval = vtp->v7.eb.Lookback * 4;
+  rval = vtp->v7.eb.Lookback;
   VUNLOCK;
+
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_DC:
+      rval*=8;
+      break;
+    default:
+      rval*=4;
+      break;
+  }
 
   return(rval);
 }
@@ -306,8 +352,18 @@ vtpGetWindowWidth()
   CHECKINIT;
 
   VLOCK;
-  rval = vtp->v7.eb.WindowWidth * 4;;
+  rval = vtp->v7.eb.WindowWidth;
   VUNLOCK;
+
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_DC:
+      rval*=8;
+      break;
+    default:
+      rval*=4;
+      break;
+  }
 
   return(rval);
 }
@@ -1095,17 +1151,23 @@ vtpSendScalers()
   switch(VTP_FW_Type)
   {
     case VTP_FW_TYPE_ECS:
+      r = vtpEcsSendErrors(host);
       r = vtpEcsSendScalers(host);
       break;
     case VTP_FW_TYPE_PCS:
+      r = vtpPcsSendErrors(host);
       r = vtpPcsSendScalers(host);
       break;
     case VTP_FW_TYPE_HTCC:
+      r = vtpHtccSendErrors(host);
       r = vtpHtccSendScalers(host);
       break;
     case VTP_FW_TYPE_FTOF:
+      r = vtpFtofSendErrors(host);
+      r = vtpFtofSendScalers(host);
       break;
     case VTP_FW_TYPE_CND:
+      r = vtpCndSendErrors(host);
       r = vtpCndSendScalers(host);
       break;
     case VTP_FW_TYPE_EC:
@@ -1113,17 +1175,20 @@ vtpSendScalers()
     case VTP_FW_TYPE_PC:
       break;
     case VTP_FW_TYPE_FTHODO:
+      r = vtpFTHodoSendErrors(host);
       r = vtpFTHodoSendScalers(host);
       break;
     case VTP_FW_TYPE_GT:
       r = vtpGtSendScalers(host);
       break;
     case VTP_FW_TYPE_DC:
+      r = vtpDcSendErrors(host);
       r = vtpDcSendScalers(host);
       break;
     case VTP_FW_TYPE_HCAL:
       break;
     case VTP_FW_TYPE_FTCAL:
+      r = vtpFTSendErrors(host);
       r = vtpFTSendScalers(host);
       break;
   }
@@ -2227,6 +2292,44 @@ vtpGetFTCALcluster_deadtime_emin(int *emin)
 
 #ifdef IPC
 int
+vtpFTSendErrors(char *host)
+{
+  char name[100];
+  int data[NSERDES];
+  unsigned int val;
+  int i;
+  CHECKINIT;
+
+  for(i=0;i<4;i++)
+  {
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 0, data);
+
+    if(data[4] & 0x1) // check channel up bit
+      val |= (1<<i);
+    else
+      val &= ~(1<<i);
+  }
+
+  if(!(val & 0x1))  // Fiber 0 = trig2 SSP_SLOT9
+  {
+    sprintf(name, "err: crate=%s link to trig2 SSP_SLOT9 down", host);
+    epics_json_msg_send(name, "int", 1, &data);
+  }
+  if(!(val & 0x2))  // Fiber 1 = adcftXvtp
+  {
+    sprintf(name, "err: crate=%s,adcft1vtp link to adcft2vtp down", host);
+    epics_json_msg_send(name, "int", 1, &data);
+  }
+  if(!(val & 0x4) || !(val & 0x8))  // Fiber 2,3 = adcft3vtp
+  {
+    sprintf(name, "err: crate=%s,link to adcft3vtp down", host);
+    epics_json_msg_send(name, "int", 1, &data);
+  }
+  
+  return OK;
+}
+
+int
 vtpFTSendScalers(char *host)
 {
   char name[100];
@@ -2256,8 +2359,6 @@ vtpFTSendScalers(char *host)
 #endif
 
   vtp->v7.ftcalTrigger.HistCtrl = 0x60000000;
-  printf("Start - Setting ftcalTrigger.HistCtrl, read back 0x%08X\n",
-    vtp->v7.ftcalTrigger.HistCtrl);
   val = vtp->v7.ftcalTrigger.HistTime;
   if(!val) val = 1;
 
@@ -2300,10 +2401,41 @@ vtpFTSendScalers(char *host)
   epics_json_msg_send(name, "float", 9, data);
 
   vtp->v7.ftcalTrigger.HistCtrl = 0x60000000 | 0x7F;
-  printf("Stop - Setting ftcalTrigger.HistCtrl, read back 0x%08X\n",
-    vtp->v7.ftcalTrigger.HistCtrl);
   VUNLOCK;
 
+  return OK;
+}
+
+int
+vtpFTHodoSendErrors(char *host)
+{
+  char name[100];
+  int data[NSERDES];
+  unsigned int val;
+  int i;
+  CHECKINIT;
+
+  for(i=0;i<4;i++)
+  {
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 0, data);
+
+    if(data[4] & 0x1) // check channel up bit
+      val |= (1<<i);
+    else
+      val &= ~(1<<i);
+  }
+
+  if(!(val & 0x1) || !(val & 0x2))  // Fiber 0,1 = adcft1vtp
+  {
+    sprintf(name, "err: crate=%s link to adcft1vtp down", host);
+    epics_json_msg_send(name, "int", 1, &data);
+  }
+  if(!(val & 0x4) || !(val & 0x8))  // Fiber 2,3 = adcft2vtp
+  {
+    sprintf(name, "err: crate=%s,link to adcft2vtp down", host);
+    epics_json_msg_send(name, "int", 1, &data);
+  }
+  
   return OK;
 }
 
@@ -2319,7 +2451,6 @@ vtpFTHodoSendScalers(char *host)
   printf("%s...", __func__);
 
   VLOCK;
-#if VTP_FT_SENDHODOSCALERS
   vtp->v7.sd.ScalerLatch = 1;
   //Read/normalize reference
   val = vtp->v7.sd.Scaler_BusClk;
@@ -2331,7 +2462,6 @@ vtpFTHodoSendScalers(char *host)
   vtp->v7.sd.ScalerLatch = 0;
   sprintf(name, "%s_VTPFT_HODOSCALERS", host);
   epics_json_msg_send(name, "float", 256, data);
-#endif
   VUNLOCK;
 
   return OK;
@@ -2526,6 +2656,34 @@ vtpHtccPrintScalers()
 
 #ifdef IPC
 int
+vtpHtccSendErrors(char *host)
+{
+  char name[100];
+  int data[NSERDES];
+  unsigned int val;
+  int i;
+  CHECKINIT;
+
+  for(i=0;i<4;i++)
+  {
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 0, data);
+
+    if(data[4] & 0x1) // check channel up bit
+      val |= (1<<i);
+    else
+      val &= ~(1<<i);
+  }
+
+  if(!(val & 0x1))  // Fiber 0 = trig2 SSP_SLOT10
+  {
+    sprintf(name, "err: crate=%s link to trig2 SSP_SLOT10 down", host);
+    epics_json_msg_send(name, "int", 1, &data);
+  }
+  
+  return OK;
+}
+
+int
 vtpHtccSendScalers(char *host)
 {
   char name[100];
@@ -2672,6 +2830,38 @@ vtpFtofPrintScalers()
 
 #ifdef IPC
 int
+vtpFtofSendErrors(char *host)
+{
+  char name[100];
+  int data[NSERDES];
+  unsigned int val;
+  int i, slot;
+  CHECKINIT;
+
+  for(i=0;i<4;i++)
+  {
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 0, data);
+
+    if(data[4] & 0x1) // check channel up bit
+      val |= (1<<i);
+    else
+      val &= ~(1<<i);
+  }
+
+  slot = 3+host[7]-'0';
+  if(slot>=3 && slot<=8)
+  {
+    if(!(val & 0x1))  // Fiber 0 = trig2 SSP_SLOTX
+    {
+      sprintf(name, "err: crate=%s link to trig2 SSP_SLOT%d down", host, slot);
+      epics_json_msg_send(name, "int", 1, &data);
+    }
+  }
+  
+  return OK;
+}
+
+int
 vtpFtofSendScalers(char *host)
 {
   char name[100];
@@ -2811,6 +3001,34 @@ vtpCndPrintScalers()
 }
 
 #ifdef IPC
+int
+vtpCndSendErrors(char *host)
+{
+  char name[100];
+  int data[NSERDES];
+  unsigned int val;
+  int i, slot;
+  CHECKINIT;
+
+  for(i=0;i<4;i++)
+  {
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 0, data);
+
+    if(data[4] & 0x1) // check channel up bit
+      val |= (1<<i);
+    else
+      val &= ~(1<<i);
+  }
+
+  if(!(val & 0x1))  // Fiber 0 = trig2 SSP_SLOT10
+  {
+    sprintf(name, "err: crate=%s link to trig2 SSP_SLOT10 down", host);
+    epics_json_msg_send(name, "int", 1, &data);
+  }
+  
+  return OK;
+}
+
 int
 vtpCndSendScalers(char *host)
 {
@@ -2996,6 +3214,38 @@ vtpGetPCS_dalitz(int *dalitz_min, int *dalitz_max)
 }
 
 #ifdef IPC
+int
+vtpPcsSendErrors(char *host)
+{
+  char name[100];
+  int data[NSERDES];
+  unsigned int val;
+  int i, slot;
+  CHECKINIT;
+
+  for(i=0;i<4;i++)
+  {
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 0, data);
+
+    if(data[4] & 0x1) // check channel up bit
+      val |= (1<<i);
+    else
+      val &= ~(1<<i);
+  }
+
+  slot = 3+host[7]-'0';
+  if(slot>=3 && slot<=8)
+  {
+    if(!(val & 0x1))  // Fiber 0 = trig2 SSP_SLOTX
+    {
+      sprintf(name, "err: crate=%s link to trig2 SSP_SLOT%d down", host, slot);
+      epics_json_msg_send(name, "int", 1, &data);
+    }
+  }
+  
+  return OK;
+}
+
 int
 vtpPcsSendScalers(char *host)
 {
@@ -3263,14 +3513,44 @@ vtpEcsPrintScalers()
 
 #ifdef IPC
 int
+vtpEcsSendErrors(char *host)
+{
+  char name[100];
+  int data[NSERDES];
+  unsigned int val;
+  int i, slot;
+  CHECKINIT;
+
+  for(i=0;i<4;i++)
+  {
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 0, data);
+
+    if(data[4] & 0x1) // check channel up bit
+      val |= (1<<i);
+    else
+      val &= ~(1<<i);
+  }
+
+  slot = 3+host[7]-'0';
+  if(slot>=3 && slot<=8)
+  {
+    if(!(val & 0x1))  // Fiber 0 = trig2 SSP_SLOTX
+    {
+      sprintf(name, "err: crate=%s link to trig2 SSP_SLOT%d down", host, slot);
+      epics_json_msg_send(name, "int", 1, &data);
+    }
+  }
+  
+  return OK;
+}
+
+int
 vtpEcsSendScalers(char *host)
 {
   char name[100];
   float ref, data[4];
   unsigned int val;
   CHECKINIT;
-
-  printf("%s...", __func__);
 
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
@@ -3932,6 +4212,50 @@ vtpDcPrintScalers()
 
 #ifdef IPC
 int
+vtpDcSendErrors(char *host)
+{
+  char name[100];
+  int data[NSERDES];
+  unsigned int val;
+  int i, sector, region;
+  CHECKINIT;
+
+  for(i=0;i<4;i++)
+  {
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 0, data);
+
+    if(data[4] & 0x1) // check channel up bit
+      val |= (1<<i);
+    else
+      val &= ~(1<<i);
+  }
+
+  sector = host[2]-'0';
+  region = host[3]-'0';
+  if(sector>=1 && sector<=6)
+  {
+    if(region==1 || region==2)
+    {
+      if(!(val & 0x2))  // Fiber 1 = dcX3vtp
+      {
+        sprintf(name, "err: crate=%s link to dc%d3vtp down", host, sector);
+        epics_json_msg_send(name, "int", 1, &data);
+      }
+    }
+    if(region==3)
+    {
+      if(!(val & 0x1))  // Fiber 0 = trig2 SSP_SLOTX
+      {
+        sprintf(name, "err: crate=%s link to trig2 SSP_SLOT%d down", host, 2+sector);
+        epics_json_msg_send(name, "int", 1, &data);
+      }
+    }
+  }
+  
+  return OK;
+}
+
+int
 vtpDcSendScalers(char *host)
 {
   char name[100];
@@ -4150,7 +4474,7 @@ int
 vtpDmaWaitDone(int id)
 {
   AXI_DMA_REGS *pDma = vtpDmaGet(id);
-  int rval = 0;
+  int rval = 0, status;
   unsigned int cnt = 0;
   CHECKINIT;
 
@@ -4158,22 +4482,30 @@ vtpDmaWaitDone(int id)
     return ERROR;
 
   
-  VLOCK;
   while(1)
   {
-    if((pDma->S2MM_DMASR & 0x3) == 0x2)
+    VLOCK;
+    status = pDma->S2MM_DMASR;
+    VUNLOCK;
+
+    if((status & 0x3) == 0x2)
     {
+      VLOCK;
       rval = pDma->S2MM_LENGTH;
+      VUNLOCK;
       break;
     }
     else if(++cnt > 1000000)
     {
       printf("%s(%d): *** timeout ***\n", __func__, id);
-      vtpDmaStatus(id);
+      //vtpDmaStatus(id);
+
+      /*disabling dma engine*/
+      vtpDmaInit(id);
+
       break;
     }
   }
-  VUNLOCK;
  
   return rval;
 }
@@ -4797,8 +5129,6 @@ vtpLock()
 {
   int rval;
 
-printf("%s - start\n", __func__);
-
   if(p_sync!=NULL)
     {
       rval = pthread_mutex_lock(&(p_sync->mutex));
@@ -4845,7 +5175,6 @@ printf("%s - start\n", __func__);
       return ERROR;
     }
 
-printf("%s - end\n", __func__);
   return rval;
 }
 
@@ -4978,7 +5307,6 @@ int
 vtpUnlock()
 {
   int rval=0;
-printf("%s - start\n", __func__);
   if(p_sync!=NULL)
     {
       rval = pthread_mutex_unlock(&p_sync->mutex);
@@ -5001,7 +5329,6 @@ printf("%s - start\n", __func__);
       printf("%s: ERROR: VTP mutex not initialized.\n",__FUNCTION__);
       return ERROR;
     }
-printf("%s - end\n", __func__);
   return rval;
 }
 

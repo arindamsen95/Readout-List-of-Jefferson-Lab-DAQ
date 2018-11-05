@@ -681,6 +681,7 @@ int  vtpSetPCS_dalitz(int dalitz_min, int dalitz_max);
 int  vtpGetPCS_dalitz(int *dalitz_min, int *dalitz_max);
 int  vtpPcsPrintScalers();
 #ifdef IPC
+int  vtpPcsSendErrors(char *host);
 int  vtpPcsSendScalers(char *host);
 #endif
 int  vtpSetPCU_thresholds(int thr0, int thr1, int thr2);
@@ -701,6 +702,7 @@ int  vtpSetECS_dalitz(int dalitz_min, int dalitz_max);
 int  vtpGetECS_dalitz(int *dalitz_min, int *dalitz_max);
 int  vtpEcsPrintScalers();
 #ifdef IPC
+int  vtpEcsSendErrors(char *host);
 int  vtpEcsSendScalers(char *host);
 #endif
 
@@ -719,6 +721,7 @@ int  vtpGtSendScalers(char *host);
 int  vtpSetDc_SegmentThresholdMin(int inst, int threshold);
 int  vtpGetDc_SegmentThresholdMin(int inst, int *threshold);
 #ifdef IPC
+int  vtpDcSendErrors(char *host);
 int  vtpDcSendScalers(char *host);
 #endif
 
@@ -742,6 +745,7 @@ int  vtpGetFTCALcluster_deadtime(int *deadtime);
 int  vtpSetFTCALcluster_deadtime_emin(int emin);
 int  vtpGetFTCALcluster_deadtime_emin(int *emin);
 #ifdef IPC
+int  vtpFTSendErrors(char *host);
 int  vtpFTSendScalers(char *host);
 #endif
 
@@ -749,11 +753,13 @@ int  vtpFTSendScalers(char *host);
 int  vtpSetFTHODOemin(int emin);
 int  vtpGetFTHODOemin(int *emin);
 #ifdef IPC
+int  vtpFTHodoSendErrors(char *host);
 int  vtpFTHodoSendScalers(char *host);
 #endif
 
 // VTP_FT_TYPE_HTCC functions
 #ifdef IPC
+int  vtpHtccSendErrors(char *host);
 int  vtpHtccSendScalers(char *host);
 #endif
 int  vtpHtccPrintScalers();
@@ -768,6 +774,7 @@ int  vtpGetCTOF_nframes(int *nframes);
 
 // VTP_FT_TYPE_FTOF functions
 #ifdef IPC
+int  vtpFtofSendErrors(char *host);
 int  vtpFtofSendScalers(char *host);
 #endif
 int  vtpFtofPrintScalers();
@@ -778,6 +785,7 @@ int  vtpGetFTOF_nframes(int *nframes);
 
 // VTP_FT_TYPE_CND functions
 #ifdef IPC
+int  vtpCndSendErrors(char *host);
 int  vtpCndSendScalers(char *host);
 #endif
 int  vtpCndPrintScalers();
