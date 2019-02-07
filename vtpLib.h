@@ -22,12 +22,13 @@
 #include <stdint.h>
 #include "vtp-i2c.h"
 #include "vtp-spi.h"
+#include "vtp-ltm.h"
 #include "si5341_cfg.h"
 
 #ifndef ERROR
 #define ERROR -1
 #endif
-#ifndef OK 
+#ifndef OK
 #define OK 0
 #endif
 
@@ -37,6 +38,11 @@
 #define BLANK LABEL_(__LINE__)
 
 #define VTP_ZYNC_PHYSMEM_BASE 0x43C00000
+
+#define VTP_DEBUG_INIT    (1<<0)
+
+#define VTP_DBG(format, ...) {if(vtpPrintMask&1) {printf("%s: DEBUG: ",__FUNCTION__); printf(format, ## __VA_ARGS__);fflush(stdout);} }
+#define VTP_DBGN(x,format, ...) {if(vtpDebugMask&x) {printf("%s: DEBUG%d: ",__FUNCTION__, x); printf(format, ## __VA_ARGS__);fflush(stdout);} }
 
 
 typedef struct EventBuilder_Struct
@@ -367,7 +373,8 @@ typedef struct DcrbSegment_Struct
 typedef struct DcrbRoad_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
-  /** 0x0004 */ BLANK[(0x020-0x004)/4];
+  /** 0x0004 */ volatile uint32_t Id[2];
+  /** 0x000C */ BLANK[(0x020-0x00C)/4];
   /** 0x0020 */ volatile uint32_t Scalers[6];
   /** 0x0038 */ BLANK[(0x100-0x038)/4];
 } DCRBROADFIND_REGS;
@@ -377,8 +384,8 @@ typedef struct Trigger_Output_Struct
   /** 0x0000 */ volatile uint32_t Latency;
   /** 0x0004 */ volatile uint32_t Width;
   /** 0x0008 */ BLANK[(0x10-0x8)/4];
-  /** 0x0010 */ volatile uint32_t BusyScaler;
-  /** 0x0014 */ BLANK[(0x100-0x14)/4];
+  /** 0x0010 */ volatile uint32_t Prescaler[32];
+  /** 0x0090 */ BLANK[(0x100-0x90)/4];
 } TRIGGER_OUTPUT_REGS;
 
 #define VTP_TRIGGER_OUTPUT_LATENCY_MASK 0x07FF
@@ -479,11 +486,11 @@ typedef struct v7_bridge_struct
   /** 0x43C10200 */ SD_REGS sd;
 
   /** 0x43C10300 */ FADCDECODER_REGS fadcDec;
-  
+
   /** 0x43C10400 */ SSPDECODER_REGS sspDec;
 
   /** 0x43C10500 */ DCRBDECODER_REGS dcrbDec;
-  
+
   /** 0x43C10600 */ FTCALDECODER_REGS ftcalDec;
 
   /** 0x43C10700 */ BLANK[(0x1000 - 0x700)/4];
@@ -503,19 +510,19 @@ typedef struct v7_bridge_struct
   /** 0x43C14100 */ ECTRIGGER_REGS ecTrigger[2];
 
   /** 0x43C14300 */ FADCSUM_REGS fadcSum;
-  
+
   /** 0x43C14400 */ DCRBSEGFIND_REGS dcrbSegFind[2];
-  
+
   /** 0x43C14600 */ ECCOSMIC_REGS ecCosmic[2];
 
   /** 0x43C14800 */ HCAL_REGS hcal;
-  
+
   /** 0x43C14900 */ BLANK[(0x4A00 - 0x4900)/4];
-  
+
   /** 0x43C14A00 */ PCCOSMIC_REGS pcCosmic;
-  
+
   /** 0x43C14B00 */ FTCALTRIGGER_REGS ftcalTrigger;
-  
+
   /** 0x43C14C00 */ PCSTRIGGER_REGS pcsTrigger;
 
   /** 0x43C14D00 */ ECSTRIGGER_REGS ecsTrigger;
@@ -537,9 +544,9 @@ typedef struct v7_bridge_struct
   /** 0x43C15800 */ BLANK[(0x6000 - 0x5800)/4];
 
   /** 0x43C16000 */ GTBIT_REGS gtBit[16]; /* 128 bytes */
-  
+
   /** 0x43C16800 */ BLANK[(0xFFF4 - 0x6800)/4];
-  
+
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
   /** 0x43C1FFFC */ volatile uint32_t Cfg;
@@ -568,9 +575,9 @@ typedef struct zync_reg_struct
 } ZYNC_REGS;
 
 /* Open/Close argument (device mask bits) */
-#define VTP_FPGA_OPEN  (1<<0)					     
-#define VTP_I2C_OPEN   (1<<1)					     
-#define VTP_SPI_OPEN   (1<<2)					     
+#define VTP_FPGA_OPEN  (1<<0)
+#define VTP_I2C_OPEN   (1<<1)
+#define VTP_SPI_OPEN   (1<<2)
 
 /* Initialization Flags */
 #define VTP_INIT_CLK_MASK            0x0000000F
@@ -594,6 +601,8 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_CND               12
 
 /* Routine prototypes */
+int  vtpSetDebugMask(uint32_t mask);
+
 int  vtpInit(int iFlag);
 int  vtpBReady();
 int  vtpV7GetFW_Version();
@@ -602,7 +611,7 @@ int  vtpV7GetFW_Type();
 int  vtpSendScalers();
 int  vtpSendSerdes();
 #endif
-					     
+
 int  vtpCheckAddresses();
 
 #define NSERDES 10
@@ -711,8 +720,8 @@ int  vtpSetGt_latency(int latency);
 int  vtpGetGt_latency();
 int  vtpSetGt_width(int width);
 int  vtpGetGt_width();
-int  vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, int delay, float pulser_freq);
-int  vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq);
+int  vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, int delay, float pulser_freq, int prescale);
+int  vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq, int *prescale);
 #ifdef IPC
 int  vtpGtSendScalers(char *host);
 #endif
@@ -720,6 +729,7 @@ int  vtpGtSendScalers(char *host);
 // VTP_FW_TYPE_DC functions
 int  vtpSetDc_SegmentThresholdMin(int inst, int threshold);
 int  vtpGetDc_SegmentThresholdMin(int inst, int *threshold);
+int  vtpGetDc_RoadId(char *id_str);
 #ifdef IPC
 int  vtpDcSendErrors(char *host);
 int  vtpDcSendScalers(char *host);
@@ -841,4 +851,3 @@ unsigned long vtpDmaMemGetPhysAddress(int buffer_id);
 unsigned long vtpDmaMemGetLocalAddress(int buffer_id);
 
 #endif /* VTPLIB_H */
-

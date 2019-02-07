@@ -24,6 +24,7 @@ typedef struct
   int ssp_ctrigger_bit_mask;
   int delay;
   float pulser_freq;
+  int prescale;
 } trgbit;
 
 /** VTP configuration parameters **/
@@ -149,6 +150,7 @@ typedef struct {
   struct
   {
     int dcsegfind_threshold[2];
+    char roadid[9];
   } dc;
   
   struct

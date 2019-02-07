@@ -38,6 +38,8 @@ uint32_t vtpSpiSpeed[1] = {781250, };
 uint16_t vtpSpiDelay[1] = {200, };
 uint8_t vtpSpiBits[1] = {8, };
 
+extern uint32_t vtpDebugMask;
+
 /* static struct spi_ioc_transfer xfer[2]; */
 #define CHECKSPIID(x)				\
   if(vtpSPIFD[x] <= 0) \
@@ -61,6 +63,7 @@ vtpSPIOpen()
 	  return ERROR;
 	}
 
+      VTP_DBGN(VTP_DEBUG_INIT, "open SPI device = %s\n", vtpSPIDev[iid]);
       vtpSPIFD[iid] = open(vtpSPIDev[iid], O_RDWR | O_SYNC);
 
       if(vtpSPIFD[iid] < 0)
@@ -75,10 +78,12 @@ vtpSPIOpen()
        */
 #define SETDEFAULT
 #ifdef SETDEFAULT
+      VTP_DBGN(VTP_DEBUG_INIT, "set SPI mode = 0x%x\n", vtpSpiMode[iid]);
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_MODE32, &vtpSpiMode[iid]);
       if (ret == -1)
         perror("can't set spi mode");
 #endif
+      VTP_DBGN(VTP_DEBUG_INIT, "get SPI mode\n");
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_RD_MODE32, &vtpSpiMode[iid]);
       if (ret == -1)
 	perror("can't get spi mode");
@@ -87,10 +92,12 @@ vtpSPIOpen()
        * bits per word
        */
 #ifdef SETDEFAULT
+      VTP_DBGN(VTP_DEBUG_INIT, "set SPI bits per word = 0x%x\n", vtpSpiBits);
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_BITS_PER_WORD, &vtpSpiBits);
       if (ret == -1)
         perror("can't set bits per word");
 #endif
+      VTP_DBGN(VTP_DEBUG_INIT, "get SPI bits per word\n");
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_RD_BITS_PER_WORD, &vtpSpiBits[iid]);
       if (ret == -1)
 	perror("can't get bits per word");
@@ -99,10 +106,12 @@ vtpSPIOpen()
        * max speed hz
        */
 #ifdef SETDEFAULT
+      VTP_DBGN(VTP_DEBUG_INIT, "set SPI max speed = 0x%x\n", vtpSpiSpeed);
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_MAX_SPEED_HZ, &vtpSpiSpeed);
       if (ret == -1)
         perror("can't set max speed hz");
 #endif
+      VTP_DBGN(VTP_DEBUG_INIT, "get SPI max speed\n");
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_RD_MAX_SPEED_HZ, &vtpSpiSpeed[iid]);
       if (ret == -1)
 	perror("can't get max speed hz");

@@ -38,6 +38,8 @@ const char vtpI2CDev[2][256] = {
   "/dev/i2c-1"
 };
 
+extern uint32_t vtpDebugMask;
+
 #define CHECKI2CID(x)				\
   if(vtpI2CFD[x] <= 0) \
     {							\
@@ -59,9 +61,10 @@ vtpI2COpen()
 		 __func__, iid);
 	  return ERROR;
 	}
-      
+
+      VTP_DBGN(VTP_DEBUG_INIT, "open I2C device = %s\n", vtpI2CDev[iid]);
       vtpI2CFD[iid] = open(vtpI2CDev[iid], O_RDWR);
-      
+
       if(vtpI2CFD[iid] < 0)
 	{
 	  printf("%s: ERROR for %s from open: %s (%d)",
@@ -69,7 +72,7 @@ vtpI2COpen()
 	  return ERROR;
 	}
     }
-  
+
   return OK;
 }
 
@@ -77,11 +80,11 @@ int
 vtpI2CClose()
 {
   int iid;
-  
+
   for(iid = 0; iid < nVTPI2CFD; iid++)
     {
       CHECKI2CID(iid);
-      
+
       close(vtpI2CFD[iid]);
     }
 
@@ -102,7 +105,7 @@ vtpI2CSelectSlave(int id, uint8_t slaveAddr)
 	     id, lerrno, strerror(lerrno));
       return ERROR;
     }
-      
+
   return OK;
 }
 
@@ -140,7 +143,7 @@ vtpI2CRead8(int id, uint8_t cmd)
 		 id, lerrno, strerror(lerrno));
 	  return ERROR;
 	}
-  
+
   return (uint8_t)(rval & 0xFF);
 }
 
@@ -159,7 +162,7 @@ vtpI2CRead16(int id, uint8_t cmd)
 	     id, lerrno, strerror(lerrno));
       return ERROR;
     }
-  
+
   return (uint16_t)(rval & 0xFFFF);
 }
 
@@ -178,7 +181,7 @@ vtpI2CReadBlock(int id, uint8_t cmd, uint8_t *buf)
 	     id, lerrno, strerror(lerrno));
       return ERROR;
     }
-  
+
   return rval;
 }
 
@@ -219,4 +222,3 @@ vtpI2CWrite16(int id, uint8_t cmd, uint16_t val)
 
   return OK;
 }
-

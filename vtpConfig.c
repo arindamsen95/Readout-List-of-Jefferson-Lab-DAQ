@@ -234,11 +234,13 @@ vtpInitGlobals()
     vtpConf.gt.trgbits[i].ssp_ctrigger_bit_mask = 0;
     vtpConf.gt.trgbits[i].pulser_freq = 0;
     vtpConf.gt.trgbits[i].delay = 0;
+    vtpConf.gt.trgbits[i].prescale = 1;
   }
   
   // DC configuration
   vtpConf.dc.dcsegfind_threshold[0] = 0;
   vtpConf.dc.dcsegfind_threshold[1] = 0;
+  memset(vtpConf.dc.roadid, 0, sizeof(vtpConf.dc.roadid));
   
   // HCAL configuration
   vtpConf.hcal.hit_dt = 0;
@@ -265,7 +267,7 @@ vtpReadConfigFile(char *filename_in)
   int    jj, ch;
   char   str_tmp[STRLEN], keyword[ROCLEN];
   char   host[ROCLEN], ROC_name[ROCLEN];
-  int    args,i1,i2,i3,i4,i5,i6,i7,msk[16],trg_bit;
+  int    argc,args,i1,i2,i3,i4,i5,i6,i7,i8,msk[16],trg_bit;
   float  f1;
   unsigned int  ui1;
   char *clonparms;
@@ -812,7 +814,6 @@ vtpReadConfigFile(char *filename_in)
           }
           vtpConf.gt.trgbits[trg_bit].pulser_freq = f1;
         }
-
         else if(!strcmp(keyword,"VTP_GT_TRG_DELAY"))
         {
           sscanf (str_tmp, "%*s %d", &i1);
@@ -823,10 +824,19 @@ vtpReadConfigFile(char *filename_in)
           }
           vtpConf.gt.trgbits[trg_bit].delay = i1;
         }
-        
+        else if(!strcmp(keyword,"VTP_GT_TRG_PRESCALE"))
+        {
+          sscanf (str_tmp, "%*s %d", &i1);
+          if(trg_bit<0 || trg_bit>=32)
+          {
+            printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
+            return(-4);
+          }
+          vtpConf.gt.trgbits[trg_bit].prescale = i1;
+        }
         else if(!strcmp(keyword,"VTP_GT_TRGBIT"))
         {
-          sscanf (str_tmp, "%*s %d %d %d %d %d %d %d", &i1, &i2, &i3, &i4, &i5, &i6, &i7);
+          argc = sscanf (str_tmp, "%*s %d %d %d %d %d %d %d %d",&i1,&i2,&i3,&i4,&i5,&i6,&i7,&i8);
           if(i1<0 || i1>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",i1);
@@ -837,7 +847,8 @@ vtpReadConfigFile(char *filename_in)
           vtpConf.gt.trgbits[i1].sector_mult_min = i4;
           vtpConf.gt.trgbits[i1].sector_coin_width = i5;
           vtpConf.gt.trgbits[i1].ssp_ctrigger_bit_mask = i6;
-          vtpConf.gt.trgbits[i1].delay = i7;
+          if(argc>=7) vtpConf.gt.trgbits[i1].delay = i7;
+          if(argc>=8) vtpConf.gt.trgbits[i1].prescale = i8;
         }
 
         else if(!strcmp(keyword,"VTP_DC_SEGTHR"))
@@ -1072,7 +1083,8 @@ vtpDownloadAll()
           vtpConf.gt.trgbits[ii].sector_coin_width,
           vtpConf.gt.trgbits[ii].ssp_ctrigger_bit_mask,
           vtpConf.gt.trgbits[ii].delay,
-          vtpConf.gt.trgbits[ii].pulser_freq
+          vtpConf.gt.trgbits[ii].pulser_freq,
+          vtpConf.gt.trgbits[ii].prescale
         );
     }
   }
@@ -1237,7 +1249,8 @@ vtpUploadAll(char *string, int length)
           &vtpConf.gt.trgbits[i].sector_coin_width,
           &vtpConf.gt.trgbits[i].ssp_ctrigger_bit_mask,
           &vtpConf.gt.trgbits[i].delay, 
-          &vtpConf.gt.trgbits[i].pulser_freq
+          &vtpConf.gt.trgbits[i].pulser_freq,
+          &vtpConf.gt.trgbits[i].prescale
         );
     }
   }
@@ -1246,6 +1259,7 @@ vtpUploadAll(char *string, int length)
   {
     vtpGetDc_SegmentThresholdMin(0, &vtpConf.dc.dcsegfind_threshold[0]);
     vtpGetDc_SegmentThresholdMin(1, &vtpConf.dc.dcsegfind_threshold[1]);
+    vtpGetDc_RoadId(vtpConf.dc.roadid);
   }
   
   if(vtpConf.fw_type == VTP_FW_TYPE_HCAL)
@@ -1417,13 +1431,15 @@ vtpUploadAll(char *string, int length)
         sprintf(sss, "VTP_GT_TRG_SSP_SECTOR_WIDTH %d\n", vtpConf.gt.trgbits[i].sector_coin_width); ADD_TO_STRING;
         sprintf(sss, "VTP_GT_TRG_PULSER_FREQ %.3f\n", vtpConf.gt.trgbits[i].pulser_freq); ADD_TO_STRING;
         sprintf(sss, "VTP_GT_TRG_DELAY %d\n", vtpConf.gt.trgbits[i].delay); ADD_TO_STRING;
+        sprintf(sss, "VTP_GT_TRG_PRESCALE %d\n", vtpConf.gt.trgbits[i].prescale); ADD_TO_STRING;
       }
     }
     
     if(vtpConf.fw_type == VTP_FW_TYPE_DC)
     {
       sprintf(sss, "VTP_DC_SEGTHR 0 %d\n", vtpConf.dc.dcsegfind_threshold[0]); ADD_TO_STRING;
-      sprintf(sss, "VTP_DC_SEGTHR 1 %d\n", vtpConf.dc.dcsegfind_threshold[1]); ADD_TO_STRING;      
+      sprintf(sss, "VTP_DC_SEGTHR 1 %d\n", vtpConf.dc.dcsegfind_threshold[1]); ADD_TO_STRING;
+      sprintf(sss, "VTP_DC_ROADID %s\n", vtpConf.dc.roadid); ADD_TO_STRING;
     }
     
     if(vtpConf.fw_type == VTP_FW_TYPE_HCAL)

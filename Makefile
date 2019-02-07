@@ -48,7 +48,7 @@ ifeq ($(USE_IPC),1)
 CFLAGS			+= -DIPC
 endif
 
-SRC			= vtpLib.c vtpConfig.c vtp-i2c.c vtp-spi.c si5341_cfg.c
+SRC			= vtpLib.c vtpConfig.c vtp-i2c.c vtp-spi.c si5341_cfg.c vtp-ltm.c
 HDRS			= $(SRC:.c=.h)
 OBJ			= $(SRC:.c=.o)
 DEPS			= $(SRC:.c=.d)

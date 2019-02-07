@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <linux/types.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -71,6 +72,8 @@ static volatile ZYNC_REGS *vtp = NULL;
 static int vtpEbTiEventReadErrors;
 static int vtpEbEventReadErrors;
 
+uint32_t vtpDebugMask = VTP_DEBUG_INIT;
+
 /* Mutex to guard VTP read/writes */
 pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
 #define VLOCK     if(pthread_mutex_lock(&vtpMutex)<0) perror("pthread_mutex_lock");
@@ -112,12 +115,17 @@ vtp_Limit vtpLimits[] = {
     }
   };
 
+int
+vtpSetDebugMask(uint32_t mask)
+{
+  vtpDebugMask = mask;
+  return OK;
+}
 
-      
 
 /*******************************************************************************
  *
- * vtpInit - Initialize JLAB VTP Library. 
+ * vtpInit - Initialize JLAB VTP Library.
  *
  *
  *   iFlag: 18 bit integer
@@ -125,8 +133,8 @@ vtp_Limit vtpLimits[] = {
  *             1 Internal clock, software trig & sync
  *             2 VXS clock, trig, sync
  *             0,2-15 undefined
- * 
- * 
+ *
+ *
  *      bit 16:  Exit before board initialization
  *             0 Initialize FADC (default behavior)
  *             1 Skip initialization (just setup register map pointers)
@@ -134,7 +142,7 @@ vtp_Limit vtpLimits[] = {
  *      bit 18:  Skip firmware check.  Useful for firmware updating.
  *             0 Perform firmware check
  *             1 Skip firmware check
- *      
+ *
  *
  * RETURNS: OK, or ERROR if the address is invalid or a board is not present.
  */
@@ -144,7 +152,7 @@ vtpInit(int iFlag)
 {
   int rval = OK;
   int syncSrc, trig1Src, clkSrc, sdStatus;
-  
+
   rval = vtpCheckAddresses();
   if(rval != OK)
     return rval;
@@ -156,13 +164,13 @@ vtpInit(int iFlag)
       trig1Src = VTP_SD_TRIG1SEL_0;
       clkSrc = SI5341_IN_SEL_LOCAL;
       break;
-      
+
     case VTP_INIT_CLK_VXS:
       syncSrc = VTP_SD_SYNCSEL_VXS;
       trig1Src = VTP_SD_TRIG1SEL_VXS;
       clkSrc = SI5341_IN_SEL_VXS;
       break;
-      
+
     default:
       printf("%s: ERROR invalid trig/sync/clock source specification.\n", __func__);
       break;
@@ -175,9 +183,9 @@ vtpInit(int iFlag)
     printf("%s: VTP_FW_Version=%d, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
     return rval;
   }
-  
+
   vtpLock();
-  
+
   vtpV7SetReset(1);
   vtpV7SetResetSoft(1);
 
@@ -187,7 +195,7 @@ vtpInit(int iFlag)
   VTP_FW_Type = vtpV7GetFW_Type();
   VTP_FW_Version = vtpV7GetFW_Version();
   printf("%s: VTP_FW_Version=%d, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
-  
+
   if(clkSrc == SI5341_IN_SEL_LOCAL)
   {
     printf("%s: Setting up VTP PLL for local reference\n", __func__);
@@ -211,19 +219,19 @@ vtpInit(int iFlag)
         printf("%s: Setting up VTP PLL for 250MHz VXS reference\n", __func__);
         si5341_Init(SI5341_IN_SEL_VXS_250);
         break;
-        
+
       case VTP_FW_TYPE_DC:
         printf("%s: Setting up VTP PLL for 125MHz VXS reference\n", __func__);
         si5341_Init(SI5341_IN_SEL_VXS_125);
         break;
-        
+
       default:
         printf("%s: ERROR - unknown firmware type %d. Unable to setup VTP PLL.\n", __func__, VTP_FW_Type);
         vtpUnlock();
         return ERROR;
     }
   }
-  
+
   vtpV7PllReset(1);
   vtpV7PllReset(0);
 
@@ -233,7 +241,7 @@ vtpInit(int iFlag)
   vtpSetSyncSource(syncSrc);
 
   vtpTiLinkInit();
-  
+
   vtpEbResetFifo();
 
   VLOCK;
@@ -258,7 +266,7 @@ vtpSetBlockLevel(int level)
   VLOCK;
   vtp->v7.eb.BlockSize = level;
   VUNLOCK;
-  
+
   return(OK);
   }
 
@@ -271,7 +279,7 @@ vtpGetBlockLevel()
   VLOCK;
   rval = vtp->v7.eb.BlockSize;
   VUNLOCK;
-  
+
   return(rval);
 }
 
@@ -280,20 +288,20 @@ vtpTiLinkGetBlockLevel(int print)
 {
   int val;
   CHECKINIT;
-  
+
   VLOCK;
   vtp->eb.TiCtrl = VTP_EB_TICTRL_TI_BL_REQ;
   VUNLOCK;
-  
+
   usleep(1000);
-  
+
   VLOCK;
   val = vtp->eb.TiStatus & 0xFF;
   VUNLOCK;
-  
+
   if(print)
     printf("%s: returned %d\n", __func__, val);
-  
+
   return val;
 }
 
@@ -301,7 +309,7 @@ int
 vtpSetWindow(int lookback, int width)
 {
   CHECKINIT;
-  
+
   switch(VTP_FW_Type)
   {
     case VTP_FW_TYPE_DC:
@@ -367,14 +375,14 @@ vtpGetWindowWidth()
 
   return(rval);
 }
-  
+
 int
 vtpCheckAddresses()
 {
   int rval = OK;
   unsigned long offset=0, expected=0, base=0;
   ZYNC_REGS test;
-  
+
   printf("%s:\n\t ---------- Checking VTP register map ---------- \n",
 	 __func__);
 
@@ -514,12 +522,12 @@ vtpSerdesCheckLinks()
 {
   uint32_t i, status, ctrl, pass, tries;
   CHECKINIT;
-  
+
   for(tries=0; tries<VTP_SERDES_MAX_TRIES; tries++)
   {
     printf("Waiting on links:");
     pass = 1;
-  
+
     for(i=0; i<20; i++)
     {
       VLOCK;
@@ -575,7 +583,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
   int index;
   CHECKINIT;
   CHECKTYPEDEV;
-  
+
   VLOCK;
   ctrl2 = sdev->Ctrl;
   status = sdev->Status;
@@ -625,7 +633,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
       }
       printf("------------------------------------------------------------------------------\n");
     }
-  
+
   printf("%2d  ", dev);
   printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(0))?"U":"D");
   printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(1))?"U":"D");
@@ -677,7 +685,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
     data[index++] = ((latency>>0)&0xFFFF)*4;
     if(index>NSERDES) return(OK);
   }
-  
+
   return OK;
 }
 
@@ -762,7 +770,7 @@ int
 vtpV7PllReset(int enable)
 {
   int status;
-  
+
   if(enable)
   {
     VLOCK;
@@ -775,8 +783,8 @@ vtpV7PllReset(int enable)
     vtp->v7.clk.Ctrl &= ~VTP_V7CLK_CTRL_GCLK_RESET;
     VUNLOCK;
   }
-  usleep(10000);    
-  
+  usleep(10000);
+
   VLOCK;
   status = vtp->v7.clk.Status;
   VUNLOCK;
@@ -793,7 +801,7 @@ vtpV7PllReset(int enable)
     if(!enable)
       return ERROR;
   }
-  
+
   return OK;
 }
 
@@ -802,7 +810,7 @@ vtpV7GetFW_Version()
 {
   int rval=0;
   CHECKINIT;
-  
+
   VLOCK;
   rval = vtp->v7.clk.FW_Version;
   VUNLOCK;
@@ -815,7 +823,7 @@ vtpV7GetFW_Type()
 {
   int rval=0;
   CHECKINIT;
-  
+
   VLOCK;
   rval = vtp->v7.clk.FW_Type;
   VUNLOCK;
@@ -914,7 +922,7 @@ vtpV7SetProgram_B(int val)
 
   vtp->v7.Ctrl = CfgCtrl_Shadow;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1010,7 +1018,7 @@ vtpV7CfgLoad(char *filename)
   unsigned int bytesRead, i = 0;
   FILE *f;
 
-  vtpLock(); 
+  vtpLock();
   vtpV7CfgStart();
 
   printf("%s: Opening file: %s...", __func__, filename);
@@ -1119,10 +1127,10 @@ vtpZ7CfgLoad(char *filename)
   write(fd, pBits, len);
   close(fd);
   free(pBits);
-  
+
   printf("%s: wrote %ld bytes\r\n", __func__, len);
   printf("%s: end reached.\r\n", __func__);
-  
+
   return OK;
 }
 
@@ -1244,12 +1252,12 @@ vtpWrite32(volatile unsigned int *addr, unsigned int val)
 {
   uintptr_t pint = (uintptr_t)vtp + (uintptr_t)addr;
   volatile unsigned int *p = (volatile unsigned int *)pint;
-  
+
   CHECKINIT;
   VLOCK;
     *p = val;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1259,7 +1267,7 @@ vtpRead32(volatile unsigned int *addr)
   uintptr_t pint = (uintptr_t)vtp + (uintptr_t)addr;
   volatile unsigned int *p = (volatile unsigned int *)pint;
   unsigned int val;
-  
+
   CHECKINIT;
   VLOCK;
     val = *p;
@@ -1272,7 +1280,7 @@ vtpEnableTriggerPayloadMask(int pp_mask)
 {
   int i;
   CHECKINIT;
-  
+
   VLOCK;
   switch(VTP_FW_Type)
   {
@@ -1303,7 +1311,7 @@ vtpEnableTriggerPayloadMask(int pp_mask)
 
   for(i = 0; i < 16; i++)
     vtpSerdesEnable(VTP_SERDES_VXS, i, pp_mask & (1<<i));
-  
+
   return OK;
 }
 
@@ -1312,7 +1320,7 @@ vtpGetTriggerPayloadMask()
   {
   int pp_mask = 0;
   CHECKINIT;
-  
+
   VLOCK;
   switch(VTP_FW_Type)
     {
@@ -1340,7 +1348,7 @@ vtpGetTriggerPayloadMask()
       break;
     }
   VUNLOCK;
-  
+
   return pp_mask;
 }
 
@@ -1365,10 +1373,10 @@ vtpEnableTriggerFiberMask(int fiber_mask)
 
   for(i = 0; i < 4; i++)
     vtpSerdesEnable(VTP_SERDES_QSFP, i, fiber_mask & (1<<i));
-  
+
   return OK;
   }
-  
+
 int
 vtpGetTriggerFiberMask()
 {
@@ -1438,16 +1446,16 @@ int
 vtpSetTrig1Source(int src)
 {
   CHECKINIT;
-  
+
   src &= VTP_SD_TRIG1SEL_MASK;
-  
+
   if(src == VTP_SD_TRIG1SEL_0)
     printf("%s: Setting trig1 source to constant 0.\n", __func__);
   else if(src == VTP_SD_TRIG1SEL_1)
     printf("%s: Setting trig1 source to constant 1.\n", __func__);
   else //if(src == VTP_SD_TRIG1SEL_VXS)
     printf("%s: Setting trig1 source to VXS.\n", __func__);
-  
+
   VLOCK;
     vtp->v7.sd.Trig1Sel = src;
   VUNLOCK;
@@ -1459,20 +1467,20 @@ int
 vtpSetSyncSource(int src)
 {
   CHECKINIT;
-  
+
   src &= VTP_SD_SYNCSEL_MASK;
-  
+
   if(src == VTP_SD_SYNCSEL_0)
     printf("%s: Setting sync source to constant 0.\n", __func__);
   else if(src == VTP_SD_SYNCSEL_1)
     printf("%s: Setting sync source to constant 1.\n", __func__);
   else //if(src == VTP_SD_SYNCSEL_VXS)
     printf("%s: Setting sync source to VXS.\n", __func__);
-  
+
   VLOCK;
     vtp->v7.sd.SyncSel = src;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1482,7 +1490,7 @@ vtpSetECtrig_dt(int inst, int dt)
   uint32_t val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_EC);
-  
+
   dt = dt / 4;
   if(dt<0)
   {
@@ -1494,13 +1502,13 @@ vtpSetECtrig_dt(int inst, int dt)
     printf("%s: ERROR dt too large. Setting to maximum (8).\n", __func__);
     dt = 8;
   }
-  
+
   VLOCK;
   val = vtp->v7.ecTrigger[inst].Hit;
   val = (val & 0xFFF0FFFF) | (dt<<16);
   vtp->v7.ecTrigger[inst].Hit = val;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1510,11 +1518,11 @@ vtpGetECtrig_dt(int inst, int *dt)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_EC);
-  
+
   VLOCK;
   *dt = ((vtp->v7.ecTrigger[inst].Hit>>16) & 0xF) * 4;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1524,13 +1532,13 @@ vtpSetECtrig_emin(int inst, int emin)
   uint32_t val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_EC);
-  
+
   VLOCK;
     val = vtp->v7.ecTrigger[inst].Hit;
     val = (val & 0xFFFFE000) | (emin<<0);
     vtp->v7.ecTrigger[inst].Hit = val;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1539,11 +1547,11 @@ vtpGetECtrig_emin(int inst, int *emin)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_EC);
-  
+
   VLOCK;
   *emin = vtp->v7.ecTrigger[inst].Hit & 0x1FFF;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1553,13 +1561,13 @@ vtpSetECtrig_peak_multmax(int inst, int mult_max)
   uint32_t val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_EC);
-  
+
   VLOCK;
     val = vtp->v7.ecTrigger[inst].Hit;
     val = (val & 0xE0FFFFFF) | (mult_max<<24);
     vtp->v7.ecTrigger[inst].Hit = val;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1568,11 +1576,11 @@ vtpGetECtrig_peak_multmax(int inst, int *mult_max)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_EC);
-  
+
   VLOCK;
   *mult_max = (vtp->v7.ecTrigger[inst].Hit & 0x1F000000)>>24;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1581,11 +1589,11 @@ vtpSetECtrig_dalitz(int inst, int min, int max)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_EC);
-  
+
   VLOCK;
     vtp->v7.ecTrigger[inst].Dalitz = (max<<16) | (min<<0);
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1595,13 +1603,13 @@ vtpGetECtrig_dalitz(int inst, int *min, int *max)
   int val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_EC);
-  
+
   VLOCK;
   val = vtp->v7.ecTrigger[inst].Dalitz;
   *min = (val>>0) & 0x3FF;
   *max = (val>>16) & 0x3FF;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1623,7 +1631,7 @@ vtpSetFadcSum_MaskEn(unsigned int mask[16])
       printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type);
       return ERROR;
   }
-  
+
   VLOCK;
   for(i=0; i<8; i++)
   {
@@ -1632,7 +1640,7 @@ vtpSetFadcSum_MaskEn(unsigned int mask[16])
     vtp->v7.fadcSum.SumEn[i] = val;
   }
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1654,7 +1662,7 @@ vtpGetFadcSum_MaskEn(unsigned int mask[16])
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   for(i=0; i<8;i++)
   {
@@ -1663,7 +1671,7 @@ vtpGetFadcSum_MaskEn(unsigned int mask[16])
     mask[2*i+1] = (val>>16) & 0xFFFF;
   }
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -1682,13 +1690,13 @@ vtpSetECcosmic_emin(int inst, int emin)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   val = vtp->v7.ecCosmic[inst].Ctrl;
   val = (val & ~VTP_ECCOSMIC_CTRL_EMIN_MASK) | emin;
   vtp->v7.ecCosmic[inst].Ctrl = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -1707,7 +1715,7 @@ vtpGetECcosmic_emin(int inst, int *emin)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   *emin = vtp->v7.ecCosmic[inst].Ctrl & VTP_ECCOSMIC_CTRL_EMIN_MASK;
   VUNLOCK;
@@ -1730,13 +1738,13 @@ vtpSetECcosmic_multmax(int inst, int multmax)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   val = vtp->v7.ecCosmic[inst].Ctrl;
   val = (val & ~VTP_ECCOSMIC_CTRL_MULTMAX_MASK) | (multmax<<24);
   vtp->v7.ecCosmic[inst].Ctrl = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -1755,7 +1763,7 @@ vtpGetECcosmic_multmax(int inst, int *multmax)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   *multmax = (vtp->v7.ecCosmic[inst].Ctrl & VTP_ECCOSMIC_CTRL_MULTMAX_MASK)>>24;
   VUNLOCK;
@@ -1778,13 +1786,13 @@ vtpSetECcosmic_width(int inst, int hitwidth)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   val = vtp->v7.ecCosmic[inst].Delay;
   val = (val & ~VTP_ECCOSMIC_DELAY_WIDTH_MASK) | (hitwidth<<0);
   vtp->v7.ecCosmic[inst].Delay = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -1803,7 +1811,7 @@ vtpGetECcosmic_width(int inst, int *hitwidth)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   *hitwidth = (vtp->v7.ecCosmic[inst].Delay & VTP_ECCOSMIC_DELAY_WIDTH_MASK)>>0;
   VUNLOCK;
@@ -1826,13 +1834,13 @@ vtpSetECcosmic_delay(int inst, int evaldelay)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   val = vtp->v7.ecCosmic[inst].Delay;
   val = (val & ~VTP_ECCOSMIC_DELAY_EVAL_MASK) | (evaldelay<<16);
   vtp->v7.ecCosmic[inst].Delay = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -1851,7 +1859,7 @@ vtpGetECcosmic_delay(int inst, int *evaldelay)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   *evaldelay = (vtp->v7.ecCosmic[inst].Delay & VTP_ECCOSMIC_DELAY_EVAL_MASK)>>16;
   VUNLOCK;
@@ -1899,7 +1907,7 @@ vtpGetPCcosmic_emin(int *emin)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   *emin = vtp->v7.pcCosmic.Ctrl & VTP_PCCOSMIC_CTRL_EMIN_MASK;
   VUNLOCK;
@@ -1922,13 +1930,13 @@ vtpSetPCcosmic_multmax(int multmax)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   val = vtp->v7.pcCosmic.Ctrl;
   val = (val & ~VTP_PCCOSMIC_CTRL_MULTMAX_MASK) | (multmax<<24);
   vtp->v7.pcCosmic.Ctrl = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -1947,7 +1955,7 @@ vtpGetPCcosmic_multmax(int *multmax)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   *multmax = (vtp->v7.pcCosmic.Ctrl & VTP_PCCOSMIC_CTRL_MULTMAX_MASK)>>24;
   VUNLOCK;
@@ -1970,13 +1978,13 @@ vtpSetPCcosmic_width(int hitwidth)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   val = vtp->v7.pcCosmic.Delay;
   val = (val & ~VTP_PCCOSMIC_DELAY_WIDTH_MASK) | (hitwidth<<0);
   vtp->v7.pcCosmic.Delay = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -1995,7 +2003,7 @@ vtpGetPCcosmic_width(int *hitwidth)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   *hitwidth = (vtp->v7.pcCosmic.Delay & VTP_PCCOSMIC_DELAY_WIDTH_MASK)>>0;
   VUNLOCK;
@@ -2018,7 +2026,7 @@ vtpSetPCcosmic_delay(int evaldelay)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   val = vtp->v7.pcCosmic.Delay;
   val = (val & ~VTP_PCCOSMIC_DELAY_EVAL_MASK) | (evaldelay<<16);
@@ -2043,7 +2051,7 @@ vtpGetPCcosmic_delay(int *evaldelay)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   *evaldelay = (vtp->v7.pcCosmic.Delay & VTP_PCCOSMIC_DELAY_EVAL_MASK)>>16;
   VUNLOCK;
@@ -2068,16 +2076,16 @@ vtpSetPCcosmic_pixel(int enable)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   if(enable)
     enable = 1;
-  
+
   VLOCK;
   val = vtp->v7.pcCosmic.Ctrl;
   val = (val & ~VTP_PCCOSMIC_CTRL_PIXEL_MASK) | (enable<<16);
   vtp->v7.pcCosmic.Ctrl = val;
   VUNLOCK;
-  
+
 printf("%s(%d): 0x%08X, 0x%08X\n", __func__, enable, val, vtp->v7.pcCosmic.Ctrl);
   return OK;
 
@@ -2097,7 +2105,7 @@ vtpGetPCcosmic_pixel(int *enable)
       printf("%s: ERROR: VTP wrong firmware type\n",__func__);
       return ERROR;
   }
-  
+
   VLOCK;
   *enable = (vtp->v7.pcCosmic.Ctrl & VTP_PCCOSMIC_CTRL_PIXEL_MASK)>>16;
   VUNLOCK;
@@ -2111,13 +2119,13 @@ vtpSetFTCALseed_emin(int emin)
   uint32_t val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);
-  
+
   VLOCK;
   val = vtp->v7.ftcalTrigger.Ctrl;
   val = (val & ~VTP_FTCAL_CTRL_SEEDTHR_MASK) | (emin<<0);
   vtp->v7.ftcalTrigger.Ctrl = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -2127,7 +2135,7 @@ vtpGetFTCALseed_emin(int *emin)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);
-  
+
   VLOCK;
   *emin = (vtp->v7.ftcalTrigger.Ctrl & VTP_FTCAL_CTRL_SEEDTHR_MASK)>>0;
   VUNLOCK;
@@ -2142,14 +2150,14 @@ vtpSetFTCALseed_dt(int dt)
   uint32_t val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);
-  
+
   VLOCK;
   dt = dt/4;
   val = vtp->v7.ftcalTrigger.Ctrl;
   val = (val & ~VTP_FTCAL_CTRL_SEEDDT_MASK) | ((dt&0x7)<<16);
   vtp->v7.ftcalTrigger.Ctrl = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -2159,7 +2167,7 @@ vtpGetFTCALseed_dt(int *dt)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);
-  
+
   VLOCK;
   *dt = ((vtp->v7.ftcalTrigger.Ctrl & VTP_FTCAL_CTRL_SEEDDT_MASK)>>16)*4;
   VUNLOCK;
@@ -2173,14 +2181,14 @@ vtpSetFTCALhodo_dt(int dt)
   uint32_t val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);
-  
+
   VLOCK;
   dt = dt/4;
   val = vtp->v7.ftcalTrigger.Ctrl;
   val = (val & ~VTP_FTCAL_CTRL_HODODT_MASK) | ((dt&0x7)<<24);
   vtp->v7.ftcalTrigger.Ctrl = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -2190,7 +2198,7 @@ vtpGetFTCALhodo_dt(int *dt)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);
-  
+
   VLOCK;
   *dt = ((vtp->v7.ftcalTrigger.Ctrl & VTP_FTCAL_CTRL_HODODT_MASK)>>24)*4;
   VUNLOCK;
@@ -2205,13 +2213,13 @@ vtpSetFTHODOemin(int emin)
   uint32_t val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTHODO);
-  
+
   VLOCK;
   val = vtp->v7.fthodoTrigger.Ctrl;
   val = (emin & VTP_FTHODO_CTRL_EMIN_MASK)<<0;
   vtp->v7.fthodoTrigger.Ctrl = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -2221,7 +2229,7 @@ vtpGetFTHODOemin(int *emin)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTHODO);
-  
+
   VLOCK;
   *emin = (vtp->v7.fthodoTrigger.Ctrl & VTP_FTHODO_CTRL_EMIN_MASK)>>0;
   VUNLOCK;
@@ -2235,14 +2243,14 @@ vtpSetFTCALcluster_deadtime(int deadtime)
   uint32_t val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);
-  
+
   VLOCK;
   deadtime = deadtime/4;
   val = vtp->v7.ftcalTrigger.DeadtimeCtrl;
   val = (val & ~VTP_FTCAL_DEADTIMECTRL_DEADTIME_MASK) | ((deadtime&0x3f)<<16);
   vtp->v7.ftcalTrigger.DeadtimeCtrl = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -2252,7 +2260,7 @@ vtpGetFTCALcluster_deadtime(int *deadtime)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);
-  
+
   VLOCK;
   *deadtime = ((vtp->v7.ftcalTrigger.DeadtimeCtrl & VTP_FTCAL_DEADTIMECTRL_DEADTIME_MASK)>>16)*4;
   VUNLOCK;
@@ -2266,13 +2274,13 @@ vtpSetFTCALcluster_deadtime_emin(int emin)
   uint32_t val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);
-  
+
   VLOCK;
   val = vtp->v7.ftcalTrigger.DeadtimeCtrl;
   val = (emin & VTP_FTCAL_DEADTIMECTRL_EMIN_MASK)<<0;
   vtp->v7.ftcalTrigger.DeadtimeCtrl = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -2282,7 +2290,7 @@ vtpGetFTCALcluster_deadtime_emin(int *emin)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTCAL);
-  
+
   VLOCK;
   *emin = (vtp->v7.ftcalTrigger.DeadtimeCtrl & VTP_FTCAL_DEADTIMECTRL_EMIN_MASK)>>0;
   VUNLOCK;
@@ -2325,7 +2333,7 @@ vtpFTSendErrors(char *host)
     sprintf(name, "err: crate=%s,link to adcft3vtp down", host);
     epics_json_msg_send(name, "int", 1, &data);
   }
-  
+
   return OK;
 }
 
@@ -2435,7 +2443,7 @@ vtpFTHodoSendErrors(char *host)
     sprintf(name, "err: crate=%s,link to adcft2vtp down", host);
     epics_json_msg_send(name, "int", 1, &data);
   }
-  
+
   return OK;
 }
 
@@ -2497,7 +2505,7 @@ vtpSetHTCC_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HTCC);
-  
+
   VLOCK;
   vtp->v7.htccTrigger.Thresholds[0] = thr0;
   vtp->v7.htccTrigger.Thresholds[1] = thr1;
@@ -2512,7 +2520,7 @@ vtpGetHTCC_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HTCC);
-  
+
   VLOCK;
   *thr0 = vtp->v7.htccTrigger.Thresholds[0];
   *thr1 = vtp->v7.htccTrigger.Thresholds[1];
@@ -2527,7 +2535,7 @@ vtpSetHTCC_nframes(int nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HTCC);
-  
+
   VLOCK;
   vtp->v7.htccTrigger.NFrames = nframes;
   VUNLOCK;
@@ -2540,7 +2548,7 @@ vtpGetHTCC_nframes(int *nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HTCC);
-  
+
   VLOCK;
   *nframes = vtp->v7.htccTrigger.NFrames;
   VUNLOCK;
@@ -2554,7 +2562,7 @@ vtpSetCTOF_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HTCC);
-  
+
   VLOCK;
   vtp->v7.ctofTrigger.Thresholds[0] = thr0;
   vtp->v7.ctofTrigger.Thresholds[1] = thr1;
@@ -2569,7 +2577,7 @@ vtpGetCTOF_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HTCC);
-  
+
   VLOCK;
   *thr0 = vtp->v7.ctofTrigger.Thresholds[0];
   *thr1 = vtp->v7.ctofTrigger.Thresholds[1];
@@ -2584,7 +2592,7 @@ vtpSetCTOF_nframes(int nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HTCC);
-  
+
   VLOCK;
   vtp->v7.ctofTrigger.NFrames = nframes;
   VUNLOCK;
@@ -2597,7 +2605,7 @@ vtpGetCTOF_nframes(int *nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HTCC);
-  
+
   VLOCK;
   *nframes = vtp->v7.ctofTrigger.NFrames;
   VUNLOCK;
@@ -2608,18 +2616,18 @@ vtpGetCTOF_nframes(int *nframes)
 int
 vtpHtccPrintScalers()
 {
-  double ref, rate; 
-  int i; 
+  double ref, rate;
+  int i;
   unsigned int scalers[3];
   const char *scalers_name[3] = {
     "BusClk",
     "HTCCHit",
     "CTOFHit"
    };
- 
+
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HTCC);
- 
+
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
 
@@ -2630,26 +2638,26 @@ vtpHtccPrintScalers()
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
 
- 
-  printf("%s - \n", __FUNCTION__); 
-  if(!scalers[0]) 
-  {
-    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__); 
-    ref = 1.0; 
-  } 
-  else 
-  { 
-    ref = (double)scalers[0] / (double)33330000;
-  } 
 
-  for(i=0; i<3; i++) 
-  { 
-    rate = (double)scalers[i]; 
-    rate = rate / ref; 
-    if(scalers[i] == 0xFFFFFFFF) 
-     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate); 
-    else 
-     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate); 
+  printf("%s - \n", __FUNCTION__);
+  if(!scalers[0])
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__);
+    ref = 1.0;
+  }
+  else
+  {
+    ref = (double)scalers[0] / (double)33330000;
+  }
+
+  for(i=0; i<3; i++)
+  {
+    rate = (double)scalers[i];
+    rate = rate / ref;
+    if(scalers[i] == 0xFFFFFFFF)
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate);
+    else
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate);
   }
   return OK;
 }
@@ -2679,7 +2687,7 @@ vtpHtccSendErrors(char *host)
     sprintf(name, "err: crate=%s link to trig2 SSP_SLOT10 down", host);
     epics_json_msg_send(name, "int", 1, &data);
   }
-  
+
   return OK;
 }
 
@@ -2730,7 +2738,7 @@ vtpSetFTOF_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTOF);
-  
+
   VLOCK;
   vtp->v7.ftofTrigger.Thresholds[0] = thr0;
   vtp->v7.ftofTrigger.Thresholds[1] = thr1;
@@ -2745,7 +2753,7 @@ vtpGetFTOF_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTOF);
-  
+
   VLOCK;
   *thr0 = vtp->v7.ftofTrigger.Thresholds[0];
   *thr1 = vtp->v7.ftofTrigger.Thresholds[1];
@@ -2760,7 +2768,7 @@ vtpSetFTOF_nframes(int nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTOF);
-  
+
   VLOCK;
   vtp->v7.ftofTrigger.NFrames = nframes;
   VUNLOCK;
@@ -2773,7 +2781,7 @@ vtpGetFTOF_nframes(int *nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTOF);
-  
+
   VLOCK;
   *nframes = vtp->v7.ftofTrigger.NFrames;
   VUNLOCK;
@@ -2784,17 +2792,17 @@ vtpGetFTOF_nframes(int *nframes)
 int
 vtpFtofPrintScalers()
 {
-  double ref, rate; 
-  int i; 
+  double ref, rate;
+  int i;
   unsigned int scalers[2];
   const char *scalers_name[2] = {
     "BusClk",
     "Hit"
    };
- 
+
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_FTOF);
- 
+
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
 
@@ -2804,26 +2812,26 @@ vtpFtofPrintScalers()
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
 
- 
-  printf("%s - \n", __FUNCTION__); 
-  if(!scalers[0]) 
-  {
-    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__); 
-    ref = 1.0; 
-  } 
-  else 
-  { 
-    ref = (double)scalers[0] / (double)33330000;
-  } 
 
-  for(i=0; i<2; i++) 
-  { 
-    rate = (double)scalers[i]; 
-    rate = rate / ref; 
-    if(scalers[i] == 0xFFFFFFFF) 
-     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate); 
-    else 
-     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate); 
+  printf("%s - \n", __FUNCTION__);
+  if(!scalers[0])
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__);
+    ref = 1.0;
+  }
+  else
+  {
+    ref = (double)scalers[0] / (double)33330000;
+  }
+
+  for(i=0; i<2; i++)
+  {
+    rate = (double)scalers[i];
+    rate = rate / ref;
+    if(scalers[i] == 0xFFFFFFFF)
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate);
+    else
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate);
   }
   return OK;
 }
@@ -2857,7 +2865,7 @@ vtpFtofSendErrors(char *host)
       epics_json_msg_send(name, "int", 1, &data);
     }
   }
-  
+
   return OK;
 }
 
@@ -2902,7 +2910,7 @@ vtpSetCND_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_CND);
-  
+
   VLOCK;
   vtp->v7.cndTrigger.Thresholds[0] = thr0;
   vtp->v7.cndTrigger.Thresholds[1] = thr1;
@@ -2917,7 +2925,7 @@ vtpGetCND_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_CND);
-  
+
   VLOCK;
   *thr0 = vtp->v7.cndTrigger.Thresholds[0];
   *thr1 = vtp->v7.cndTrigger.Thresholds[1];
@@ -2932,7 +2940,7 @@ vtpSetCND_nframes(int nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_CND);
-  
+
   VLOCK;
   vtp->v7.cndTrigger.NFrames = nframes;
   VUNLOCK;
@@ -2945,7 +2953,7 @@ vtpGetCND_nframes(int *nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_CND);
-  
+
   VLOCK;
   *nframes = vtp->v7.cndTrigger.NFrames;
   VUNLOCK;
@@ -2956,17 +2964,17 @@ vtpGetCND_nframes(int *nframes)
 int
 vtpCndPrintScalers()
 {
-  double ref, rate; 
-  int i; 
+  double ref, rate;
+  int i;
   unsigned int scalers[2];
   const char *scalers_name[2] = {
     "BusClk",
     "Hit"
    };
- 
+
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_CND);
- 
+
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
 
@@ -2976,26 +2984,26 @@ vtpCndPrintScalers()
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
 
- 
-  printf("%s - \n", __FUNCTION__); 
-  if(!scalers[0]) 
-  {
-    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__); 
-    ref = 1.0; 
-  } 
-  else 
-  { 
-    ref = (double)scalers[0] / (double)33330000;
-  } 
 
-  for(i=0; i<2; i++) 
-  { 
-    rate = (double)scalers[i]; 
-    rate = rate / ref; 
-    if(scalers[i] == 0xFFFFFFFF) 
-     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate); 
-    else 
-     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate); 
+  printf("%s - \n", __FUNCTION__);
+  if(!scalers[0])
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__);
+    ref = 1.0;
+  }
+  else
+  {
+    ref = (double)scalers[0] / (double)33330000;
+  }
+
+  for(i=0; i<2; i++)
+  {
+    rate = (double)scalers[i];
+    rate = rate / ref;
+    if(scalers[i] == 0xFFFFFFFF)
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate);
+    else
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate);
   }
   return OK;
 }
@@ -3007,7 +3015,7 @@ vtpCndSendErrors(char *host)
   char name[100];
   int data[NSERDES];
   unsigned int val;
-  int i, slot;
+  int i;
   CHECKINIT;
 
   for(i=0;i<4;i++)
@@ -3025,7 +3033,7 @@ vtpCndSendErrors(char *host)
     sprintf(name, "err: crate=%s link to trig2 SSP_SLOT10 down", host);
     epics_json_msg_send(name, "int", 1, &data);
   }
-  
+
   return OK;
 }
 
@@ -3078,7 +3086,7 @@ vtpSetPCS_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   VLOCK;
   vtp->v7.pcsTrigger.Thresholds[0] = thr0;
   vtp->v7.pcsTrigger.Thresholds[1] = thr1;
@@ -3093,7 +3101,7 @@ vtpGetPCS_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   VLOCK;
   *thr0 = vtp->v7.pcsTrigger.Thresholds[0];
   *thr1 = vtp->v7.pcsTrigger.Thresholds[1];
@@ -3108,7 +3116,7 @@ vtpSetPCS_nframes(int nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   VLOCK;
   vtp->v7.pcsTrigger.NFrames = nframes;
   VUNLOCK;
@@ -3121,7 +3129,7 @@ vtpGetPCS_nframes(int *nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   VLOCK;
   *nframes = vtp->v7.pcsTrigger.NFrames;
   VUNLOCK;
@@ -3134,7 +3142,7 @@ vtpSetPCS_dipfactor(int dipfactor)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   VLOCK;
   vtp->v7.pcsTrigger.Dipfactor = dipfactor;
   VUNLOCK;
@@ -3147,7 +3155,7 @@ vtpGetPCS_dipfactor(int *dipfactor)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   VLOCK;
   *dipfactor = vtp->v7.pcsTrigger.Dipfactor;
   VUNLOCK;
@@ -3160,7 +3168,7 @@ vtpSetPCS_nstrip(int nstripmin, int nstripmax)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   /* nstripmin is not implemented */
   VLOCK;
   vtp->v7.pcsTrigger.NstripMax = nstripmax;
@@ -3174,7 +3182,7 @@ vtpGetPCS_nstrip(int *nstripmin, int *nstripmax)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   /* nstripmin is not implemented */
   *nstripmax = 0;
 
@@ -3190,7 +3198,7 @@ vtpSetPCS_dalitz(int dalitz_min, int dalitz_max)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   VLOCK;
   vtp->v7.pcsTrigger.DalitzMin = dalitz_min;
   vtp->v7.pcsTrigger.DalitzMax = dalitz_max;
@@ -3204,7 +3212,7 @@ vtpGetPCS_dalitz(int *dalitz_min, int *dalitz_max)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   VLOCK;
   *dalitz_min = vtp->v7.pcsTrigger.DalitzMin;
   *dalitz_max = vtp->v7.pcsTrigger.DalitzMax;
@@ -3242,7 +3250,7 @@ vtpPcsSendErrors(char *host)
       epics_json_msg_send(name, "int", 1, &data);
     }
   }
-  
+
   return OK;
 }
 
@@ -3289,7 +3297,7 @@ vtpSetPCU_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   VLOCK;
   vtp->v7.pcuTrigger.Thresholds[0] = thr0;
   vtp->v7.pcuTrigger.Thresholds[1] = thr1;
@@ -3304,7 +3312,7 @@ vtpGetPCU_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
-  
+
   VLOCK;
   *thr0 = vtp->v7.pcuTrigger.Thresholds[0];
   *thr1 = vtp->v7.pcuTrigger.Thresholds[1];
@@ -3322,7 +3330,7 @@ vtpSetECS_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
-  
+
   VLOCK;
   vtp->v7.ecsTrigger.Thresholds[0] = thr0;
   vtp->v7.ecsTrigger.Thresholds[1] = thr1;
@@ -3337,7 +3345,7 @@ vtpGetECS_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
-  
+
   VLOCK;
   *thr0 = vtp->v7.ecsTrigger.Thresholds[0];
   *thr1 = vtp->v7.ecsTrigger.Thresholds[1];
@@ -3352,7 +3360,7 @@ vtpSetECS_nframes(int nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
-  
+
   VLOCK;
   vtp->v7.ecsTrigger.NFrames = nframes;
   VUNLOCK;
@@ -3365,7 +3373,7 @@ vtpGetECS_nframes(int *nframes)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
-  
+
   VLOCK;
   *nframes = vtp->v7.ecsTrigger.NFrames;
   VUNLOCK;
@@ -3378,7 +3386,7 @@ vtpSetECS_dipfactor(int dipfactor)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
-  
+
   VLOCK;
   vtp->v7.ecsTrigger.Dipfactor = dipfactor;
   VUNLOCK;
@@ -3391,7 +3399,7 @@ vtpGetECS_dipfactor(int *dipfactor)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
-  
+
   VLOCK;
   *dipfactor = vtp->v7.ecsTrigger.Dipfactor;
   VUNLOCK;
@@ -3404,7 +3412,7 @@ vtpSetECS_nstrip(int nstripmin, int nstripmax)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
-  
+
   /* nstripmin is not implemented */
   VLOCK;
   vtp->v7.ecsTrigger.NstripMax = nstripmax;
@@ -3418,7 +3426,7 @@ vtpGetECS_nstrip(int *nstripmin, int *nstripmax)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
-  
+
   /* nstripmin is not implemented */
   *nstripmax = 0;
 
@@ -3434,7 +3442,7 @@ vtpSetECS_dalitz(int dalitz_min, int dalitz_max)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
-  
+
   VLOCK;
   vtp->v7.ecsTrigger.DalitzMin = dalitz_min<<3;
   vtp->v7.ecsTrigger.DalitzMax = dalitz_max<<3;
@@ -3448,7 +3456,7 @@ vtpGetECS_dalitz(int *dalitz_min, int *dalitz_max)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
-  
+
   VLOCK;
   *dalitz_min = vtp->v7.ecsTrigger.DalitzMin>>3;
   *dalitz_max = vtp->v7.ecsTrigger.DalitzMax>>3;
@@ -3461,8 +3469,8 @@ vtpGetECS_dalitz(int *dalitz_min, int *dalitz_max)
 int
 vtpEcsPrintScalers()
 {
-  double ref, rate; 
-  int i; 
+  double ref, rate;
+  int i;
   unsigned int scalers[5];
   const char *scalers_name[5] = {
     "BusClk",
@@ -3471,10 +3479,10 @@ vtpEcsPrintScalers()
     "PeakW",
     "Hit"
    };
- 
+
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_ECS);
- 
+
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
 
@@ -3487,26 +3495,26 @@ vtpEcsPrintScalers()
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
 
- 
-  printf("%s - \n", __FUNCTION__); 
-  if(!scalers[0]) 
-  {
-    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__); 
-    ref = 1.0; 
-  } 
-  else 
-  { 
-    ref = (double)scalers[0] / (double)33330000;
-  } 
 
-  for(i = 0; i < 5; i++) 
-  { 
-    rate = (double)scalers[i]; 
-    rate = rate / ref; 
-    if(scalers[i] == 0xFFFFFFFF) 
-     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate); 
-    else 
-     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate); 
+  printf("%s - \n", __FUNCTION__);
+  if(!scalers[0])
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__);
+    ref = 1.0;
+  }
+  else
+  {
+    ref = (double)scalers[0] / (double)33330000;
+  }
+
+  for(i = 0; i < 5; i++)
+  {
+    rate = (double)scalers[i];
+    rate = rate / ref;
+    if(scalers[i] == 0xFFFFFFFF)
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate);
+    else
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate);
   }
   return OK;
 }
@@ -3540,7 +3548,7 @@ vtpEcsSendErrors(char *host)
       epics_json_msg_send(name, "int", 1, &data);
     }
   }
-  
+
   return OK;
 }
 
@@ -3584,16 +3592,16 @@ vtpSetPCScosmic_pixel(int enable)
   uint32_t val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PC);
-  
+
   if(enable)
     enable = 1;
-  
+
   VLOCK;
   val = vtp->v7.pcCosmic.Ctrl;
   val = (val & ~VTP_PCCOSMIC_CTRL_PIXEL_MASK) | (enable<<16);
   vtp->v7.pcCosmic.Delay = val;
   VUNLOCK;
-  
+
   return OK;
 
 }
@@ -3603,7 +3611,7 @@ vtpGetPCScosmic_pixel(int *enable)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PC);
-  
+
   VLOCK;
   *enable = (vtp->v7.pcCosmic.Ctrl & VTP_PCCOSMIC_CTRL_PIXEL_MASK)>>16;
   VUNLOCK;
@@ -3625,11 +3633,11 @@ vtpSetDc_SegmentThresholdMin(int inst, int threshold)
     printf("%s: ERROR - invalid instance %d\n", __func__, inst);
     return ERROR;
   }
-  
+
   VLOCK;
   vtp->v7.dcrbSegFind[inst].Ctrl = threshold;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -3638,17 +3646,17 @@ vtpGetDc_SegmentThresholdMin(int inst, int *threshold)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_DC);
-  
+
   if(inst < 0 || inst > 1)
   {
     printf("%s: ERROR - invalid instance %d\n", __func__, inst);
     return ERROR;
   }
-  
+
   VLOCK;
   *threshold = vtp->v7.dcrbSegFind[inst].Ctrl;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -3657,11 +3665,11 @@ vtpSetGt_latency(int latency)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_GT);
-  
+
   VLOCK;
   vtp->v7.trigOut.Latency = latency/4;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -3671,11 +3679,11 @@ vtpGetGt_latency()
   int latency;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_GT);
-  
+
   VLOCK;
   latency = vtp->v7.trigOut.Latency;
   VUNLOCK;
-  
+
   return latency*4;
 }
 
@@ -3684,11 +3692,11 @@ vtpSetGt_width(int width)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_GT);
-  
+
   VLOCK;
   vtp->v7.trigOut.Width = width;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -3698,18 +3706,18 @@ vtpGetGt_width()
   int width;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_GT);
-  
+
   VLOCK;
   width = vtp->v7.trigOut.Width;
   VUNLOCK;
-  
+
   return width;
 }
 
 int
 vtpPrintGtTriggerBitRegs()
 {
-  int strig, strigmask, ctrig, pulser, i;
+  int strig, strigmask, ctrig, pulser, i, prescaler;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_GT);
 
@@ -3720,28 +3728,29 @@ vtpPrintGtTriggerBitRegs()
     strigmask= vtp->v7.gtBit[i].STriggerMask;
     ctrig = vtp->v7.gtBit[i].CTrigger;
     pulser = vtp->v7.gtBit[i].Pulser;
+    prescaler = vtp->v7.trigOut.Prescaler[i];
     VUNLOCK;
-    printf("Bit %d: STrigger = 0x%08X, STriggerMask = 0x%08X, CTrigger = 0x%08X, Pulser = 0x%08X\n", i, strig, strigmask, ctrig, pulser);
+    printf("Bit %d: STrigger = 0x%08X, STriggerMask = 0x%08X, CTrigger = 0x%08X, Pulser = 0x%08X, Prescaler = %d\n", i, strig, strigmask, ctrig, pulser, prescaler);
   }
-  
-  return OK;  
+
+  return OK;
 }
 
 int
-vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, int delay, float pulser_freq)
+vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, int delay, float pulser_freq, int prescale)
 {
   float f;
   int strig, strigmask, ctrig, pulser;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_GT);
-  
+
   if(inst < 0 || inst > 32)
   {
     printf("%s: ERROR - invalid trigger bit %d\n", __func__, inst);
     return ERROR;
   }
 
-  ctrig = ((ctrigger_mask & 0xF) <<0);  
+  ctrig = ((ctrigger_mask & 0xF) <<0);
 
   strig = ((mult_min      & 0x7) <<4) |
           ((sector_mask   & 0x3F)<<8) |
@@ -3764,29 +3773,31 @@ vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, i
   vtp->v7.gtBit[inst].CTrigger = ctrig;
   vtp->v7.gtBit[inst].Pulser = pulser;
   vtp->v7.gtBit[inst].STriggerMask = strigmask;
+  vtp->v7.trigOut.Prescaler[inst] = prescale;
   VUNLOCK;
-  
-  return OK;  
+
+  return OK;
 }
 
 int
-vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq)
+vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq, int *prescale)
 {
   int strig, strigmask, ctrig, pulser;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_GT);
-  
+
   if(inst < 0 || inst > 32)
   {
     printf("%s: ERROR - invalid trigger bit %d\n", __func__, inst);
     return ERROR;
   }
-  
+
   VLOCK;
   strig = vtp->v7.gtBit[inst].STrigger;
   ctrig = vtp->v7.gtBit[inst].CTrigger;
   pulser = vtp->v7.gtBit[inst].Pulser;
   strigmask = vtp->v7.gtBit[inst].STriggerMask;
+  *prescale = vtp->v7.trigOut.Prescaler[inst];
   VUNLOCK;
 
   *mult_min      = (strig>>4)&0x7;
@@ -3807,7 +3818,7 @@ vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min
   else
     *pulser_freq = 0.0f;
 
-  return OK;  
+  return OK;
 }
 
 #ifdef IPC
@@ -3815,7 +3826,7 @@ int
 vtpGtSendScalers(char *host)
 {
   char name[100];
-  float ref, data[32];
+  float ref, data[32], idata[32];
   unsigned int val;
   int i;
   CHECKINIT;
@@ -3834,10 +3845,17 @@ vtpGtSendScalers(char *host)
   for(i=0; i<32; i++)
     data[i] = ref * (float)vtp->v7.gtBit[i].TriggerScaler;
   vtp->v7.sd.ScalerLatch = 0;
+
+  //Trigger bit prescalers
+  for(i=0; i<32; i++)
+    idata[i] = vtp->v7.trigOut.Prescaler[i];
   VUNLOCK;
 
   sprintf(name, "%s_VTPGT_TRIGGERBITS", host);
   epics_json_msg_send(name, "float", 32, data);
+
+  sprintf(name, "%s_VTPGT_PRESCALES", host);
+  epics_json_msg_send(name, "int", 32, idata);
 
   return OK;
 }
@@ -3846,8 +3864,8 @@ vtpGtSendScalers(char *host)
 int
 vtpGtPrintScalers()
 {
-  double ref, rate; 
-  int i; 
+  double ref, rate;
+  int i;
   unsigned int gtscalers[36];
   const char *scalers_name[36] = {
     "BusClk",
@@ -3887,11 +3905,11 @@ vtpGtPrintScalers()
     "Trigger30",
     "Trigger31"
     };
- 
+
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_GT);
- 
-  
+
+
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
   gtscalers[0] = vtp->v7.sd.Scaler_BusClk;
@@ -3904,26 +3922,26 @@ vtpGtPrintScalers()
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
 
- 
-  printf("%s - \n", __FUNCTION__); 
-  if(!gtscalers[0]) 
-  {
-    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__); 
-    ref = 1.0; 
-  } 
-  else 
-  { 
-    ref = (double)gtscalers[0] / (double)33330000;
-  } 
 
-  for(i = 0; i < 36; i++) 
-  { 
-    rate = (double)gtscalers[i]; 
-    rate = rate / ref; 
-    if(gtscalers[i] == 0xFFFFFFFF) 
-     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], gtscalers[i], rate); 
-    else 
-     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], gtscalers[i], rate); 
+  printf("%s - \n", __FUNCTION__);
+  if(!gtscalers[0])
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__);
+    ref = 1.0;
+  }
+  else
+  {
+    ref = (double)gtscalers[0] / (double)33330000;
+  }
+
+  for(i = 0; i < 36; i++)
+  {
+    rate = (double)gtscalers[i];
+    rate = rate / ref;
+    if(gtscalers[i] == 0xFFFFFFFF)
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], gtscalers[i], rate);
+    else
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], gtscalers[i], rate);
   }
   return OK;
 }
@@ -3931,8 +3949,8 @@ vtpGtPrintScalers()
 int
 vtpPcsPrintScalers()
 {
-  double ref, rate; 
-  int i; 
+  double ref, rate;
+  int i;
   unsigned int scalers[6];
   const char *scalers_name[6] = {
     "BusClk",
@@ -3942,10 +3960,10 @@ vtpPcsPrintScalers()
     "Hit",
     "Pcu"
    };
- 
+
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_PCS);
- 
+
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
 
@@ -3959,26 +3977,26 @@ vtpPcsPrintScalers()
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
 
- 
-  printf("%s - \n", __FUNCTION__); 
-  if(!scalers[0]) 
-  {
-    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__); 
-    ref = 1.0; 
-  } 
-  else 
-  { 
-    ref = (double)scalers[0] / (double)33330000;
-  } 
 
-  for(i = 0; i < 6; i++) 
-  { 
-    rate = (double)scalers[i]; 
-    rate = rate / ref; 
-    if(scalers[i] == 0xFFFFFFFF) 
-     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate); 
-    else 
-     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate); 
+  printf("%s - \n", __FUNCTION__);
+  if(!scalers[0])
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__);
+    ref = 1.0;
+  }
+  else
+  {
+    ref = (double)scalers[0] / (double)33330000;
+  }
+
+  for(i = 0; i < 6; i++)
+  {
+    rate = (double)scalers[i];
+    rate = rate / ref;
+    if(scalers[i] == 0xFFFFFFFF)
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate);
+    else
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate);
   }
   return OK;
 }
@@ -3993,7 +4011,7 @@ vtpPrintHist_PeakPosition(int inst)
   int i;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_EC);
-  
+
   VLOCK;
     vtp->v7.ecTrigger[inst].HistCtrl &= ~0x00000003;
     val = vtp->v7.ecTrigger[inst].HistTime;
@@ -4008,7 +4026,7 @@ vtpPrintHist_PeakPosition(int inst)
       scale = 1.0f;
       printf("%s: Error - normalization invalid. Raw counts will be displayed.\n", __func__);
     }
-    
+
     for(i=0;i<256;i++)
     {
       val = vtp->v7.ecTrigger[inst].HistPeakPosition;
@@ -4036,7 +4054,7 @@ vtpPrintHist_PeakPosition(int inst)
   for(i=0;i<36;i++)
     printf("strip %2d: %9.2f, %9.2f, %9.2f\n", i, hist_u[i], hist_v[i], hist_w[i]);
   printf("    total: %9.2f, %9.2f, %9.2f\n", tot_u, tot_v, tot_w);
-  
+
   return OK;
 }
 
@@ -4050,7 +4068,7 @@ vtpPrintHist_ClusterPosition(int inst)
   int i,u,v;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_EC);
-  
+
   VLOCK;
     vtp->v7.ecTrigger[inst].HistCtrl &= ~0x00000005;
     val = vtp->v7.ecTrigger[inst].HistTime;
@@ -4070,7 +4088,7 @@ vtpPrintHist_ClusterPosition(int inst)
     {
       val = vtp->v7.ecTrigger[inst].HistClusterPosition;
       fval = scale * (float)val;
-      
+
       tot+= fval;
       u = i%64;
       v = i/64;
@@ -4088,7 +4106,7 @@ vtpPrintHist_ClusterPosition(int inst)
     printf("\n");
   }
   printf("total = %f\n", tot);
-  
+
   return OK;
 }
 
@@ -4097,17 +4115,17 @@ vtpSetHcal_ClusterCoincidence(int coin)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HCAL);
-  
+
   if(coin > 7)
   {
     printf("%s: Error - invalid coincidence specified %dns\n", __func__, coin);
     coin = 7;
   }
-  
+
   VLOCK;
   vtp->v7.hcal.ClusterPulseCoincidence = coin/4;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -4116,11 +4134,11 @@ vtpGetHcal_ClusterCoincidence(int *coin)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HCAL);
-  
+
   VLOCK;
   *coin = vtp->v7.hcal.ClusterPulseCoincidence * 4;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -4129,17 +4147,17 @@ vtpSetHcal_ClusterThreshold(int thr)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HCAL);
-  
+
   if(thr > 8191)
   {
     printf("%s: Error - invalid threshold specified %dns\n", __func__, thr);
     thr = 8191;
   }
-  
+
   VLOCK;
   vtp->v7.hcal.ClusterPulseThreshold = thr;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -4148,11 +4166,11 @@ vtpGetHcal_ClusterThreshold(int *thr)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HCAL);
-  
+
   VLOCK;
   *thr = vtp->v7.hcal.ClusterPulseThreshold;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -4160,8 +4178,8 @@ vtpGetHcal_ClusterThreshold(int *thr)
 int
 vtpDcPrintScalers()
 {
-  double ref, rate; 
-  int i; 
+  double ref, rate;
+  int i;
   unsigned int scalers[7];
   const char *scalers_name[7] = {
     "BusClk",
@@ -4172,10 +4190,10 @@ vtpDcPrintScalers()
     "SL5",
     "SL6"
    };
- 
+
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_DC);
- 
+
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
 
@@ -4186,27 +4204,50 @@ vtpDcPrintScalers()
   vtp->v7.sd.ScalerLatch = 0;
   VUNLOCK;
 
- 
-  printf("%s - \n", __FUNCTION__); 
-  if(!scalers[0]) 
-  {
-    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__); 
-    ref = 1.0; 
-  } 
-  else 
-  { 
-    ref = (double)scalers[0] / (double)33330000;
-  } 
 
-  for(i=0; i<7; i++) 
-  { 
-    rate = (double)scalers[i]; 
-    rate = rate / ref; 
-    if(scalers[i] == 0xFFFFFFFF) 
-     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate); 
-    else 
-     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate); 
+  printf("%s - \n", __FUNCTION__);
+  if(!scalers[0])
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__);
+    ref = 1.0;
   }
+  else
+  {
+    ref = (double)scalers[0] / (double)33330000;
+  }
+
+  for(i=0; i<7; i++)
+  {
+    rate = (double)scalers[i];
+    rate = rate / ref;
+    if(scalers[i] == 0xFFFFFFFF)
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate);
+    else
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate);
+  }
+  return OK;
+}
+
+int
+vtpGetDc_RoadId(char *id_str)
+{
+  int i, id[2];
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_DC);
+
+  VLOCK;
+  id[0] = vtp->v7.dcrbRoadFind.Id[0];
+  id[1] = vtp->v7.dcrbRoadFind.Id[1];
+  VUNLOCK;
+
+  for(i=0;i<8;i++)
+  {
+    id_str[i] = (id[i/4]>>(i%4)) & 0xff;
+    if(!isprint(id_str[i]))
+      id_str[i] = '!';
+  }
+  id_str[8] = 0;
+  
   return OK;
 }
 
@@ -4251,7 +4292,7 @@ vtpDcSendErrors(char *host)
       }
     }
   }
-  
+
   return OK;
 }
 
@@ -4295,11 +4336,11 @@ vtpTiAck(int clearsync)
 
   if(clearsync)
     val |= VTP_EB_TICTRL_SYNCEVT_RST;
-  
+
   VLOCK;
   vtp->eb.TiCtrl = val;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -4318,13 +4359,13 @@ vtpTiLinkInit()
     vtp->eb.LinkCtrl = VTP_EB_LINKCTRL_RX_FIFO_RST;
     vtp->eb.LinkCtrl = 0;
     VUNLOCK;
-  
+
     usleep(10000);
-    
+
     VLOCK;
     val = vtp->eb.LinkStatus;
     VUNLOCK;
-    
+
     if(val & VTP_EB_LINKSTATUS_RX_READY)
     {
       printf("%s: VTP <-> TI Link RX Ready (status=0x%08X)\n", __func__, val);
@@ -4332,7 +4373,7 @@ vtpTiLinkInit()
     }
     else
       printf("%s: *** Warning *** VTP <-> TI Link NOT Ready (status=0x%08X)...", __func__, val);
-    
+
     if(i != TI_LINK_INIT_TRIES-1)
       printf("trying again.\n");
     else
@@ -4341,11 +4382,11 @@ vtpTiLinkInit()
       printf("%s: *** ERROR *** VTP <-> TI Link problem.\n", __func__);
     }
   }
-  
+
   VLOCK;
   vtp->eb.TiCtrl = VTP_EB_TICTRL_SYNCEVT_RST;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -4358,7 +4399,7 @@ vtpTiLinkStatus()
   VLOCK;
   val = vtp->eb.LinkStatus;
   VUNLOCK;
-  
+
   printf("%s: LinkStatus = 0x%08X RxReady=%u, RxLocked=%u,PllLocked=%u,RxErrorCnt = %u\n",
          __func__, val,
          (val & VTP_EB_LINKSTATUS_RX_READY) ? 1:0,
@@ -4366,7 +4407,7 @@ vtpTiLinkStatus()
          (val & VTP_EB_LINKSTATUS_GCLK_PLL_LOCK) ? 1:0,
          (val & VTP_EB_LINKSTATUS_RX_ERROR_CNT_MASK)
         );
-  
+
   return OK;
 }
 
@@ -4379,7 +4420,7 @@ vtpEbResetFifo()
   vtp->eb.LinkCtrl |= VTP_EB_LINKCTRL_FIFO_RST;
   vtp->eb.LinkCtrl &= ~VTP_EB_LINKCTRL_FIFO_RST;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -4389,7 +4430,7 @@ AXI_DMA_REGS *vtpDmaGet(int id)
     return (AXI_DMA_REGS *)&vtp->dma_ti;
   else if(id == VTP_DMA_VTP)
     return (AXI_DMA_REGS *)&vtp->dma_vtp;
-  
+
   return NULL;
 }
 
@@ -4401,7 +4442,7 @@ vtpDmaStatus(int id)
   CHECKINIT;
 
   if(!pDma)
-    return ERROR; 
+    return ERROR;
 
   VLOCK;
   cr  = pDma->S2MM_DMACR;
@@ -4409,7 +4450,7 @@ vtpDmaStatus(int id)
   len = pDma->S2MM_LENGTH;
   da  = pDma->S2MM_DA;
   VUNLOCK;
-  
+
   printf("%s: cr=0x%08X, sr=0x%08X, len=%d, da=0x%08X\n", __func__,  cr, sr, len, da);
   printf("%s: eb status=0x%08X, ctrl=0x%08X\n", __func__, vtp->eb.EbStatus, vtp->eb.EbCtrl);
   return OK;
@@ -4423,26 +4464,26 @@ vtpDmaInit(int id)
   CHECKINIT;
 
   if(!pDma)
-    return ERROR; 
-  
+    return ERROR;
+
   printf("%s: start", __func__);
   vtpDmaStatus(id);
-  
+
   VLOCK;
   pDma->S2MM_DMACR =
     (0<<0)  |   // 0-stops, 1-starts DMA engine
     (1<<1)  |   // reserved, defaults to 1
     (1<<2);     // 1-reset DMA engine
-      
+
   pDma->S2MM_DMACR =
     (0<<0)  |   // 0-stops, 1-starts DMA engine
     (1<<1)  |   // reserved, defaults to 1
     (0<<2);     // 1-reset DMA engine
   VUNLOCK;
-  
+
   printf("%s: end  ", __func__);
   vtpDmaStatus(id);
-  
+
   return OK;
 }
 
@@ -4451,9 +4492,9 @@ vtpDmaStart(int id, unsigned int destAddr, int maxLength)
 {
   AXI_DMA_REGS *pDma = vtpDmaGet(id);
   CHECKINIT;
-  
+
   if(!pDma)
-    return ERROR; 
+    return ERROR;
 
   VLOCK;
   pDma->S2MM_DMACR =
@@ -4466,7 +4507,7 @@ vtpDmaStart(int id, unsigned int destAddr, int maxLength)
   pDma->S2MM_LENGTH = maxLength;
 
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -4481,7 +4522,7 @@ vtpDmaWaitDone(int id)
   if(!pDma)
     return ERROR;
 
-  
+
   while(1)
   {
     VLOCK;
@@ -4506,7 +4547,7 @@ vtpDmaWaitDone(int id)
       break;
     }
   }
- 
+
   return rval;
 }
 
@@ -4514,11 +4555,11 @@ int
 vtpEbBuildTestEvent(int len)
 {
   CHECKINIT;
-  
+
   VLOCK;
   vtp->eb.EbCtrl = 0x8 | (len<<8);
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -4526,13 +4567,13 @@ int
 vtpEbReset()
 {
   CHECKINIT;
-  
+
   VLOCK;
   vtp->eb.EbCtrl = 0x0;
   vtp->eb.LinkCtrl = 0x8;
   vtp->eb.LinkCtrl = 0x0;
   VUNLOCK;
-  
+
   return OK;
 }
 
@@ -4551,7 +4592,7 @@ vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
     VLOCK;
     status = vtp->eb.EbStatus;
     VUNLOCK;
-    
+
     if(status & 0x1)
 	{
       if(retry-- > 0)
@@ -4564,7 +4605,7 @@ vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
         printf("vtpEbTiReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpEbTiEventReadErrors);
         break;
 	  }
-	}    
+	}
 
     VLOCK;
     *pBuf++ = vtp->eb.TiFifo;
@@ -4572,14 +4613,14 @@ vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
 
     if(status & 0x10000)
       break;
-    
+
     if(++cnt > maxsize)
     {
       printf("too many event words...exiting\n");
       break;
     }
   }
-  
+
   return cnt;
 }
 
@@ -4590,17 +4631,17 @@ vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize)
 {
   int status, cnt = 0;
   CHECKINIT;
-  
+
   if(vtpEbEventReadErrors)
     printf("{vtpEbEventReadErrors=%d}\n", vtpEbEventReadErrors);
- 
+
   int retry=VTP_EB_NRETRIES;
   while(cnt < maxsize)
   {
     VLOCK;
     status = vtp->eb.EbStatus;
     VUNLOCK;
-    
+
     if(status & 0x2)
     {
       if(retry-- > 0)
@@ -4613,22 +4654,22 @@ vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize)
         printf("vtpEbReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpEbEventReadErrors);
       break;
       }
-    }    
-    
+    }
+
     VLOCK;
     *pBuf++ = vtp->eb.VtpFifo;
     VUNLOCK;
 
     if(status & 0x20000)
       break;
-    
+
     if(++cnt > maxsize)
     {
       printf("too many event words...exitting\n");
       break;
     }
   }
-  
+
   return cnt;
 }
 
@@ -4637,14 +4678,14 @@ vtpEbReadEvent_test(uint32_t *pBuf, uint32_t maxsize)
 {
   int status, cnt = 0, tries = 0;
   CHECKINIT;
-  
+
   while(cnt < maxsize)
   {
     VLOCK;
     status = vtp->eb.EbStatus;
     VUNLOCK;
-   
-    // if buffer is empty, try again until data is ready 
+
+    // if buffer is empty, try again until data is ready
     if(status & 0x2)
     {
       tries++;
@@ -4654,21 +4695,21 @@ vtpEbReadEvent_test(uint32_t *pBuf, uint32_t maxsize)
       continue;
     }
     tries = 0;
-    
+
     VLOCK;
     *pBuf++ = vtp->eb.VtpFifo;
     VUNLOCK;
 
     if(status & 0x20000)
       break;
-    
+
     if(++cnt > maxsize)
     {
       printf("too many event words...exitting\n");
       break;
     }
   }
-  
+
   return cnt;
 }
 
@@ -4677,30 +4718,30 @@ vtpEbReadTestEvent(uint32_t *pBuf, uint32_t maxsize)
 {
   int status, cnt = 0;
   CHECKINIT;
-  
+
   while(cnt < maxsize)
   {
     VLOCK;
     status = vtp->eb.EbStatus;
     VUNLOCK;
-    
+
     if(status & 0x4)
       break;
-    
+
     VLOCK;
     *pBuf++ = vtp->eb.TestFifo;
     VUNLOCK;
 
     if(status & 0x40000)
       break;
-    
+
     if(++cnt > maxsize)
     {
       printf("too many event words...exitting\n");
       break;
     }
   }
-  
+
   return cnt;
 }
 
@@ -4726,13 +4767,13 @@ vtpEbDecodeEvent(uint32_t *pBuf, uint32_t size)
 {
   uint32_t tag = 0, index = 0, val, last_val, v;
   char view_array[4] = {'U', 'V', 'W', '?'};
-  
+
   printf("%s: Decoding VTP event buffer:\n", __func__);
   while(size--)
   {
     last_val = val;
     val = *pBuf++;
-    
+
     if(val & 0x80000000)
     {
       index = 0;
@@ -4740,10 +4781,10 @@ vtpEbDecodeEvent(uint32_t *pBuf, uint32_t size)
     }
     else
       index++;
-    
-    
+
+
     printf("%08X: ", val);
-    
+
     switch(tag)
     {
       case 0:  // Block Header Tag
@@ -4751,17 +4792,17 @@ vtpEbDecodeEvent(uint32_t *pBuf, uint32_t size)
         printf(" Block Count = %d,", (val>>8) & 0x3FF);
         printf(" Block Size = %d\n", (val>>0) & 0xFF);
         break;
-        
+
       case 1:  // Block Trailer Tag
         printf("Block Trailer:");
         printf(" Word Count = %d\n", (val>>0) & 0x3FFFFF);
         break;
-        
+
       case 2:  // Event Header Tag
         printf("Event Header:");
         printf(" Event Number: %d\n", (val>>0) & 0x3FFFFF);
         break;
-        
+
       case 3:  // Trigger Time Tag
         if(index == 1)
         {
@@ -4782,7 +4823,7 @@ vtpEbDecodeEvent(uint32_t *pBuf, uint32_t size)
           printf(" Time = %4d\n", (val>>0) & 0x7ff);
         }
         break;
-        
+
       case 5:  // ECtrig Cluster Tag
         if(index == 1)
         {
@@ -4797,20 +4838,20 @@ vtpEbDecodeEvent(uint32_t *pBuf, uint32_t size)
           printf(" Time = %4d\n", (val>>0) & 0x7ff);
         }
         break;
-        
+
       case 6:  // Trigger bit Tag
         printf("Trigger bit:");
         printf(" Inst = %1d", (val>>16)&0x1);
         printf(" Lane = %2d", (val>>11)&0x1f);
         printf(" Time = %4d\n", (val>>0)&0x7ff);
         break;
-        
+
       default:
         printf("*** UNKNOWN TAG/WORD *** 0x%08X\n", val);
         break;
     }
   }
-  
+
   return OK;
 }
 
@@ -4821,22 +4862,24 @@ vtpEbReadAndDecodeEvent()
 
   size = vtpEbReadEvent(buf, sizeof(buf)/sizeof(buf[0]));
   return vtpEbDecodeEvent(buf, size);
-  
+
   return OK;
 }
 
 static int
 vtpFPGAOpen()
 {
+
   if(vtpFPGAFD > 0)
     {
       printf("%s: ERROR: VTP FPGA already opened.\n",
 	     __func__);
       return ERROR;
     }
-  
+
+  VTP_DBGN(VTP_DEBUG_INIT, "open FPGA device = %s\n", vtpFPGADev);
   vtpFPGAFD = open(vtpFPGADev, O_RDWR | O_SYNC);
-  
+
   if(vtpFPGAFD < 0)
     {
       printf("%s: ERROR from open: %s (%d)\n",
@@ -4845,7 +4888,7 @@ vtpFPGAOpen()
     }
 
   printf(" size = %d\n", (int)sizeof(ZYNC_REGS)); /* should be 131072 */
-  
+
   vtp = (volatile ZYNC_REGS *) mmap((void *)VTP_ZYNC_PHYSMEM_BASE, sizeof(ZYNC_REGS),
 				    PROT_READ|PROT_WRITE, MAP_SHARED,
 				    vtpFPGAFD, 0);
@@ -4856,7 +4899,7 @@ vtpFPGAOpen()
 	     __func__, strerror(errno), errno);
       return ERROR;
     }
-  
+
   return OK;
 }
 
@@ -4875,7 +4918,7 @@ vtpFPGAClose()
 	     __func__, strerror(errno), errno);
 
   vtp = NULL;
-  
+
   close(vtpFPGAFD);
   return OK;
 }
@@ -4884,12 +4927,14 @@ vtpFPGAClose()
 int
 vtpOpen(int dev_mask)
 {
+  VTP_DBGN(VTP_DEBUG_INIT, "dev_mask = 0x%x\n", dev_mask);
+
   if(dev_mask & VTP_FPGA_OPEN)
     {
-      
+
       if(vtpFPGAOpen() == OK)
 	{
-	  vtpDevOpenMASK |= VTP_FPGA_OPEN; 
+	  vtpDevOpenMASK |= VTP_FPGA_OPEN;
 	}
       else
 	{
@@ -4900,10 +4945,10 @@ vtpOpen(int dev_mask)
 
   if(dev_mask & VTP_I2C_OPEN)
     {
-      
+
       if(vtpI2COpen() == OK)
 	{
-	  vtpDevOpenMASK |= VTP_I2C_OPEN; 
+	  vtpDevOpenMASK |= VTP_I2C_OPEN;
 	}
       else
 	{
@@ -4911,13 +4956,13 @@ vtpOpen(int dev_mask)
 		 __func__);
 	}
     }
-  
+
   if(dev_mask & VTP_SPI_OPEN)
     {
-      
+
       if(vtpSPIOpen() == OK)
 	{
-	  vtpDevOpenMASK |= VTP_SPI_OPEN; 
+	  vtpDevOpenMASK |= VTP_SPI_OPEN;
 	}
       else
 	{
@@ -4927,7 +4972,7 @@ vtpOpen(int dev_mask)
     }
 
   vtpCreateLockShm();
-  
+
   return vtpDevOpenMASK;
 }
 
@@ -4936,14 +4981,14 @@ vtpClose(int dev_mask)
 {
   if(dev_mask & VTP_SPI_OPEN)
     {
-      
+
       if(vtpSPIClose() == OK)
 	{
 	  vtpDevOpenMASK &= ~VTP_SPI_OPEN;
 	}
 
     }
-      
+
   if(dev_mask & VTP_I2C_OPEN)
     {
 
@@ -4963,9 +5008,9 @@ vtpClose(int dev_mask)
 	}
 
     }
-  
+
   vtpKillLockShm(0);
-  
+
   return vtpDevOpenMASK;
 }
 
@@ -4974,7 +5019,7 @@ static int
 vtpMutexInit()
 {
   printf("%s: Initializing vtp mutex\n",__FUNCTION__);
-  if(pthread_mutexattr_init(&p_sync->m_attr)<0) 
+  if(pthread_mutexattr_init(&p_sync->m_attr)<0)
     {
       perror("pthread_mutexattr_init");
       printf("%s: ERROR:  Unable to initialized mutex attribute\n",__FUNCTION__);
@@ -5006,7 +5051,7 @@ vtpMutexInit()
 
 /*!
   Routine to create (if needed) a shared mutex for VME Bus locking
- 
+
   @return 0, if successful. -1, otherwise.
 */
 int
@@ -5017,7 +5062,7 @@ vtpCreateLockShm()
   mode_t prev_mode;
 
   /* First check to see if the file already exists */
-  fd_shm = shm_open(shm_name_vtp, O_RDWR, 
+  fd_shm = shm_open(shm_name_vtp, O_RDWR,
 		    S_IRUSR | S_IWUSR |
 		    S_IRGRP | S_IWGRP |
 		    S_IROTH | S_IWOTH );
@@ -5056,7 +5101,7 @@ vtpCreateLockShm()
     }
 
   addr_shm = mmap(0, sizeof(struct shared_memory_struct), PROT_READ|PROT_WRITE, MAP_SHARED, fd_shm, 0);
-  if(addr_shm<0) 
+  if(addr_shm<0)
     {
       perror("mmap");
       printf("%s: ERROR: Unable to mmap shared memory\n",__FUNCTION__);
@@ -5094,7 +5139,7 @@ vtpCreateLockShm()
 
 /*!
   Routine to destroy the shared mutex created by vtpCreateLockShm()
- 
+
   @return 0, if successful. -1, otherwise.
 */
 int
@@ -5107,11 +5152,11 @@ vtpKillLockShm(int kflag)
     {
       if(pthread_mutexattr_destroy(&p_sync->m_attr)<0)
 	perror("pthread_mutexattr_destroy");
-      
+
       if(pthread_mutex_destroy(&p_sync->mutex)<0)
 	perror("pthread_mutex_destroy");
 
-      if(shm_unlink(shm_name_vtp)<0) 
+      if(shm_unlink(shm_name_vtp)<0)
 	perror("shm_unlink");
 
       printf("%s: VTP shared memory mutex destroyed\n",__FUNCTION__);
@@ -5121,7 +5166,7 @@ vtpKillLockShm(int kflag)
 
 /*!
   Routine to lock the shared mutex created by vtpCreateLockShm()
- 
+
   @return 0, if successful. -1 or other error code otherwise.
 */
 int
@@ -5132,7 +5177,7 @@ vtpLock()
   if(p_sync!=NULL)
     {
       rval = pthread_mutex_lock(&(p_sync->mutex));
-      if(rval<0) 
+      if(rval<0)
 	{
 	  perror("pthread_mutex_lock");
 	  printf("%s: ERROR locking VTP\n",__FUNCTION__);
@@ -5180,18 +5225,18 @@ vtpLock()
 
 /*!
   Routine to try to lock the shared mutex created by vtpCreateLockShm()
- 
+
   @return 0, if successful. -1 or other error code otherwise.
 */
 int
 vtpTryLock()
 {
   int rval=ERROR;
-  
+
   if(p_sync!=NULL)
     {
       rval = pthread_mutex_trylock(&(p_sync->mutex));
-      if(rval<0) 
+      if(rval<0)
 	{
 	  perror("pthread_mutex_trylock");
 	}
@@ -5239,7 +5284,7 @@ vtpTryLock()
 
 /*!
   Routine to lock the shared mutex created by vtpCreateLockShm()
- 
+
   @return 0, if successful. -1 or other error code otherwise.
 */
 
@@ -5256,7 +5301,7 @@ vtpTimedLock(int time_seconds)
       timeout.tv_sec += time_seconds;
 
       rval = pthread_mutex_timedlock(&p_sync->mutex,&timeout);
-      if(rval<0) 
+      if(rval<0)
 	{
 	  perror("pthread_mutex_timedlock");
 	}
@@ -5300,7 +5345,7 @@ vtpTimedLock(int time_seconds)
 
 /*!
   Routine to unlock the shared mutex created by vtpCreateLockShm()
- 
+
   @return 0, if successful. -1 or other error code otherwise.
 */
 int
@@ -5310,7 +5355,7 @@ vtpUnlock()
   if(p_sync!=NULL)
     {
       rval = pthread_mutex_unlock(&p_sync->mutex);
-      if(rval<0) 
+      if(rval<0)
 	{
 	  perror("pthread_mutex_unlock");
 	}
@@ -5337,7 +5382,7 @@ vtpUnlock()
 
   If the mutex is found to be stale (Owner of the lock has died), it will
   be recovered.
- 
+
   @param time_seconds     How many seconds to wait for mutex to unlock when testing
 
   @return 0, if successful. -1, otherwise.
@@ -5439,11 +5484,11 @@ vtpCheckMutexHealth(int time_seconds)
 
 	  }
 	  break;
-	  
+
 	default:
 	  printf("%s: Undefined return from vtpTryLock (%d)\n",
 		 __FUNCTION__,rval);
-	  
+
 	}
 
       if(rval==OK)
