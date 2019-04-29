@@ -3737,10 +3737,10 @@ vtpPrintGtTriggerBitRegs()
 }
 
 int
-vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, int delay, float pulser_freq, int prescale)
+vtpSetGtTriggerBit(int inst, int strigger_mask0, int sector_mask0, int mult_min0, int strigger_mask1, int sector_mask1, int mult_min1, int coin_width, int ctrigger_mask, int delay, float pulser_freq, int prescale)
 {
   float f;
-  int strig, strigmask, ctrig, pulser;
+  int strig, strigmask, strig1, strig1mask, ctrig, pulser;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_GT);
 
@@ -3752,12 +3752,17 @@ vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, i
 
   ctrig = ((ctrigger_mask & 0xF) <<0);
 
-  strig = ((mult_min      & 0x7) <<4) |
-          ((sector_mask   & 0x3F)<<8) |
+  strig = ((mult_min0     & 0x7) <<4) |
+          ((sector_mask0  & 0x3F)<<8) |
           ((coin_width    & 0xFF)<<16) |
           ((delay         & 0xFF)<<24);
 
-  strigmask = ((strigger_mask & 0xFFFF) <<0);
+  strigmask = ((strigger_mask0 & 0xFFFF) <<0);
+
+  strig1 = ((mult_min1     & 0x7) <<4) |
+           ((sector_mask1  & 0x3F)<<8);
+
+  strig1mask = ((strigger_mask1 & 0xFFFF) <<0);
 
   // convert freq to 250MHz period ticks
   if(pulser_freq > 0.0f)
@@ -3770,9 +3775,11 @@ vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, i
 
   VLOCK;
   vtp->v7.gtBit[inst].STrigger = strig;
+  vtp->v7.gtBit[inst].STrigger1 = strig1;
   vtp->v7.gtBit[inst].CTrigger = ctrig;
   vtp->v7.gtBit[inst].Pulser = pulser;
   vtp->v7.gtBit[inst].STriggerMask = strigmask;
+  vtp->v7.gtBit[inst].STrigger1Mask = strig1mask;
   vtp->v7.trigOut.Prescaler[inst] = prescale;
   VUNLOCK;
 
@@ -3780,9 +3787,9 @@ vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, i
 }
 
 int
-vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq, int *prescale)
+vtpGetGtTriggerBit(int inst, int *strigger_mask0, int *sector_mask0, int *mult_min0, int *strigger_mask1, int *sector_mask1, int *mult_min1, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq, int *prescale)
 {
-  int strig, strigmask, ctrig, pulser;
+  int strig, strigmask, strig1, strig1mask, ctrig, pulser;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_GT);
 
@@ -3794,20 +3801,25 @@ vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min
 
   VLOCK;
   strig = vtp->v7.gtBit[inst].STrigger;
+  strig1 = vtp->v7.gtBit[inst].STrigger1;
   ctrig = vtp->v7.gtBit[inst].CTrigger;
   pulser = vtp->v7.gtBit[inst].Pulser;
   strigmask = vtp->v7.gtBit[inst].STriggerMask;
+  strig1mask = vtp->v7.gtBit[inst].STrigger1Mask;
   *prescale = vtp->v7.trigOut.Prescaler[inst];
   VUNLOCK;
 
-  *mult_min      = (strig>>4)&0x7;
-  *sector_mask   = (strig>>8)&0x3F;
-  *coin_width    = (strig>>16)&0xFF;
-  *delay         = (strig>>24)&0xFF;
+  *coin_width     = (strig>>16)&0xFF;
+  *delay          = (strig>>24)&0xFF;
+  *ctrigger_mask  = (ctrig>>0)&0xF;
 
-  *strigger_mask = (strigmask>>0)&0xFFFF;
+  *mult_min0      = (strig>>4)&0x7;
+  *sector_mask0   = (strig>>8)&0x3F;
+  *strigger_mask0 = (strigmask>>0)&0xFFFF;
 
-  *ctrigger_mask = (ctrig>>0)&0xF;
+  *mult_min1      = (strig1>>4)&0x7;
+  *sector_mask1   = (strig1>>8)&0x3F;
+  *strigger_mask1 = (strig1mask>>0)&0xFFFF;
 
   // convert 250MHz period ticks to freq
   if(pulser & 0x80000000)
@@ -3826,7 +3838,8 @@ int
 vtpGtSendScalers(char *host)
 {
   char name[100];
-  float ref, data[32], idata[32];
+  float ref, data[32];
+  int idata[32];
   unsigned int val;
   int i;
   CHECKINIT;

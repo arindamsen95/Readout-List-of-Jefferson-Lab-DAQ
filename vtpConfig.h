@@ -17,9 +17,9 @@
 
 typedef struct
 {
-  int ssp_strigger_bit_mask;
-  int ssp_sector_mask;
-  int sector_mult_min;
+  int ssp_strigger_bit_mask[2];
+  int ssp_sector_mask[2];
+  int sector_mult_min[2];
   int sector_coin_width;
   int ssp_ctrigger_bit_mask;
   int delay;
@@ -177,6 +177,7 @@ typedef struct {
 } VTP_CONF;
 
 /* functions */
+void vtpSetExpid(char *string);
 void vtpInitGlobals();
 int vtpReadConfigFile(char *filename);
 int vtpDownloadAll();

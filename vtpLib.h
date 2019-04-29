@@ -364,6 +364,93 @@ typedef struct FTHODOScalers_Struct
   /** 0x0000 */ volatile uint32_t Scalers[256];
 } FTHODOSCALERS_REGS;
 
+////////////////////////////////////////////////////////
+// HPS Section - START
+////////////////////////////////////////////////////////
+
+typedef struct HPSCluster_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x040-0x004)/4];
+} HPSCLUSTER_REGS;
+
+typedef struct HPSHodoscope_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x040-0x004)/4];
+} HPSHODOSCOPE_REGS;
+
+typedef struct HPSSingleTrigger_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t Cluster_Emin;
+  /** 0x0008 */ volatile uint32_t Cluster_Emax;
+  /** 0x000C */ volatile uint32_t Cluster_Nmin;
+  /** 0x0010 */ volatile uint32_t Cluster_Xmin;
+  /** 0x0014 */ volatile uint32_t Cluster_PDE_C[4];
+  /** 0x0024 */ BLANK[(0x040-0x024)/4];
+  /** 0x0040 */ volatile uint32_t ScalerTotal;
+  /** 0x0044 */ volatile uint32_t ScalerAccept;
+  /** 0x0048 */ volatile uint32_t ScalerCuts[8];
+  /** 0x0068 */ BLANK[(0x080-0x068)/4];
+} HPSSINGLETRIGGER_REGS;
+
+typedef struct HPSPairTrigger_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t Pair_Esum;
+  /** 0x0008 */ volatile uint32_t Pair_Ediff;
+  /** 0x000C */ volatile uint32_t Cluster_Eminmax;
+  /** 0x0010 */ volatile uint32_t Cluster_Nmin;
+  /** 0x0014 */ volatile uint32_t Pair_CoplanarTol;
+  /** 0x0018 */ volatile uint32_t Pair_ED;
+  /** 0x001C */ BLANK[(0x020-0x01C)/4];
+  /** 0x0020 */ volatile uint32_t ScalerTotal;
+  /** 0x0024 */ volatile uint32_t ScalerCuts[4];
+  /** 0x0028 */ volatile uint32_t ScalerAccept;
+  /** 0x002C */ BLANK[(0x040-0x02C)/4];
+} HPSPAIRTRIGGER_REGS;
+
+typedef struct HPSCalibTrigger_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t Pulser;
+  /** 0x0018 */ BLANK[(0x020-0x01C)/4];
+  /** 0x0020 */ volatile uint32_t ScalerCosmicTop;
+  /** 0x0024 */ volatile uint32_t ScalerCosmicBot;
+  /** 0x0028 */ volatile uint32_t ScalerCosmicTopBot;
+  /** 0x002C */ volatile uint32_t ScalerLED;
+  /** 0x0030 */ volatile uint32_t ScalerHodoscopeTop;
+  /** 0x0034 */ volatile uint32_t ScalerHodoscopeBot;
+  /** 0x0038 */ volatile uint32_t ScalerHodoscopeTopBot;
+  /** 0x003C */ volatile uint32_t ScalerPulser;
+} HPSCALIBTRIGGER_REGS;
+
+typedef struct HPSMultiplicityTrigger_Struct
+{
+  /** 0x0000 */ volatile uint32_t Cluster_Emin;
+  /** 0x0004 */ volatile uint32_t Cluster_Emax;
+  /** 0x0008 */ volatile uint32_t Cluster_Nmin;
+  /** 0x000C */ volatile uint32_t Cluster_MultMin;
+  /** 0x0010 */ volatile uint32_t Latency;
+  /** 0x0014 */ BLANK[(0x030-0x014)/4];
+  /** 0x0030 */ volatile uint32_t ScalerAccept;
+  /** 0x0034 */ BLANK[(0x040-0x034)/4];
+} HPSMULTTRIGGER_REGS;
+
+typedef struct HPSTrigger_Struct
+{
+  /** 0x0000 */ volatile uint32_t Latency;
+  /** 0x0004 */ BLANK[(0x010-0x004)/4];
+  /** 0x0010 */ volatile uint32_t Prescale[32];
+  /** 0x0090 */ BLANK[(0x100-0x090)/4];
+} HPSTRIGGER_REGS;
+
+
+////////////////////////////////////////////////////////
+// HPS Section - END
+////////////////////////////////////////////////////////
+
 typedef struct DcrbSegment_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
@@ -460,7 +547,9 @@ typedef struct GtBit_Struct
   /** 0x0004 */ volatile uint32_t CTrigger;
   /** 0x0008 */ volatile uint32_t Pulser;
   /** 0x000C */ volatile uint32_t STriggerMask;
-  /** 0x0010 */ BLANK[(0x40-0x10)/4];
+  /** 0x0010 */ volatile uint32_t STrigger1;
+  /** 0x0014 */ volatile uint32_t STrigger1Mask;
+  /** 0x0018 */ BLANK[(0x40-0x18)/4];
   /** 0x0040 */ volatile uint32_t TriggerScaler;
   /** 0x0044 */ BLANK[(0x80-0x44)/4];
 } GTBIT_REGS;
@@ -540,6 +629,26 @@ typedef struct v7_bridge_struct
   /** 0x43C15300 */ CNDTRIGGER_REGS cndTrigger;
 
   /** 0x43C15400 */ FTHODOSCALERS_REGS fthodoScalers;
+
+  /** 0x43C15800 */ HPSCLUSTER_REGS hpsCluster;
+
+  /** 0x43C15840 */ HPSHODOSCOPE_REGS hpsHodoscope;
+
+  /** 0x43C15880 */ BLANK[(0x5900 - 0x5880)/4];
+
+  /** 0x43C15900 */ HPSSINGLETRIGGER_REGS hpsSingleTriggerTop[4];
+
+  /** 0x43C15B00 */ HPSSINGLETRIGGER_REGS hpsSingleTriggerBot[4];
+
+  /** 0x43C15D00 */ HPSPAIRTRIGGER_REGS hpsPairTrigger[4];
+
+  /** 0x43C15E00 */ HPSCALIBTRIGGER_REGS hpsCalibTrigger;
+
+  /** 0x43C15E40 */ HPSMULTTRIGGER_REGS hpsMultiplcityTrigger;
+
+  /** 0x43C15E80 */ BLANK[(0x5F00 - 0x5E80)/4];
+
+  /** 0x43C15F00 */ HPSTRIGGER_REGS hpsTriggerBits;
 
   /** 0x43C15800 */ BLANK[(0x6000 - 0x5800)/4];
 
@@ -720,8 +829,8 @@ int  vtpSetGt_latency(int latency);
 int  vtpGetGt_latency();
 int  vtpSetGt_width(int width);
 int  vtpGetGt_width();
-int  vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, int delay, float pulser_freq, int prescale);
-int  vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq, int *prescale);
+int  vtpSetGtTriggerBit(int inst, int strigger_mask0, int sector_mask0, int mult_min0, int strigger_mask1, int sector_mask1, int mult_min1, int coin_width, int ctrigger_mask, int delay, float pulser_freq, int prescale);
+int  vtpGetGtTriggerBit(int inst, int *strigger_mask0, int *sector_mask0, int *mult_min0, int *strigger_mask1, int *sector_mask1, int *mult_min1, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq, int *prescale);
 #ifdef IPC
 int  vtpGtSendScalers(char *host);
 #endif

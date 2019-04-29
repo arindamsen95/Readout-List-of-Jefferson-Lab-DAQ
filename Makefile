@@ -92,7 +92,7 @@ realclean: clean
 install:
 	-cp *.a $(CODA)/Linux_armv7l/lib/
 	-cp *.so $(CODA)/Linux_armv7l/lib/
-	-cp *.h $(CODA)/Linux_armv7l/include/
+	-cp *.h $(CODA)/common/include/
 
 echoarch:
 	@echo "Make for $(ARCH)"
