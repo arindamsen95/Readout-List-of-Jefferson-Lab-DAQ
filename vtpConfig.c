@@ -227,9 +227,12 @@ vtpInitGlobals()
   
   for(i=0; i<32; i++)
   {
-    vtpConf.gt.trgbits[i].ssp_strigger_bit_mask = 0;
-    vtpConf.gt.trgbits[i].ssp_sector_mask = 0;
-    vtpConf.gt.trgbits[i].sector_mult_min = 0;
+    vtpConf.gt.trgbits[i].ssp_strigger_bit_mask[0] = 0;
+    vtpConf.gt.trgbits[i].ssp_strigger_bit_mask[1] = 0;
+    vtpConf.gt.trgbits[i].ssp_sector_mask[0] = 0;
+    vtpConf.gt.trgbits[i].ssp_sector_mask[1] = 0;
+    vtpConf.gt.trgbits[i].sector_mult_min[0] = 0;
+    vtpConf.gt.trgbits[i].sector_mult_min[1] = 0;
     vtpConf.gt.trgbits[i].sector_coin_width = 0;
     vtpConf.gt.trgbits[i].ssp_ctrigger_bit_mask = 0;
     vtpConf.gt.trgbits[i].pulser_freq = 0;
@@ -267,7 +270,7 @@ vtpReadConfigFile(char *filename_in)
   int    jj, ch;
   char   str_tmp[STRLEN], keyword[ROCLEN];
   char   host[ROCLEN], ROC_name[ROCLEN];
-  int    argc,args,i1,i2,i3,i4,i5,i6,i7,i8,msk[16],trg_bit;
+  int    argc,args,i1,i2,i3,i4,i5,i6,i7,i8,i9,i10,i11,msk[16],trg_bit;
   float  f1;
   unsigned int  ui1;
   char *clonparms;
@@ -756,13 +759,14 @@ vtpReadConfigFile(char *filename_in)
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_SSP_STRIGGER_MASK"))
         {
-          sscanf (str_tmp, "%*s 0x%X", &i1);
+          argc = sscanf (str_tmp, "%*s 0x%X 0x%X",&i1,&i2);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].ssp_strigger_bit_mask = i1;
+          vtpConf.gt.trgbits[trg_bit].ssp_strigger_bit_mask[0] = i1;
+          if(argc>=2) vtpConf.gt.trgbits[trg_bit].ssp_strigger_bit_mask[1] = i2;
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_SSP_CTRIGGER_MASK"))
         {
@@ -776,23 +780,25 @@ vtpReadConfigFile(char *filename_in)
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_SSP_SECTOR_MASK"))
         {
-          sscanf (str_tmp, "%*s 0x%X", &i1);
+          argc = sscanf (str_tmp, "%*s 0x%X 0x%X",&i1,&i2);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].ssp_sector_mask = i1;
+          vtpConf.gt.trgbits[trg_bit].ssp_sector_mask[0] = i1;
+          if(argc>=2) vtpConf.gt.trgbits[trg_bit].ssp_sector_mask[1] = i2;
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_SSP_SECTOR_MULT_MIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
+          argc = sscanf (str_tmp, "%*s %d %d", &i1,&i2);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].sector_mult_min = i1;
+          vtpConf.gt.trgbits[trg_bit].sector_mult_min[0] = i1;
+          if(argc>=2) vtpConf.gt.trgbits[trg_bit].sector_mult_min[1] = i2;
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_SSP_SECTOR_WIDTH"))
         {
@@ -842,13 +848,35 @@ vtpReadConfigFile(char *filename_in)
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",i1);
             return(-4);
           }
-          vtpConf.gt.trgbits[i1].ssp_strigger_bit_mask = i2;
-          vtpConf.gt.trgbits[i1].ssp_sector_mask = i3;
-          vtpConf.gt.trgbits[i1].sector_mult_min = i4;
+          vtpConf.gt.trgbits[i1].ssp_strigger_bit_mask[0] = i2;
+          vtpConf.gt.trgbits[i1].ssp_strigger_bit_mask[1] = 0;
+          vtpConf.gt.trgbits[i1].ssp_sector_mask[0] = i3;
+          vtpConf.gt.trgbits[i1].ssp_sector_mask[1] = 0;
+          vtpConf.gt.trgbits[i1].sector_mult_min[0] = i4;
+          vtpConf.gt.trgbits[i1].sector_mult_min[1] = 0;
           vtpConf.gt.trgbits[i1].sector_coin_width = i5;
           vtpConf.gt.trgbits[i1].ssp_ctrigger_bit_mask = i6;
           if(argc>=7) vtpConf.gt.trgbits[i1].delay = i7;
           if(argc>=8) vtpConf.gt.trgbits[i1].prescale = i8;
+        }
+        else if(!strcmp(keyword,"VTP_GT_TRGBIT2"))
+        {
+          argc = sscanf (str_tmp, "%*s %d %d %d %d %d %d %d %d %d %d %d",&i1,&i2,&i3,&i4,&i5,&i6,&i7,&i8,&i9,&i10,&i11);
+          if(i1<0 || i1>=32)
+          {
+            printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",i1);
+            return(-4);
+          }
+          vtpConf.gt.trgbits[i1].ssp_strigger_bit_mask[0] = i2;
+          vtpConf.gt.trgbits[i1].ssp_sector_mask[0] = i3;
+          vtpConf.gt.trgbits[i1].sector_mult_min[0] = i4;
+          vtpConf.gt.trgbits[i1].ssp_strigger_bit_mask[1] = i5;
+          vtpConf.gt.trgbits[i1].ssp_sector_mask[1] = i6;
+          vtpConf.gt.trgbits[i1].sector_mult_min[1] = i7;
+          vtpConf.gt.trgbits[i1].sector_coin_width = i8;
+          vtpConf.gt.trgbits[i1].ssp_ctrigger_bit_mask = i9;
+          vtpConf.gt.trgbits[i1].delay = i10;
+          vtpConf.gt.trgbits[i1].prescale = i11;
         }
 
         else if(!strcmp(keyword,"VTP_DC_SEGTHR"))
@@ -1077,9 +1105,12 @@ vtpDownloadAll()
     for(ii=0; ii<32; ii++)
     {
       vtpSetGtTriggerBit(ii,
-          vtpConf.gt.trgbits[ii].ssp_strigger_bit_mask,
-          vtpConf.gt.trgbits[ii].ssp_sector_mask,
-          vtpConf.gt.trgbits[ii].sector_mult_min,
+          vtpConf.gt.trgbits[ii].ssp_strigger_bit_mask[0],
+          vtpConf.gt.trgbits[ii].ssp_sector_mask[0],
+          vtpConf.gt.trgbits[ii].sector_mult_min[0],
+          vtpConf.gt.trgbits[ii].ssp_strigger_bit_mask[1],
+          vtpConf.gt.trgbits[ii].ssp_sector_mask[1],
+          vtpConf.gt.trgbits[ii].sector_mult_min[1],
           vtpConf.gt.trgbits[ii].sector_coin_width,
           vtpConf.gt.trgbits[ii].ssp_ctrigger_bit_mask,
           vtpConf.gt.trgbits[ii].delay,
@@ -1088,7 +1119,7 @@ vtpDownloadAll()
         );
     }
   }
-  
+
   if(vtpConf.fw_type == VTP_FW_TYPE_DC)
   {
     vtpSetDc_SegmentThresholdMin(0, vtpConf.dc.dcsegfind_threshold[0]);
@@ -1243,9 +1274,12 @@ vtpUploadAll(char *string, int length)
     for(i=0; i<32; i++)
     {
       vtpGetGtTriggerBit(i,
-          &vtpConf.gt.trgbits[i].ssp_strigger_bit_mask,
-          &vtpConf.gt.trgbits[i].ssp_sector_mask,
-          &vtpConf.gt.trgbits[i].sector_mult_min,
+          &vtpConf.gt.trgbits[i].ssp_strigger_bit_mask[0],
+          &vtpConf.gt.trgbits[i].ssp_sector_mask[0],
+          &vtpConf.gt.trgbits[i].sector_mult_min[0],
+          &vtpConf.gt.trgbits[i].ssp_strigger_bit_mask[1],
+          &vtpConf.gt.trgbits[i].ssp_sector_mask[1],
+          &vtpConf.gt.trgbits[i].sector_mult_min[1],
           &vtpConf.gt.trgbits[i].sector_coin_width,
           &vtpConf.gt.trgbits[i].ssp_ctrigger_bit_mask,
           &vtpConf.gt.trgbits[i].delay, 
@@ -1424,14 +1458,14 @@ vtpUploadAll(char *string, int length)
       for(i=0; i<32; i++)
       {
         sprintf(sss, "VTP_GT_TRG %d\n", i); ADD_TO_STRING;
-        sprintf(sss, "VTP_GT_TRG_SSP_STRIGGER_MASK 0x%08X\n", vtpConf.gt.trgbits[i].ssp_strigger_bit_mask); ADD_TO_STRING;
-        sprintf(sss, "VTP_GT_TRG_SSP_CTRIGGER_MASK 0x%08X\n", vtpConf.gt.trgbits[i].ssp_ctrigger_bit_mask); ADD_TO_STRING;
-        sprintf(sss, "VTP_GT_TRG_SSP_SECTOR_MASK 0x%08X\n", vtpConf.gt.trgbits[i].ssp_sector_mask); ADD_TO_STRING;
-        sprintf(sss, "VTP_GT_TRG_SSP_SECTOR_MULT_MIN %d\n", vtpConf.gt.trgbits[i].sector_mult_min); ADD_TO_STRING;
-        sprintf(sss, "VTP_GT_TRG_SSP_SECTOR_WIDTH %d\n", vtpConf.gt.trgbits[i].sector_coin_width); ADD_TO_STRING;
-        sprintf(sss, "VTP_GT_TRG_PULSER_FREQ %.3f\n", vtpConf.gt.trgbits[i].pulser_freq); ADD_TO_STRING;
-        sprintf(sss, "VTP_GT_TRG_DELAY %d\n", vtpConf.gt.trgbits[i].delay); ADD_TO_STRING;
-        sprintf(sss, "VTP_GT_TRG_PRESCALE %d\n", vtpConf.gt.trgbits[i].prescale); ADD_TO_STRING;
+        sprintf(sss, "VTP_GT_TRG_SSP_STRIGGER_MASK 0x%08X 0x%08X\n",vtpConf.gt.trgbits[i].ssp_strigger_bit_mask[0],vtpConf.gt.trgbits[i].ssp_strigger_bit_mask[1]); ADD_TO_STRING;
+        sprintf(sss, "VTP_GT_TRG_SSP_CTRIGGER_MASK 0x%08X\n",vtpConf.gt.trgbits[i].ssp_ctrigger_bit_mask); ADD_TO_STRING;
+        sprintf(sss, "VTP_GT_TRG_SSP_SECTOR_MASK 0x%08X 0x%08X\n",vtpConf.gt.trgbits[i].ssp_sector_mask[0],vtpConf.gt.trgbits[i].ssp_sector_mask[1]); ADD_TO_STRING;
+        sprintf(sss, "VTP_GT_TRG_SSP_SECTOR_MULT_MIN %d %d\n",vtpConf.gt.trgbits[i].sector_mult_min[0],vtpConf.gt.trgbits[i].sector_mult_min[1]); ADD_TO_STRING;
+        sprintf(sss, "VTP_GT_TRG_SSP_SECTOR_WIDTH %d\n",vtpConf.gt.trgbits[i].sector_coin_width); ADD_TO_STRING;
+        sprintf(sss, "VTP_GT_TRG_PULSER_FREQ %.3f\n",vtpConf.gt.trgbits[i].pulser_freq); ADD_TO_STRING;
+        sprintf(sss, "VTP_GT_TRG_DELAY %d\n",vtpConf.gt.trgbits[i].delay); ADD_TO_STRING;
+        sprintf(sss, "VTP_GT_TRG_PRESCALE %d\n",vtpConf.gt.trgbits[i].prescale); ADD_TO_STRING;
       }
     }
     

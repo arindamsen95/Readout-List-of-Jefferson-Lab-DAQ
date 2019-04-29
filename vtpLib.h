@@ -460,7 +460,9 @@ typedef struct GtBit_Struct
   /** 0x0004 */ volatile uint32_t CTrigger;
   /** 0x0008 */ volatile uint32_t Pulser;
   /** 0x000C */ volatile uint32_t STriggerMask;
-  /** 0x0010 */ BLANK[(0x40-0x10)/4];
+  /** 0x0010 */ volatile uint32_t STrigger1;
+  /** 0x0014 */ volatile uint32_t STrigger1Mask;
+  /** 0x0018 */ BLANK[(0x40-0x18)/4];
   /** 0x0040 */ volatile uint32_t TriggerScaler;
   /** 0x0044 */ BLANK[(0x80-0x44)/4];
 } GTBIT_REGS;
@@ -720,8 +722,8 @@ int  vtpSetGt_latency(int latency);
 int  vtpGetGt_latency();
 int  vtpSetGt_width(int width);
 int  vtpGetGt_width();
-int  vtpSetGtTriggerBit(int inst, int strigger_mask, int sector_mask, int mult_min, int coin_width, int ctrigger_mask, int delay, float pulser_freq, int prescale);
-int  vtpGetGtTriggerBit(int inst, int *strigger_mask, int *sector_mask, int *mult_min, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq, int *prescale);
+int  vtpSetGtTriggerBit(int inst, int strigger_mask0, int sector_mask0, int mult_min0, int strigger_mask1, int sector_mask1, int mult_min1, int coin_width, int ctrigger_mask, int delay, float pulser_freq, int prescale);
+int  vtpGetGtTriggerBit(int inst, int *strigger_mask0, int *sector_mask0, int *mult_min0, int *strigger_mask1, int *sector_mask1, int *mult_min1, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq, int *prescale);
 #ifdef IPC
 int  vtpGtSendScalers(char *host);
 #endif
