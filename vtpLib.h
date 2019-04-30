@@ -708,6 +708,7 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_FTHODO            10
 #define VTP_FW_TYPE_FTOF              11
 #define VTP_FW_TYPE_CND               12
+#define VTP_FW_TYPE_HPS               13
 
 /* Routine prototypes */
 int  vtpSetDebugMask(uint32_t mask);

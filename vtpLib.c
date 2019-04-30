@@ -93,6 +93,32 @@ pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
     }               \
   }
 
+#define CHECKRANGE_INT(var, min, max) { \
+    if(var > max) { \
+      printf("%s: ERROR %s=%d exceeds maximum supported value %d\n", \
+        __func__, #var, var, max); \
+      var = max; \
+    } \
+    else if(var < min) { \
+      printf("%s: ERROR %s=%d exceeds minimum supported value %d\n", \
+        __func__, #var, var, min); \
+      var = min; \
+    } \
+  }
+
+#define CHECKRANGE_DOUBLE(var, min, max) { \
+    if(var > max) { \
+      printf("%s: ERROR %s=%f exceeds maximum supported value %f\n", \
+        __func__, #var, var, max); \
+      var = max; \
+    } \
+    else if(var < min) { \
+      printf("%s: ERROR %s=%f exceeds minimum supported value %f\n", \
+        __func__, #var, var, min); \
+      var = min; \
+    } \
+  }
+
 typedef struct
 {
   int serdes_chup[20];
@@ -216,6 +242,7 @@ vtpInit(int iFlag)
       case VTP_FW_TYPE_ECS:
       case VTP_FW_TYPE_FTCAL:
       case VTP_FW_TYPE_FTHODO:
+      case VTP_FW_TYPE_HPS:
         printf("%s: Setting up VTP PLL for 250MHz VXS reference\n", __func__);
         si5341_Init(SI5341_IN_SEL_VXS_250);
         break;
@@ -598,6 +625,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
     case VTP_FW_TYPE_HTCC:
     case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
+    case VTP_FW_TYPE_HPS:
       ctrl = vtp->v7.fadcDec.Ctrl;
       break;
     case VTP_FW_TYPE_GT:
@@ -1199,6 +1227,9 @@ vtpSendScalers()
       r = vtpFTSendErrors(host);
       r = vtpFTSendScalers(host);
       break;
+    case VTP_FW_TYPE_HPS:
+      r = vtpHPSSendErrors(host);
+      r = vtpHPSSendScalers(host);
   }
   vtpUnlock();
 
@@ -1292,6 +1323,7 @@ vtpEnableTriggerPayloadMask(int pp_mask)
     case VTP_FW_TYPE_FTOF:
     case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
+    case VTP_FW_TYPE_HPS:
       vtp->v7.fadcDec.Ctrl = pp_mask;
       break;
     case VTP_FW_TYPE_GT:
@@ -1332,6 +1364,7 @@ vtpGetTriggerPayloadMask()
     case VTP_FW_TYPE_FTOF:
     case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
+    case VTP_FW_TYPE_HPS:
       pp_mask = vtp->v7.fadcDec.Ctrl;
       break;
     case VTP_FW_TYPE_GT:
@@ -2113,6 +2146,8 @@ vtpGetPCcosmic_pixel(int *enable)
   return OK;
 }
 
+/* FT functions */
+
 int
 vtpSetFTCALseed_emin(int emin)
 {
@@ -2497,6 +2532,366 @@ vtpFTSelectHist(int sel)
 
   return OK;
 }
+
+/* HPS functions */
+
+int
+vtpSetHPS_Cluster(int top_nbottom, int hit_dt, int seed_thr)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  CHECKRANGE_INT(top_nbottom, 0,    1);
+  CHECKRANGE_INT(hit_dt,      0,    4);
+  CHECKRANGE_INT(seed_thr,    1, 8191);
+
+  VLOCK;
+  vtp->v7.hpsCluster.Ctrl = (top_nbottom<<31) | (hit_dt<<16) | (seed_thr<<0); 
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetHPS_Cluster(int *top_nbottom, int *hit_dt, int *seed_thr)
+{
+  int val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  VLOCK;
+  val = vtp->v7.hpsCluster.Ctrl;
+  VUNLOCK;
+
+  *top_nbottom = (val>>31) & 0x1;
+  *hit_dt      = (val>>16) & 0x7;
+  *seed_thr    = (val>>0)  & 0x1FFF;
+
+  return OK;
+}
+
+int
+vtpSetHPS_Hodoscope(int hit_width, int fadchit_thr, int hodo_thr)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  CHECKRANGE_INT(hit_width,   0,    7);
+  CHECKRANGE_INT(fadchit_thr, 1, 8191);
+  CHECKRANGE_INT(hodo_thr,    1, 8191);
+
+  VLOCK;
+  vtp->v7.hpsHodoscope.Ctrl = (hit_width<<26) | (hodo_thr<<13) | (fadchit_thr<<0); 
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetHPS_Hodoscope(int *hit_width, int *fadchit_thr, int *hodo_thr)
+{
+  int val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  VLOCK;
+  val = vtp->v7.hpsHodoscope.Ctrl;
+  VUNLOCK;
+
+  *hit_width   = (val>>26) & 0x7;
+  *hodo_thr    = (val>>13) & 0x1FFF;
+  *fadchit_thr = (val>>0)  & 0x1FFF;
+
+  return OK;
+}
+
+int
+vtpSetHPS_SingleTrigger(
+    int inst, int top_nbottom, int cluster_emin, int cluster_emax,
+    int cluster_nmin, int cluster_xmin, float cluster_pde_c[4],
+    int enable_flags)
+{
+  int i, c[4];
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  CHECKRANGE_INT(inst         ,   0,    3);
+  CHECKRANGE_INT(top_nbottom  ,   0,    1);
+  CHECKRANGE_INT(cluster_emin ,   0, 8191);
+  CHECKRANGE_INT(cluster_emax ,   0, 8191);
+  CHECKRANGE_INT(cluster_nmin ,   0,    9);
+  CHECKRANGE_INT(cluster_xmin , -31,   31);
+  CHECKRANGE_FLOAT(cluster_pde_c[0], -32767.0, 32767.0);
+  CHECKRANGE_FLOAT(cluster_pde_c[1], -32767.0, 32767.0);
+  CHECKRANGE_FLOAT(cluster_pde_c[2], -32767.0, 32767.0);
+  CHECKRANGE_FLOAT(cluster_pde_c[3], -32767.0, 32767.0);
+
+  for(i=0;i<4;i++)
+    c[i] = (int)(cluster_pde_c[i] * 65536.0);
+
+  VLOCK;
+  if(top_nbottom)
+  {
+    vtp->v7.hpsSingleTriggerTop[inst].Ctrl             = enable_flags;
+    vtp->v7.hpsSingleTriggerTop[inst].Cluster_Emin     = cluster_emin;
+    vtp->v7.hpsSingleTriggerTop[inst].Cluster_Emax     = cluster_emax;
+    vtp->v7.hpsSingleTriggerTop[inst].Cluster_Nmin     = cluster_nmin;
+    vtp->v7.hpsSingleTriggerTop[inst].Cluster_Xmin     = cluster_xmax;
+
+    for(i=0;i<4;i++)
+      vtp->v7.hpsSingleTriggerTop[inst].Cluster_PDE_C[i] = c;
+  }
+  else
+  {
+    vtp->v7.hpsSingleTriggerBot[inst].Ctrl             = enable_flags;
+    vtp->v7.hpsSingleTriggerBot[inst].Cluster_Emin     = cluster_emin;
+    vtp->v7.hpsSingleTriggerBot[inst].Cluster_Emax     = cluster_emax;
+    vtp->v7.hpsSingleTriggerBot[inst].Cluster_Nmin     = cluster_nmin;
+    vtp->v7.hpsSingleTriggerBot[inst].Cluster_Xmin     = cluster_xmax;
+
+    for(i=0;i<4;i++)
+      vtp->v7.hpsSingleTriggerBot[inst].Cluster_PDE_C[i] = c[i];
+  }
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetHPS_SingleTrigger(
+    int inst, int top_nbottom, int *cluster_emin, int *cluster_emax,
+    int *cluster_nmin, int *cluster_xmin, float cluster_pde_c[4],
+    int *enable_flags)
+{
+  int i, ctrl, emin, emax, nmin, xmin, c[4];
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  VLOCK;
+  if(top_nbottom)
+  {
+    *enable_flags = vtp->v7.hpsSingleTriggerTop[inst].Ctrl;
+    *cluster_emin = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Emin;
+    *cluster_emax = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Emax;
+    *cluster_nmin = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Nmin;
+    *cluster_xmax = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Xmin;
+
+    for(i=0;i<4;i++)
+      c[i] = vtp->v7.hpsSingleTriggerTop[inst].Cluster_PDE_C[i];
+  }
+  else
+  {
+    *enable_flags = vtp->v7.hpsSingleTriggerBot[inst].Ctrl;
+    *cluster_emin = vtp->v7.hpsSingleTriggerBot[inst].Cluster_Emin;
+    *cluster_emax = vtp->v7.hpsSingleTriggerBot[inst].Cluster_Emax;
+    *cluster_nmin = vtp->v7.hpsSingleTriggerBot[inst].Cluster_Nmin;
+    *cluster_xmax = vtp->v7.hpsSingleTriggerBot[inst].Cluster_Xmin;
+
+    for(i=0;i<4;i++)
+      c[i] = vtp->v7.hpsSingleTriggerBot[inst].Cluster_PDE_C[i];
+  }
+  VUNLOCK;
+
+  for(i=0;i<4;i++)
+    cluster_pde_c[i] = c[i] / 65536.0;
+
+  return OK;
+}
+
+int
+vtpSetHPS_PairTrigger(
+    int inst, int cluster_emin, int cluster_emax, int cluster_nmin,
+    int pair_dt, int pair_esum_min, int pair_esum_max, int pair_ediff_max,
+    float pair_ed_factor, int pair_ed_thr, int pair_coplanarity_tol,
+    int enable_flags
+  )
+{
+  int f;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  CHECKRANGE_INT(inst                 ,   0,    3);
+  CHECKRANGE_INT(cluster_emin         ,   0, 8191);
+  CHECKRANGE_INT(cluster_emax         ,   0, 8191);
+  CHECKRANGE_INT(cluster_nmin         ,   0,    9);
+  CHECKRANGE_INT(pair_esum_min        ,   0, 8191);
+  CHECKRANGE_INT(pair_esum_max        ,   0,16383);
+  CHECKRANGE_INT(pair_ediff_max       ,   0, 8191);
+  CHECKRANGE_INT(pair_ed_thr          ,   0, 8191);
+  CHECKRANGE_INT(pair_coplanarity_tol ,   0,  255);
+  CHECKRANGE_INT(pair_ed_thr          ,   0  8191);
+  CHECKRANGE_FLOAT(pair_ed_factor     , 0.0, 15.9375);
+
+  f = (int)(pair_ed_factor * 16.0);
+
+  VLOCK;
+  vtp->v7.hpsPairTrigger[inst].Ctrl             = enable_flags;
+  vtp->v7.hpsPairTrigger[inst].Pair_Esum        = (pair_esum_max<<16) | (pair_esum_min<<0);
+  vtp->v7.hpsPairTrigger[inst].Pair_Ediff       = pair_ediff_max;
+  vtp->v7.hpsPairTrigger[inst].Cluster_Eminmax  = (cluster_emax<<16)  | (cluster_emin<<0);
+  vtp->v7.hpsPairTrigger[inst].Cluster_Nmin     = cluster_nmin;
+  vtp->v7.hpsPairTrigger[inst].Pair_CoplanarTol = pair_coplanarity_tol;
+  vtp->v7.hpsPairTrigger[inst].Pair_ED          = (pair_ed_thr<<16) | (f<<0);
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetHPS_PairTrigger(
+    int inst, int *cluster_emin, int *cluster_emax, int *cluster_nmin,
+    int *pair_dt, int *pair_esum_min, int *pair_esum_max, int *pair_ediff_max,
+    float *pair_ed_factor, int *pair_ed_thr, int *pair_coplanarity_tol,
+    int *enable_flags
+{
+  int f;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  VLOCK;
+  *enable_flags         = vtp->v7.hpsPairTrigger[inst].Ctrl;
+  *pair_esum_min        = (vtp->v7.hpsPairTrigger[inst].Pair_Esum>>0)        & 0x3FFF;
+  *pair_esum_max        = (vtp->v7.hpsPairTrigger[inst].Pair_Esum>>16)       & 0x3FFF;
+  *pair_ediff_max       = vtp->v7.hpsPairTrigger[inst].Pair_Ediff;
+  *cluster_emax         = (vtp->v7.hpsPairTrigger[inst].Cluster_Eminmax>>16) & 0x1FFF;
+  *cluster_emin         = (vtp->v7.hpsPairTrigger[inst].Cluster_Eminmax>>0)  & 0x1FFF;
+  *cluster_nmin         = vtp->v7.hpsPairTrigger[inst].Cluster_Nmin;
+  *pair_coplanarity_tol = vtp->v7.hpsPairTrigger[inst].Pair_CoplanarTol;
+  *pair_ed_thr          = (vtp->v7.hpsPairTrigger[inst].Pair_ED>>16)         & 0x1FFF;
+  f                     = (vtp->v7.hpsPairTrigger[inst].Pair_ED>>0)          & 0xFF;
+  VUNLOCK;
+
+  *pair_ed_factor = f / 16.0;
+
+  return OK;
+}
+
+#ifdef IPC
+int
+vtpHPSSendErrors(char *host)
+{
+/*
+  char name[100];
+  int data[NSERDES];
+  unsigned int val;
+  int i;
+  CHECKINIT;
+
+  for(i=0;i<4;i++)
+  {
+    vtpSerdesStatus(VTP_SERDES_QSFP, i, 0, data);
+
+    if(data[4] & 0x1) // check channel up bit
+      val |= (1<<i);
+    else
+      val &= ~(1<<i);
+  }
+
+  if(!(val & 0x1))  // Fiber 0 = trig2 SSP_SLOT9
+  {
+    sprintf(name, "err: crate=%s link to trig2 SSP_SLOT9 down", host);
+    epics_json_msg_send(name, "int", 1, &data);
+  }
+  if(!(val & 0x2))  // Fiber 1 = adcftXvtp
+  {
+    sprintf(name, "err: crate=%s,adcft1vtp link to adcft2vtp down", host);
+    epics_json_msg_send(name, "int", 1, &data);
+  }
+  if(!(val & 0x4) || !(val & 0x8))  // Fiber 2,3 = adcft3vtp
+  {
+    sprintf(name, "err: crate=%s,link to adcft3vtp down", host);
+    epics_json_msg_send(name, "int", 1, &data);
+  }
+*/
+  return OK;
+}
+
+int
+vtpHPSSendScalers(char *host)
+{
+/*
+  char name[100];
+  float ref, data[1024];
+  unsigned int val;
+  int i;
+  CHECKINIT;
+
+  printf("%s...", __func__);
+
+  VLOCK;
+#if VTP_FT_SENDHODOSCALERS
+  vtp->v7.sd.ScalerLatch = 1;
+  //Read/normalize reference
+  val = vtp->v7.sd.Scaler_BusClk;
+  if(!val) val = 1;
+  ref = 33330000.0f / (float)val;
+
+  for(i=0;i<256;i++)
+  {
+    data[i] = ref * (float)vtp->v7.fthodoScalers.Scalers[i];
+    printf("vtp->v7.fthodoScalers.Scalers[%3d]=%9d\n", i, vtp->v7.fthodoScalers.Scalers[i]);
+  }
+  vtp->v7.sd.ScalerLatch = 0;
+  sprintf(name, "%s_VTPFT_HODOSCALERS", host);
+  epics_json_msg_send(name, "float", 256, data);
+#endif
+
+  vtp->v7.ftcalTrigger.HistCtrl = 0x60000000;
+  val = vtp->v7.ftcalTrigger.HistTime;
+  if(!val) val = 1;
+
+  ref = 1000000.0f / (float)val;
+
+  // Cluster position histogram (all)
+  for(i=0;i<1024;i++)
+    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistPos;
+  sprintf(name, "%s_VTPFT_CLUSTERPOSITION", host);
+  epics_json_msg_send(name, "float", 1024, data);
+
+  // Cluster energy histogram (all)
+  for(i=0;i<1024;i++)
+    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistEnergy;
+  sprintf(name, "%s_VTPFT_CLUSTERENERGY", host);
+  epics_json_msg_send(name, "float", 1024, data);
+
+  // Cluster nhits histogram (all)
+  for(i=0;i<9;i++)
+    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistNHits;
+  sprintf(name, "%s_VTPFT_CLUSTERHITS", host);
+  epics_json_msg_send(name, "float", 9, data);
+
+  // Cluster position histogram (hodo tagged)
+  for(i=0;i<1024;i++)
+    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistPosHodo;
+  sprintf(name, "%s_VTPFT_CLUSTERPOSITION_HODO", host);
+  epics_json_msg_send(name, "float", 1024, data);
+
+  // Cluster energy histogram (hodo tagged)
+  for(i=0;i<1024;i++)
+    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistEnergyHodo;
+  sprintf(name, "%s_VTPFT_CLUSTERENERGY_HODO", host);
+  epics_json_msg_send(name, "float", 1024, data);
+
+  // Cluster nhits histogram (hodo tagged)
+  for(i=0;i<9;i++)
+    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistNHitsHodo;
+  sprintf(name, "%s_VTPFT_CLUSTERNHITS_HODO", host);
+  epics_json_msg_send(name, "float", 9, data);
+
+  vtp->v7.ftcalTrigger.HistCtrl = 0x60000000 | 0x7F;
+  VUNLOCK;
+*/
+  return OK;
+}
+
+#endif
+
+
+
+
+
+
+
 
 /* HTCC functions */
 
