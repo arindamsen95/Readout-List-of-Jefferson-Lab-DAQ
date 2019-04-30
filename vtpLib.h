@@ -431,7 +431,7 @@ typedef struct HPSMultiplicityTrigger_Struct
   /** 0x0000 */ volatile uint32_t Cluster_Emin;
   /** 0x0004 */ volatile uint32_t Cluster_Emax;
   /** 0x0008 */ volatile uint32_t Cluster_Nmin;
-  /** 0x000C */ volatile uint32_t Cluster_MultMin;
+  /** 0x000C */ volatile uint32_t Cluster_Mult;
   /** 0x0010 */ volatile uint32_t Latency;
   /** 0x0014 */ BLANK[(0x030-0x014)/4];
   /** 0x0030 */ volatile uint32_t ScalerAccept;

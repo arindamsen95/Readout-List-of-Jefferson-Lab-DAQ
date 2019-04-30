@@ -2743,6 +2743,7 @@ vtpGetHPS_PairTrigger(
     int *pair_dt, int *pair_esum_min, int *pair_esum_max, int *pair_ediff_max,
     float *pair_ed_factor, int *pair_ed_thr, int *pair_coplanarity_tol,
     int *enable_flags
+  )
 {
   int f;
   CHECKINIT;
@@ -2765,6 +2766,115 @@ vtpGetHPS_PairTrigger(
 
   return OK;
 }
+
+int
+vtpSetHPS_MultiplicityTrigger(
+    int cluster_emin, int cluster_emax, int cluster_nmin,
+    int mult_dt, int mult_top_min, int mult_bot_min, int mult_tot_min
+  )
+{
+  int f;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  CHECKRANGE_INT(cluster_emin ,   0, 8191);
+  CHECKRANGE_INT(cluster_emax ,   0, 8191);
+  CHECKRANGE_INT(cluster_nmin ,   0,    9);
+
+  CHECKRANGE_INT(mult_dt      ,   0,   15);
+  CHECKRANGE_INT(mult_top_min ,   0,   15);
+  CHECKRANGE_INT(mult_bot_min ,   0,   15);
+  CHECKRANGE_INT(mult_tot_min ,   0,   15);
+
+  VLOCK;
+  vtp->v7.hpsMultiplicityTrigger.Cluster_Emin  = cluster_emin;
+  vtp->v7.hpsMultiplicityTrigger.Cluster_Emax  = cluster_emax;
+  vtp->v7.hpsMultiplicityTrigger.Cluster_Nmin  = cluster_nmin;
+  vtp->v7.hpsMultiplicityTrigger.Cluster_Mult  = (mult_dt<<12) |
+                                                 (mult_tot_min<<8) |
+                                                 (mult_bot_min<<4) |
+                                                 (mult_top_min<<0);
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetHPS_MultiplicityTrigger(
+    int *cluster_emin, int *cluster_emax, int *cluster_nmin,
+    int *mult_dt, int *mult_top_min, int *mult_bot_min, int *mult_tot_min
+  )
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  VLOCK;
+  *cluster_emin  = vtp->v7.hpsMultiplicityTrigger.Cluster_Emin;
+  *cluster_emax  = vtp->v7.hpsMultiplicityTrigger.Cluster_Emax;
+  *cluster_nmin  = vtp->v7.hpsMultiplicityTrigger.Cluster_Nmin;
+  *mult_dt       = (vtp->v7.hpsMultiplicityTrigger.Cluster_Mult>>12) & 0xF;
+  *mult_tot_min  = (vtp->v7.hpsMultiplicityTrigger.Cluster_Mult>>8) & 0xF;
+  *mult_bot_min  = (vtp->v7.hpsMultiplicityTrigger.Cluster_Mult>>4) & 0xF;
+  *mult_top_min  = (vtp->v7.hpsMultiplicityTrigger.Cluster_Mult>>0) & 0xF;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpSetHPS_CalibrationTrigger(
+    int enable_flags, int cosmic_dt, float pulser_freq
+  )
+{
+  int f;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  CHECKRANGE_INT(cosmic_dt,       0, 255);
+  CHECKRANGE_FLOAT(pulser_freq, 0.0, 125.0E6);
+
+  VLOCK;
+  vtp->v7.hpsCalibTrigger.Cluster_Emin  = cluster_emin;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetHPS_CalibrationTrigger(
+    int *cluster_emin, int *cluster_emax, int *cluster_nmin,
+    int *mult_dt, int *mult_top_min, int *mult_bot_min, int *mult_tot_min
+  )
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  VLOCK;
+  *cluster_emin  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emin;
+  *cluster_emax  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emax;
+  *cluster_nmin  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Nmin;
+  *mult_dt       = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>12) & 0xF;
+  *mult_tot_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>8) & 0xF;
+  *mult_bot_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>4) & 0xF;
+  *mult_top_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>0) & 0xF;
+  VUNLOCK;
+
+  return OK;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #ifdef IPC
 int
