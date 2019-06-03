@@ -27,6 +27,59 @@ typedef struct
   int prescale;
 } trgbit;
 
+typedef struct
+{
+  int cluster_emin;
+  int cluster_emax;
+  int cluster_nmin;
+  int cluster_xmin;
+  float pde_c[4];
+
+  int cluster_emin_en;
+  int cluster_emax_en;
+  int cluster_nmin_en;
+  int cluster_xmin_en;
+  int pde_en;
+  int hodo_l1_en;
+  int hodo_l2_en;
+  int hodo_l1l2_geom_en;
+  int hodo_l1l2x_geom_en;
+  int en;
+} hps_single_trig;
+
+typedef struct
+{
+  int cluster_emin;
+  int cluster_emax;
+  int cluster_nmin;
+
+  int pair_dt;
+  int pair_esum_min;
+  int pair_esum_max;
+  int pair_ediff_max;
+  float pair_ed_factor;
+  int pair_ed_thr;
+  int pair_coplanarity_tol;
+  
+  int pair_esum_en;
+  int pair_ediff_en;
+  int pair_ed_en;
+  int pair_coplanarity_en;
+  int en;
+} hps_pair_trig;
+
+typedef struct
+{
+  int cluster_emin;
+  int cluster_emax;
+  int cluster_nmin;
+  int mult_dt;
+  int mult_top_min;
+  int mult_bot_min;
+  int mult_tot_min;
+  int en;
+} hps_mult_trig;
+
 /** VTP configuration parameters **/
 typedef struct {
   char fw_filename[FNLEN];
@@ -173,6 +226,59 @@ typedef struct {
   {
     int hit_emin;
   } fthodo;
+
+  struct
+  {
+    struct
+    {
+      int top_nbottom;
+      int hit_dt;
+      int seed_thr;
+    } cluster;
+
+    struct
+    {
+      int hit_dt;
+      int fadchit_thr;
+      int hodo_thr;
+    } hodoscope;
+
+    struct
+    {
+      int hodoscope_top_en;
+      int hodoscope_bot_en;
+
+      int cosmic_dt;
+      int cosmic_top_en;
+      int cosmic_bot_en;
+
+      float pulser_freq;
+      int pulser_en;
+    } calib;
+
+    hps_single_trig single_trig[4];
+
+    hps_pair_trig pair_trig[4];
+
+    hps_mult_trig mult_trig[2];
+
+    struct
+    {
+      int cluster_emin;
+      int cluster_emax;
+      int cluster_nmin;
+      int prescale_xmin[7];
+      int prescale_xmax[7];
+      int prescale[7];
+      int en;
+    } fee_trig;
+
+    struct
+    {
+      int latency;
+      int prescale[32];
+    } trig;
+  } hps;
 
 } VTP_CONF;
 

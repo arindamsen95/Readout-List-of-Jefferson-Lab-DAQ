@@ -407,15 +407,15 @@ typedef struct HPSPairTrigger_Struct
   /** 0x001C */ BLANK[(0x020-0x01C)/4];
   /** 0x0020 */ volatile uint32_t ScalerTotal;
   /** 0x0024 */ volatile uint32_t ScalerCuts[4];
-  /** 0x0028 */ volatile uint32_t ScalerAccept;
-  /** 0x002C */ BLANK[(0x040-0x02C)/4];
+  /** 0x0034 */ volatile uint32_t ScalerAccept;
+  /** 0x0038 */ BLANK[(0x040-0x038)/4];
 } HPSPAIRTRIGGER_REGS;
 
 typedef struct HPSCalibTrigger_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
   /** 0x0004 */ volatile uint32_t Pulser;
-  /** 0x0018 */ BLANK[(0x020-0x01C)/4];
+  /** 0x0008 */ BLANK[(0x020-0x008)/4];
   /** 0x0020 */ volatile uint32_t ScalerCosmicTop;
   /** 0x0024 */ volatile uint32_t ScalerCosmicBot;
   /** 0x0028 */ volatile uint32_t ScalerCosmicTopBot;
@@ -437,6 +437,24 @@ typedef struct HPSMultiplicityTrigger_Struct
   /** 0x0030 */ volatile uint32_t ScalerAccept;
   /** 0x0034 */ BLANK[(0x040-0x034)/4];
 } HPSMULTTRIGGER_REGS;
+
+typedef struct HPSFeeTrigger_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t Cluster_Emin;
+  /** 0x0008 */ volatile uint32_t Cluster_Emax;
+  /** 0x000C */ volatile uint32_t Cluster_Nmin;
+  /** 0x0010 */ volatile uint32_t Prescale_Xmin[2];
+  /** 0x0018 */ volatile uint32_t Prescale_Xmax[2];
+  /** 0x0020 */ volatile uint32_t Prescale[4];
+  /** 0x0030 */ BLANK[(0x040-0x030)/4];
+  /** 0x0040 */ volatile uint32_t ScalerTotal;
+  /** 0x0044 */ volatile uint32_t ScalerAccept;
+  /** 0x0048 */ volatile uint32_t ScalerCuts[7];
+  /** 0x0064 */ BLANK[(0x068-0x064)/4];
+  /** 0x0068 */ volatile uint32_t ScalerAcceptLive;
+  /** 0x0034 */ BLANK[(0x080-0x06C)/4];
+} HPSFEETRIGGER_REGS;
 
 typedef struct HPSTrigger_Struct
 {
@@ -628,7 +646,13 @@ typedef struct v7_bridge_struct
 
   /** 0x43C15300 */ CNDTRIGGER_REGS cndTrigger;
 
-  /** 0x43C15400 */ FTHODOSCALERS_REGS fthodoScalers;
+  /** 0x43C15400 */ BLANK[(0x5600-0x5400)/4];
+
+  /** 0x43C15600 */ HPSFEETRIGGER_REGS hpsFeeTriggerTop;
+
+  /** 0x43C15680 */ HPSFEETRIGGER_REGS hpsFeeTriggerBot;
+
+  /** 0x43C15700 */ BLANK[(0x5800-0x5700)/4];  /* HPS MONITORING REGS */
 
   /** 0x43C15800 */ HPSCLUSTER_REGS hpsCluster;
 
@@ -644,13 +668,9 @@ typedef struct v7_bridge_struct
 
   /** 0x43C15E00 */ HPSCALIBTRIGGER_REGS hpsCalibTrigger;
 
-  /** 0x43C15E40 */ HPSMULTTRIGGER_REGS hpsMultiplcityTrigger;
-
-  /** 0x43C15E80 */ BLANK[(0x5F00 - 0x5E80)/4];
+  /** 0x43C15E40 */ HPSMULTTRIGGER_REGS hpsMultiplicityTrigger[2];
 
   /** 0x43C15F00 */ HPSTRIGGER_REGS hpsTriggerBits;
-
-  /** 0x43C15800 */ BLANK[(0x6000 - 0x5800)/4];
 
   /** 0x43C16000 */ GTBIT_REGS gtBit[16]; /* 128 bytes */
 
@@ -875,6 +895,30 @@ int  vtpGetFTHODOemin(int *emin);
 #ifdef IPC
 int  vtpFTHodoSendErrors(char *host);
 int  vtpFTHodoSendScalers(char *host);
+#endif
+
+// VTP_FW_TYPE_HPS functions
+int  vtpSetHPS_Cluster(int top_nbottom, int hit_dt, int seed_thr);
+int  vtpGetHPS_Cluster(int *top_nbottom, int *hit_dt, int *seed_thr);
+int  vtpSetHPS_Hodoscope(int hit_width, int fadchit_thr, int hodo_thr);
+int  vtpGetHPS_Hodoscope(int *hit_width, int *fadchit_thr, int *hodo_thr);
+int  vtpSetHPS_SingleTrigger(int inst, int top_nbottom, int cluster_emin, int cluster_emax, int cluster_nmin, int cluster_xmin, float cluster_pde_c[4], int enable_flags);
+int vtpGetHPS_SingleTrigger(int inst, int top_nbottom, int *cluster_emin, int *cluster_emax, int *cluster_nmin, int *cluster_xmin, float cluster_pde_c[4], int *enable_flags);
+int vtpSetHPS_PairTrigger(int inst, int cluster_emin, int cluster_emax, int cluster_nmin, int pair_dt, int pair_esum_min, int pair_esum_max, int pair_ediff_max, float pair_ed_factor, int pair_ed_thr, int pair_coplanarity_tol, int enable_flags);
+int vtpGetHPS_PairTrigger(int inst, int *cluster_emin, int *cluster_emax, int *cluster_nmin, int *pair_dt, int *pair_esum_min, int *pair_esum_max, int *pair_ediff_max, float *pair_ed_factor, int *pair_ed_thr, int *pair_coplanarity_tol, int *enable_flags);
+int vtpSetHPS_MultiplicityTrigger(int inst, int cluster_emin, int cluster_emax, int cluster_nmin, int mult_dt, int mult_top_min, int mult_bot_min, int mult_tot_min, int enable_flags);
+int vtpGetHPS_MultiplicityTrigger(int inst, int *cluster_emin, int *cluster_emax, int *cluster_nmin, int *mult_dt, int *mult_top_min, int *mult_bot_min, int *mult_tot_min, int *enable_flags);
+int vtpSetHPS_FeeTrigger(int cluster_emin, int cluster_emax, int cluster_nmin, int *prescale_xmin, int *prescale_xmax, int *prescale, int enable_flags);
+int vtpGetHPS_FeeTrigger(int *cluster_emin, int *cluster_emax, int *cluster_nmin, int *prescale_xmin, int *prescale_xmax, int *prescale, int *enable_flags);
+int vtpSetHPS_CalibrationTrigger(int enable_flags, int cosmic_dt, float pulser_freq);
+int vtpGetHPS_CalibrationTrigger(int *enable_flags, int *cosmic_dt, float *pulser_freq);
+int vtpSetHPS_TriggerLatency(int latency);
+int vtpGetHPS_TriggerLatency(int *latency);
+int vtpSetHPS_TriggerPrescale(int inst, int prescale);
+int vtpGetHPS_TriggerPrescale(int inst, int *prescale);
+#ifdef IPC
+int  vtpHPSSendErrors(char *host);
+int  vtpHPSSendScalers(char *host);
 #endif
 
 // VTP_FT_TYPE_HTCC functions

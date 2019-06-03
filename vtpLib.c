@@ -106,7 +106,7 @@ pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
     } \
   }
 
-#define CHECKRANGE_DOUBLE(var, min, max) { \
+#define CHECKRANGE_FLOAT(var, min, max) { \
     if(var > max) { \
       printf("%s: ERROR %s=%f exceeds maximum supported value %f\n", \
         __func__, #var, var, max); \
@@ -2485,6 +2485,7 @@ vtpFTHodoSendErrors(char *host)
 int
 vtpFTHodoSendScalers(char *host)
 {
+/*
   char name[100];
   float ref, data[1024];
   unsigned int val;
@@ -2506,7 +2507,7 @@ vtpFTHodoSendScalers(char *host)
   sprintf(name, "%s_VTPFT_HODOSCALERS", host);
   epics_json_msg_send(name, "float", 256, data);
   VUNLOCK;
-
+*/
   return OK;
 }
 #endif
@@ -2541,6 +2542,8 @@ vtpSetHPS_Cluster(int top_nbottom, int hit_dt, int seed_thr)
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
 
+  hit_dt/= 4;
+
   CHECKRANGE_INT(top_nbottom, 0,    1);
   CHECKRANGE_INT(hit_dt,      0,    4);
   CHECKRANGE_INT(seed_thr,    1, 8191);
@@ -2567,6 +2570,8 @@ vtpGetHPS_Cluster(int *top_nbottom, int *hit_dt, int *seed_thr)
   *hit_dt      = (val>>16) & 0x7;
   *seed_thr    = (val>>0)  & 0x1FFF;
 
+  *hit_dt *= 4;
+
   return OK;
 }
 
@@ -2575,6 +2580,8 @@ vtpSetHPS_Hodoscope(int hit_width, int fadchit_thr, int hodo_thr)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  hit_width/= 4;
 
   CHECKRANGE_INT(hit_width,   0,    7);
   CHECKRANGE_INT(fadchit_thr, 1, 8191);
@@ -2601,6 +2608,8 @@ vtpGetHPS_Hodoscope(int *hit_width, int *fadchit_thr, int *hodo_thr)
   *hit_width   = (val>>26) & 0x7;
   *hodo_thr    = (val>>13) & 0x1FFF;
   *fadchit_thr = (val>>0)  & 0x1FFF;
+
+  *hit_width*= 4;
 
   return OK;
 }
@@ -2636,10 +2645,10 @@ vtpSetHPS_SingleTrigger(
     vtp->v7.hpsSingleTriggerTop[inst].Cluster_Emin     = cluster_emin;
     vtp->v7.hpsSingleTriggerTop[inst].Cluster_Emax     = cluster_emax;
     vtp->v7.hpsSingleTriggerTop[inst].Cluster_Nmin     = cluster_nmin;
-    vtp->v7.hpsSingleTriggerTop[inst].Cluster_Xmin     = cluster_xmax;
+    vtp->v7.hpsSingleTriggerTop[inst].Cluster_Xmin     = cluster_xmin;
 
     for(i=0;i<4;i++)
-      vtp->v7.hpsSingleTriggerTop[inst].Cluster_PDE_C[i] = c;
+      vtp->v7.hpsSingleTriggerTop[inst].Cluster_PDE_C[i] = c[i];
   }
   else
   {
@@ -2647,7 +2656,7 @@ vtpSetHPS_SingleTrigger(
     vtp->v7.hpsSingleTriggerBot[inst].Cluster_Emin     = cluster_emin;
     vtp->v7.hpsSingleTriggerBot[inst].Cluster_Emax     = cluster_emax;
     vtp->v7.hpsSingleTriggerBot[inst].Cluster_Nmin     = cluster_nmin;
-    vtp->v7.hpsSingleTriggerBot[inst].Cluster_Xmin     = cluster_xmax;
+    vtp->v7.hpsSingleTriggerBot[inst].Cluster_Xmin     = cluster_xmin;
 
     for(i=0;i<4;i++)
       vtp->v7.hpsSingleTriggerBot[inst].Cluster_PDE_C[i] = c[i];
@@ -2663,9 +2672,11 @@ vtpGetHPS_SingleTrigger(
     int *cluster_nmin, int *cluster_xmin, float cluster_pde_c[4],
     int *enable_flags)
 {
-  int i, ctrl, emin, emax, nmin, xmin, c[4];
+  int i, c[4];
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  CHECKRANGE_INT(inst         ,   0,    3);
 
   VLOCK;
   if(top_nbottom)
@@ -2674,7 +2685,7 @@ vtpGetHPS_SingleTrigger(
     *cluster_emin = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Emin;
     *cluster_emax = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Emax;
     *cluster_nmin = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Nmin;
-    *cluster_xmax = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Xmin;
+    *cluster_xmin = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Xmin;
 
     for(i=0;i<4;i++)
       c[i] = vtp->v7.hpsSingleTriggerTop[inst].Cluster_PDE_C[i];
@@ -2685,7 +2696,7 @@ vtpGetHPS_SingleTrigger(
     *cluster_emin = vtp->v7.hpsSingleTriggerBot[inst].Cluster_Emin;
     *cluster_emax = vtp->v7.hpsSingleTriggerBot[inst].Cluster_Emax;
     *cluster_nmin = vtp->v7.hpsSingleTriggerBot[inst].Cluster_Nmin;
-    *cluster_xmax = vtp->v7.hpsSingleTriggerBot[inst].Cluster_Xmin;
+    *cluster_xmin = vtp->v7.hpsSingleTriggerBot[inst].Cluster_Xmin;
 
     for(i=0;i<4;i++)
       c[i] = vtp->v7.hpsSingleTriggerBot[inst].Cluster_PDE_C[i];
@@ -2710,22 +2721,25 @@ vtpSetHPS_PairTrigger(
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
 
+  pair_dt/= 4;
+
   CHECKRANGE_INT(inst                 ,   0,    3);
   CHECKRANGE_INT(cluster_emin         ,   0, 8191);
   CHECKRANGE_INT(cluster_emax         ,   0, 8191);
   CHECKRANGE_INT(cluster_nmin         ,   0,    9);
+  CHECKRANGE_INT(pair_dt              ,   0,   15);
   CHECKRANGE_INT(pair_esum_min        ,   0, 8191);
   CHECKRANGE_INT(pair_esum_max        ,   0,16383);
   CHECKRANGE_INT(pair_ediff_max       ,   0, 8191);
   CHECKRANGE_INT(pair_ed_thr          ,   0, 8191);
   CHECKRANGE_INT(pair_coplanarity_tol ,   0,  255);
-  CHECKRANGE_INT(pair_ed_thr          ,   0  8191);
+  CHECKRANGE_INT(pair_ed_thr          ,   0, 8191);
   CHECKRANGE_FLOAT(pair_ed_factor     , 0.0, 15.9375);
 
   f = (int)(pair_ed_factor * 16.0);
 
   VLOCK;
-  vtp->v7.hpsPairTrigger[inst].Ctrl             = enable_flags;
+  vtp->v7.hpsPairTrigger[inst].Ctrl             = enable_flags | (pair_dt<<16);
   vtp->v7.hpsPairTrigger[inst].Pair_Esum        = (pair_esum_max<<16) | (pair_esum_min<<0);
   vtp->v7.hpsPairTrigger[inst].Pair_Ediff       = pair_ediff_max;
   vtp->v7.hpsPairTrigger[inst].Cluster_Eminmax  = (cluster_emax<<16)  | (cluster_emin<<0);
@@ -2749,8 +2763,11 @@ vtpGetHPS_PairTrigger(
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
 
+  CHECKRANGE_INT(inst         ,   0,    3);
+
   VLOCK;
-  *enable_flags         = vtp->v7.hpsPairTrigger[inst].Ctrl;
+  *enable_flags         = vtp->v7.hpsPairTrigger[inst].Ctrl & 0x8000FFFF;
+  *pair_dt              = (vtp->v7.hpsPairTrigger[inst].Ctrl>>16) & 0xF;
   *pair_esum_min        = (vtp->v7.hpsPairTrigger[inst].Pair_Esum>>0)        & 0x3FFF;
   *pair_esum_max        = (vtp->v7.hpsPairTrigger[inst].Pair_Esum>>16)       & 0x3FFF;
   *pair_ediff_max       = vtp->v7.hpsPairTrigger[inst].Pair_Ediff;
@@ -2763,20 +2780,25 @@ vtpGetHPS_PairTrigger(
   VUNLOCK;
 
   *pair_ed_factor = f / 16.0;
+  *pair_dt*= 4;
 
   return OK;
 }
 
 int
 vtpSetHPS_MultiplicityTrigger(
+    int inst,
     int cluster_emin, int cluster_emax, int cluster_nmin,
-    int mult_dt, int mult_top_min, int mult_bot_min, int mult_tot_min
+    int mult_dt, int mult_top_min, int mult_bot_min, int mult_tot_min,
+    int enable_flags
   )
 {
-  int f;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
 
+  mult_dt/= 4;
+
+  CHECKRANGE_INT(inst         ,   0,    1);
   CHECKRANGE_INT(cluster_emin ,   0, 8191);
   CHECKRANGE_INT(cluster_emax ,   0, 8191);
   CHECKRANGE_INT(cluster_nmin ,   0,    9);
@@ -2787,13 +2809,14 @@ vtpSetHPS_MultiplicityTrigger(
   CHECKRANGE_INT(mult_tot_min ,   0,   15);
 
   VLOCK;
-  vtp->v7.hpsMultiplicityTrigger.Cluster_Emin  = cluster_emin;
-  vtp->v7.hpsMultiplicityTrigger.Cluster_Emax  = cluster_emax;
-  vtp->v7.hpsMultiplicityTrigger.Cluster_Nmin  = cluster_nmin;
-  vtp->v7.hpsMultiplicityTrigger.Cluster_Mult  = (mult_dt<<12) |
-                                                 (mult_tot_min<<8) |
-                                                 (mult_bot_min<<4) |
-                                                 (mult_top_min<<0);
+  vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emin  = cluster_emin;
+  vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emax  = cluster_emax;
+  vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Nmin  = cluster_nmin;
+  vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult  = enable_flags | 
+                                                       (mult_dt<<12) |
+                                                       (mult_tot_min<<8) |
+                                                       (mult_bot_min<<4) |
+                                                       (mult_top_min<<0);
   VUNLOCK;
 
   return OK;
@@ -2801,23 +2824,29 @@ vtpSetHPS_MultiplicityTrigger(
 
 int
 vtpGetHPS_MultiplicityTrigger(
+    int inst,
     int *cluster_emin, int *cluster_emax, int *cluster_nmin,
-    int *mult_dt, int *mult_top_min, int *mult_bot_min, int *mult_tot_min
+    int *mult_dt, int *mult_top_min, int *mult_bot_min, int *mult_tot_min,
+    int *enable_flags
   )
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
 
+  CHECKRANGE_INT(inst         ,   0,    1);
+
   VLOCK;
-  *cluster_emin  = vtp->v7.hpsMultiplicityTrigger.Cluster_Emin;
-  *cluster_emax  = vtp->v7.hpsMultiplicityTrigger.Cluster_Emax;
-  *cluster_nmin  = vtp->v7.hpsMultiplicityTrigger.Cluster_Nmin;
-  *mult_dt       = (vtp->v7.hpsMultiplicityTrigger.Cluster_Mult>>12) & 0xF;
-  *mult_tot_min  = (vtp->v7.hpsMultiplicityTrigger.Cluster_Mult>>8) & 0xF;
-  *mult_bot_min  = (vtp->v7.hpsMultiplicityTrigger.Cluster_Mult>>4) & 0xF;
-  *mult_top_min  = (vtp->v7.hpsMultiplicityTrigger.Cluster_Mult>>0) & 0xF;
+  *cluster_emin  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emin;
+  *cluster_emax  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emax;
+  *cluster_nmin  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Nmin;
+  *enable_flags  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult & 0x8000000;
+  *mult_dt       = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>12) & 0xF;
+  *mult_tot_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>8) & 0xF;
+  *mult_bot_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>4) & 0xF;
+  *mult_top_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>0) & 0xF;
   VUNLOCK;
 
+  *mult_dt*= 4;
   return OK;
 }
 
@@ -2826,15 +2855,23 @@ vtpSetHPS_CalibrationTrigger(
     int enable_flags, int cosmic_dt, float pulser_freq
   )
 {
-  int f;
+  float period;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  cosmic_dt/= 4;
 
   CHECKRANGE_INT(cosmic_dt,       0, 255);
   CHECKRANGE_FLOAT(pulser_freq, 0.0, 125.0E6);
 
+  if(pulser_freq > 0)
+    period = 250.0E6 / pulser_freq;
+  else
+    period = 0.0;
+
   VLOCK;
-  vtp->v7.hpsCalibTrigger.Cluster_Emin  = cluster_emin;
+  vtp->v7.hpsCalibTrigger.Ctrl   = enable_flags | (cosmic_dt<<0);
+  vtp->v7.hpsCalibTrigger.Pulser = (int)period;
   VUNLOCK;
 
   return OK;
@@ -2842,39 +2879,593 @@ vtpSetHPS_CalibrationTrigger(
 
 int
 vtpGetHPS_CalibrationTrigger(
+    int *enable_flags, int *cosmic_dt, float *pulser_freq
+  )
+{
+  int val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  VLOCK;
+  val = vtp->v7.hpsCalibTrigger.Ctrl;
+  *enable_flags  = val & 0xFFFFFF00;
+  *cosmic_dt     = val & 0x000000FF;
+  
+  val            = vtp->v7.hpsCalibTrigger.Pulser;
+  if(val)
+    *pulser_freq   = 250.0E6 / val;
+  else
+    *pulser_freq   = 0.0;
+
+  VUNLOCK;
+
+  *cosmic_dt*= 4;
+
+  return OK;
+}
+
+int vtpSetHPS_FeeTrigger(
+    int cluster_emin, int cluster_emax, int cluster_nmin,
+    int *prescale_xmin, int *prescale_xmax, int *prescale, int enable_flags
+  )
+{
+  int i;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  CHECKRANGE_INT(cluster_emin,  0, 8191);
+  CHECKRANGE_INT(cluster_emax,  0, 8191);
+  CHECKRANGE_INT(cluster_nmin,  0,    9);
+  for(i=0;i<7;i++)
+  {
+    CHECKRANGE_INT(prescale_xmin[i], -31, 31);
+    CHECKRANGE_INT(prescale_xmax[i], -31, 31);
+    CHECKRANGE_INT(prescale[i],       0, 65535);
+  }
+
+  VLOCK;
+  // Top
+  vtp->v7.hpsFeeTriggerTop.Ctrl         = enable_flags;
+  vtp->v7.hpsFeeTriggerTop.Cluster_Emin = cluster_emin;
+  vtp->v7.hpsFeeTriggerTop.Cluster_Emax = cluster_emax;
+  vtp->v7.hpsFeeTriggerTop.Cluster_Nmin = cluster_nmin;
+
+  vtp->v7.hpsFeeTriggerTop.Prescale_Xmin[0] =
+    ((prescale_xmin[0] & 0x3f)<<0)  | ((prescale_xmin[1] & 0x3f)<<6) |
+    ((prescale_xmin[2] & 0x3f)<<12) | ((prescale_xmin[3] & 0x3f)<<18) |
+    ((prescale_xmin[4] & 0x3f)<<24);
+
+  vtp->v7.hpsFeeTriggerTop.Prescale_Xmin[1] =
+    ((prescale_xmin[5] & 0x3f)<<0)  | ((prescale_xmin[6] & 0x3f)<<6);
+
+  vtp->v7.hpsFeeTriggerTop.Prescale_Xmax[0] =
+    ((prescale_xmax[0] & 0x3f)<<0)  | ((prescale_xmax[1] & 0x3f)<<6) |
+    ((prescale_xmax[2] & 0x3f)<<12) | ((prescale_xmax[3] & 0x3f)<<18) |
+    ((prescale_xmax[4] & 0x3f)<<24);
+
+  vtp->v7.hpsFeeTriggerTop.Prescale_Xmax[1] =
+    ((prescale_xmax[5] & 0x3f)<<0)  | ((prescale_xmax[6] & 0x3f)<<6);
+
+  vtp->v7.hpsFeeTriggerTop.Prescale[0] = prescale[0] | (prescale[1]<<16);
+  vtp->v7.hpsFeeTriggerTop.Prescale[1] = prescale[2] | (prescale[3]<<16);
+  vtp->v7.hpsFeeTriggerTop.Prescale[2] = prescale[4] | (prescale[5]<<16);
+  vtp->v7.hpsFeeTriggerTop.Prescale[3] = prescale[6];
+
+  // Bottom
+  vtp->v7.hpsFeeTriggerBot.Ctrl         = enable_flags;
+  vtp->v7.hpsFeeTriggerBot.Cluster_Emin = cluster_emin;
+  vtp->v7.hpsFeeTriggerBot.Cluster_Emax = cluster_emax;
+  vtp->v7.hpsFeeTriggerBot.Cluster_Nmin = cluster_nmin;
+
+  vtp->v7.hpsFeeTriggerBot.Prescale_Xmin[0] =
+    ((prescale_xmin[0] & 0x3f)<<0)  | ((prescale_xmin[1] & 0x3f)<<6) |
+    ((prescale_xmin[2] & 0x3f)<<12) | ((prescale_xmin[3] & 0x3f)<<18) |
+    ((prescale_xmin[4] & 0x3f)<<24);
+
+  vtp->v7.hpsFeeTriggerBot.Prescale_Xmin[1] =
+    ((prescale_xmin[5] & 0x3f)<<0)  | ((prescale_xmin[6] & 0x3f)<<6);
+
+  vtp->v7.hpsFeeTriggerBot.Prescale_Xmax[0] =
+    ((prescale_xmax[0] & 0x3f)<<0)  | ((prescale_xmax[1] & 0x3f)<<6) |
+    ((prescale_xmax[2] & 0x3f)<<12) | ((prescale_xmax[3] & 0x3f)<<18) |
+    ((prescale_xmax[4] & 0x3f)<<24);
+
+  vtp->v7.hpsFeeTriggerBot.Prescale_Xmax[1] =
+    ((prescale_xmax[5] & 0x3f)<<0)  | ((prescale_xmax[6] & 0x3f)<<6);
+
+  vtp->v7.hpsFeeTriggerBot.Prescale[0] = prescale[0] | (prescale[1]<<16);
+  vtp->v7.hpsFeeTriggerBot.Prescale[1] = prescale[2] | (prescale[3]<<16);
+  vtp->v7.hpsFeeTriggerBot.Prescale[2] = prescale[4] | (prescale[5]<<16);
+  vtp->v7.hpsFeeTriggerBot.Prescale[3] = prescale[6];
+  VUNLOCK;
+
+  return OK;
+}
+
+int vtpGetHPS_FeeTrigger(
     int *cluster_emin, int *cluster_emax, int *cluster_nmin,
-    int *mult_dt, int *mult_top_min, int *mult_bot_min, int *mult_tot_min
+    int *prescale_xmin, int *prescale_xmax, int *prescale, int *enable_flags
+  )
+{
+  int val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  VLOCK;
+  *enable_flags = vtp->v7.hpsFeeTriggerTop.Ctrl;
+  *cluster_emin = vtp->v7.hpsFeeTriggerTop.Cluster_Emin;
+  *cluster_emax = vtp->v7.hpsFeeTriggerTop.Cluster_Emax;
+  *cluster_nmin = vtp->v7.hpsFeeTriggerTop.Cluster_Nmin;
+
+  val = vtp->v7.hpsFeeTriggerTop.Prescale_Xmin[0];
+  prescale_xmin[0] = ((val>> 0) & 0x3f) | (((val>> 0) & 0x20) ? 0xffffffc0 : 0);
+  prescale_xmin[1] = ((val>> 6) & 0x3f) | (((val>> 6) & 0x20) ? 0xffffffc0 : 0);
+  prescale_xmin[2] = ((val>>12) & 0x3f) | (((val>>12) & 0x20) ? 0xffffffc0 : 0);
+  prescale_xmin[3] = ((val>>18) & 0x3f) | (((val>>18) & 0x20) ? 0xffffffc0 : 0);
+  prescale_xmin[4] = ((val>>24) & 0x3f) | (((val>>24) & 0x20) ? 0xffffffc0 : 0);
+
+  val = vtp->v7.hpsFeeTriggerTop.Prescale_Xmin[1];
+  prescale_xmin[5] = ((val>> 0) & 0x3f) | (((val>> 0) & 0x20) ? 0xffffffc0 : 0);
+  prescale_xmin[6] = ((val>> 6) & 0x3f) | (((val>> 6) & 0x20) ? 0xffffffc0 : 0);
+
+  val = vtp->v7.hpsFeeTriggerTop.Prescale_Xmax[0];
+  prescale_xmax[0] = ((val>> 0) & 0x3f) | (((val>> 0) & 0x20) ? 0xffffffc0 : 0);
+  prescale_xmax[1] = ((val>> 6) & 0x3f) | (((val>> 6) & 0x20) ? 0xffffffc0 : 0);
+  prescale_xmax[2] = ((val>>12) & 0x3f) | (((val>>12) & 0x20) ? 0xffffffc0 : 0);
+  prescale_xmax[3] = ((val>>18) & 0x3f) | (((val>>18) & 0x20) ? 0xffffffc0 : 0);
+  prescale_xmax[4] = ((val>>24) & 0x3f) | (((val>>24) & 0x20) ? 0xffffffc0 : 0);
+
+  val = vtp->v7.hpsFeeTriggerTop.Prescale_Xmax[1];
+  prescale_xmax[5] = ((val>> 0) & 0x3f) | (((val>> 0) & 0x20) ? 0xffffffc0 : 0);
+  prescale_xmax[6] = ((val>> 6) & 0x3f) | (((val>> 6) & 0x20) ? 0xffffffc0 : 0);
+
+  val = vtp->v7.hpsFeeTriggerTop.Prescale[0];
+  prescale[0] = (val>> 0) & 0xffff;
+  prescale[1] = (val>>16) & 0xffff;
+
+  val = vtp->v7.hpsFeeTriggerTop.Prescale[1];
+  prescale[2] = (val>> 0) & 0xffff;
+  prescale[3] = (val>>16) & 0xffff;
+
+  val = vtp->v7.hpsFeeTriggerTop.Prescale[2];
+  prescale[4] = (val>> 0) & 0xffff;
+  prescale[5] = (val>>16) & 0xffff;
+
+  val = vtp->v7.hpsFeeTriggerTop.Prescale[3];
+  prescale[6] = (val>> 0) & 0xffff;
+
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpSetHPS_TriggerLatency(
+    int latency
+  )
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  latency/= 4;
+
+  CHECKRANGE_INT(latency,   0, 1023);
+
+  VLOCK;
+  vtp->v7.hpsTriggerBits.Latency         = latency;
+  vtp->v7.hpsMultiplicityTrigger[0].Latency = latency-25;
+  vtp->v7.hpsMultiplicityTrigger[1].Latency = latency-25;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetHPS_TriggerLatency(
+    int *latency
   )
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
 
   VLOCK;
-  *cluster_emin  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emin;
-  *cluster_emax  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emax;
-  *cluster_nmin  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Nmin;
-  *mult_dt       = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>12) & 0xF;
-  *mult_tot_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>8) & 0xF;
-  *mult_bot_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>4) & 0xF;
-  *mult_top_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>0) & 0xF;
+  *latency = vtp->v7.hpsTriggerBits.Latency;
+  VUNLOCK;
+
+  *latency*=4;
+
+  return OK;
+}
+
+int
+vtpSetHPS_TriggerPrescale(
+    int inst, int prescale
+  )
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+  
+  CHECKRANGE_INT(inst,   0, 31);
+
+  VLOCK;
+  vtp->v7.hpsTriggerBits.Prescale[inst] = prescale;
   VUNLOCK;
 
   return OK;
 }
 
+int
+vtpGetHPS_TriggerPrescale(
+    int inst, int *prescale
+  )
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+  
+  CHECKRANGE_INT(inst,   0, 31);
 
+  VLOCK;
+  *prescale = vtp->v7.hpsTriggerBits.Prescale[inst];
+  VUNLOCK;
 
+  return OK;
+}
 
+int
+vtpHPSPrintConfig()
+{
+  int i, j;
+  int top_nbottom, hit_dt, seed_thr;
+  int hit_width, fadchit_thr, hodo_thr;
+  int cluster_emin, cluster_emax, cluster_nmin;
+  int cluster_xmin, enable_flags;
+  int pair_dt, pair_esum_min, pair_esum_max, pair_ediff_max, pair_ed_thr, pair_coplanarity_tol;
+  int mult_dt, mult_top_min, mult_bot_min, mult_tot_min, latency, prescale[32], cosmic_dt;
+  float cluster_pde_c[4], pair_ed_factor, pulser_freq;
 
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
 
+  vtpGetHPS_Cluster(&top_nbottom, &hit_dt, &seed_thr);
+  vtpGetHPS_Hodoscope(&hit_width, &fadchit_thr, &hodo_thr);
 
+  printf("%s:\n", __func__);
+  printf("Calorimeter:\n");
+  printf("  Top/Bottom: %s\n", top_nbottom ? "Top" : "Bottom");
+  printf("  Hit dt: +/-%dns\n", hit_dt);
+  printf("  Seed Threshold: %dMeV\n", seed_thr);
+  printf("\n");
+  printf("Hodoscope:\n");
+  printf("  Hit width: %dns\n", hit_width);
+  printf("  FADC Hit Threshold: %d\n", fadchit_thr);
+  printf("  Hodo Hit Threshold: %d\n", hodo_thr);
+  printf("\n");
 
+  for(i=0;i<4;i++)
+  {
+    for(j=0;j<2;j++)
+    {
+      vtpGetHPS_SingleTrigger(i,j,&cluster_emin, &cluster_emax, &cluster_nmin, &cluster_xmin, &cluster_pde_c[0], &enable_flags);
+      printf("Singles Trigger %d %s:\n", i, j ? "Top" : "Bottom");
+      printf("  Cluster emin (req=%d):            %dMeV\n",       (enable_flags & 0x00000001)?1:0, cluster_emin);
+      printf("  Cluster emax (req=%d):            %dMeV\n",       (enable_flags & 0x00000002)?1:0, cluster_emax);
+      printf("  Cluster nmin (req=%d):            %d\n",          (enable_flags & 0x00000004)?1:0, cluster_nmin);
+      printf("  Cluster xmin (req=%d):            %d\n",          (enable_flags & 0x00000008)?1:0, cluster_xmin);
+      printf("  Cluster pde_c (req=%d):           %f %f %f %f\n", (enable_flags & 0x00000010)?1:0, cluster_pde_c[0], cluster_pde_c[1], cluster_pde_c[2], cluster_pde_c[3]);
+      printf("  Hodo l1 hit (req=%d)\n",                          (enable_flags & 0x00000020)?1:0);
+      printf("  Hodo l2 hit (req=%d)\n",                          (enable_flags & 0x00000040)?1:0);
+      printf("  Hodo l1<->l2 (req=%d)\n",                         (enable_flags & 0x00000080)?1:0);
+      printf("  Hodo l1<->ClusterX<->l2 (req=%d)\n",              (enable_flags & 0x00000100)?1:0);
+      printf("  Enabled:                      %d\n",              (enable_flags & 0x80000000)?1:0);
+      printf("\n");
+    }
+  }
 
+  for(i=0;i<4;i++)
+  {
+    vtpGetHPS_PairTrigger(i,&cluster_emin, &cluster_emax, &cluster_nmin, &pair_dt, &pair_esum_min, &pair_esum_max, &pair_ediff_max, &pair_ed_factor, &pair_ed_thr, &pair_coplanarity_tol, &enable_flags);
+    printf("Pair Trigger %d:\n", i);
+    printf("  Cluster emin:                  %dMeV\n",                  cluster_emin);
+    printf("  Cluster emax:                  %dMeV\n",                  cluster_emax);
+    printf("  Cluster nmin:                  %d\n",                     cluster_nmin);
+    printf("  Pair dt:                       +/-%dns\n",                pair_dt);
+    printf("  Pair esum min (req=%d):        %dMeV\n",                  (enable_flags & 0x00000001)?1:0, pair_esum_min);
+    printf("  Pair esum max (req=%d):        %dMeV\n",                  (enable_flags & 0x00000001)?1:0, pair_esum_max);
+    printf("  Pair ediff max (req=%d):       %dMeV\n",                  (enable_flags & 0x00000002)?1:0, pair_ediff_max);
+    printf("  Pair coplanarity tol (req=%d): +/-%ddegrees\n",           (enable_flags & 0x00000004)?1:0, pair_coplanarity_tol);
+    printf("  Pair energy,dist (req=%d):     %dMeV <= dist*%fMeV/mm\n", (enable_flags & 0x00000008)?1:0, pair_ed_thr, pair_ed_factor);
+    printf("  Enabled:                       %d\n",               (enable_flags & 0x80000000)?1:0);
+    printf("\n");
+  }
 
+  for(i=0;i<2;i++)
+  {
+    vtpGetHPS_MultiplicityTrigger(i, &cluster_emin, &cluster_emax, &cluster_nmin, &mult_dt, &mult_top_min, &mult_bot_min, &mult_tot_min, &enable_flags);
+    printf("Cluster Multiplicitiy Trigger %d:\n", i);
+    printf("  Cluster emin:           %dMeV\n", cluster_emin);
+    printf("  Cluster emax:           %dMeV\n", cluster_emax);
+    printf("  Cluster nmin:           %d\n",    cluster_nmin);
+    printf("  Multiplicity window:    %dns\n",  mult_dt);
+    printf("  Multiplicity Top Min:   %d\n",    mult_top_min);
+    printf("  Multiplicity Bot Min:   %d\n",    mult_bot_min);
+    printf("  Multiplicity Total Min: %d\n",    mult_tot_min);
+    printf("  Enabled:                %d\n",    (enable_flags & 0x80000000)?1:0);
+    printf("\n");
+  }
 
+  vtpGetHPS_CalibrationTrigger(&enable_flags, &cosmic_dt, &pulser_freq);
+  char *cosmic_mode;
+  if((enable_flags & 0x100) && (enable_flags & 0x200)) cosmic_mode = "Top && Bottom";
+  else if(enable_flags & 0x100)                        cosmic_mode = "Top only";
+  else if(enable_flags & 0x200)                        cosmic_mode = "Bottom only";
+  else                                                 cosmic_mode = "Disabled";
 
+  char *hodoscope_mode;
+  if((enable_flags & 0x10000) && (enable_flags & 0x20000)) hodoscope_mode = "Top || Bottom";
+  else if(enable_flags & 0x10000)                          hodoscope_mode = "Top only";
+  else if(enable_flags & 0x20000)                          hodoscope_mode = "Bottom only";
+  else                                                     hodoscope_mode = "Disabled";
 
+  printf("Calibration Trigger:\n");
+  printf("  Cosmic dt:       %dns\n", cosmic_dt);
+  printf("  Cosmic mode:     %s\n", cosmic_mode); 
+  printf("  Hodoscope mode:  %s\n", hodoscope_mode);
+  printf("  LED mode:        enabled\n");
+  printf("  Pulser frequency: %fHz\n", (enable_flags & 0x80000000)?pulser_freq:0.0);
+  printf("\n");
 
+  vtpGetHPS_TriggerLatency(&latency);
+  for(i=0;i<32;i++) vtpGetHPS_TriggerPrescale(i, &prescale[i]);
+  printf("HPS Trigger:\n");
+  printf("  Latency: %dns\n", latency);
+  printf("  Prescalers:\n") ;
+  printf("    Single 0 Top:   %d\n", prescale[0]);
+  printf("    Single 1 Top:   %d\n", prescale[1]);
+  printf("    Single 2 Top:   %d\n", prescale[2]);
+  printf("    Single 3 Top:   %d\n", prescale[3]);
+  printf("    Single 0 Bot:   %d\n", prescale[4]);
+  printf("    Single 1 Bot:   %d\n", prescale[5]);
+  printf("    Single 2 Bot:   %d\n", prescale[6]);
+  printf("    Single 3 Bot:   %d\n", prescale[7]);
+  printf("    Pair 0:         %d\n", prescale[8]);
+  printf("    Pair 1:         %d\n", prescale[9]);
+  printf("    Pair 2:         %d\n", prescale[10]);
+  printf("    Pair 3:         %d\n", prescale[11]);
+  printf("    LED:            %d\n", prescale[12]);
+  printf("    Cosmic:         %d\n", prescale[13]);
+  printf("    Hodoscope:      %d\n", prescale[14]);
+  printf("    Pulser:         %d\n", prescale[15]);
+  printf("    Multiplicity 0: %d\n", prescale[16]);
+  printf("    Multiplicity 1: %d\n", prescale[17]);
+  printf("    FEE Top:        %d\n", prescale[18]);
+  printf("    FEE Bottom:     %d\n", prescale[19]);
+
+  return OK;
+}
+
+int
+vtpHPSPrintScalers()
+{
+  double ref, rate;
+  int i;
+  const char *scalers_name[] = {
+    "BusClk",
+    "Sync",
+    "Trig1",
+    "Trig2",
+    "S0-T RawIn",
+    "S0-T Accept",
+    "S0-T EminMaxNminPass",
+    "S0-T +XminPass",
+    "S0-T +PDEPass",
+    "S0-T +HodoL1Pass",
+    "S0-T +HodoL2Pass",
+    "S0-T +HodoL1L2Pass",
+    "S0-T +HodoL1<->L2Pass",
+    "S0-T +HodoL1<->X<->L2Pass",
+    "S1-T RawIn",
+    "S1-T Accept",
+    "S1-T EminMaxNminPass",
+    "S1-T +XminPass",
+    "S1-T +PDEPass",
+    "S1-T +HodoL1Pass",
+    "S1-T +HodoL2Pass",
+    "S1-T +HodoL1L2Pass",
+    "S1-T +HodoL1<->L2Pass",
+    "S1-T +HodoL1<->X<->L2Pass",
+    "S2-T RawIn",
+    "S2-T Accept",
+    "S2-T EminMaxNminPass",
+    "S2-T +XminPass",
+    "S2-T +PDEPass",
+    "S2-T +HodoL1Pass",
+    "S2-T +HodoL2Pass",
+    "S2-T +HodoL1L2Pass",
+    "S2-T +HodoL1<->L2Pass",
+    "S2-T +HodoL1<->X<->L2Pass",
+    "S3-T RawIn",
+    "S3-T Accept",
+    "S3-T EminMaxNminPass",
+    "S3-T +XminPass",
+    "S3-T +PDEPass",
+    "S3-T +HodoL1Pass",
+    "S3-T +HodoL2Pass",
+    "S3-T +HodoL1L2Pass",
+    "S3-T +HodoL1<->L2Pass",
+    "S3-T +HodoL1<->X<->L2Pass",
+    "S0-B RawIn",
+    "S0-B Accept",
+    "S0-B EminMaxNminPass",
+    "S0-B +XminPass",
+    "S0-B +PDEPass",
+    "S0-B +HodoL1Pass",
+    "S0-B +HodoL2Pass",
+    "S0-B +HodoL1L2Pass",
+    "S0-B +HodoL1<->L2Pass",
+    "S0-B +HodoL1<->X<->L2Pass",
+    "S1-B RawIn",
+    "S1-B Accept",
+    "S1-B EminMaxNminPass",
+    "S1-B +XminPass",
+    "S1-B +PDEPass",
+    "S1-B +HodoL1Pass",
+    "S1-B +HodoL2Pass",
+    "S1-B +HodoL1L2Pass",
+    "S1-B +HodoL1<->L2Pass",
+    "S1-B +HodoL1<->X<->L2Pass",
+    "S2-B RawIn",
+    "S2-B Accept",
+    "S2-B EminMaxNminPass",
+    "S2-B +XminPass",
+    "S2-B +PDEPass",
+    "S2-B +HodoL1Pass",
+    "S2-B +HodoL2Pass",
+    "S2-B +HodoL1L2Pass",
+    "S2-B +HodoL1<->L2Pass",
+    "S2-B +HodoL1<->X<->L2Pass",
+    "S3-B RawIn",
+    "S3-B Accept",
+    "S3-B EminMaxNminPass",
+    "S3-B +XminPass",
+    "S3-B +PDEPass",
+    "S3-B +HodoL1Pass",
+    "S3-B +HodoL2Pass",
+    "S3-B +HodoL1L2Pass",
+    "S3-B +HodoL1<->L2Pass",
+    "S3-B +HodoL1<->X<->L2Pass",
+    "P0 RawIn",
+    "P0 Accept",
+    "P0 SumPass",
+    "P0 DiffPass",
+    "P0 EnergyDistPass",
+    "P0 CoplanarityPass",
+    "P1 RawIn",
+    "P1 Accept",
+    "P1 SumPass",
+    "P1 DiffPass",
+    "P1 EnergyDistPass",
+    "P1 CoplanarityPass",
+    "P2 RawIn",
+    "P2 Accept",
+    "P2 SumPass",
+    "P2 DiffPass",
+    "P2 EnergyDistPass",
+    "P2 CoplanarityPass",
+    "P3 RawIn",
+    "P3 Accept",
+    "P3 SumPass",
+    "P3 DiffPass",
+    "P3 EnergyDistPass",
+    "P3 CoplanarityPass",
+    "Cal CosmicTop",
+    "Cal CosmicBot",
+    "Cal CosmicTop&Bot",
+    "Cal LED",
+    "Cal HodoTop",
+    "Cal HodoBot",
+    "Cal HodoTop|Bot",
+    "Cal Pulser",
+    "Mult Accept"
+    };
+  unsigned int scalers[sizeof(scalers_name)/sizeof(scalers_name[0])], *pscalers = &scalers[0];
+
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_HPS);
+
+  VLOCK;
+  vtp->v7.sd.ScalerLatch = 1;
+
+  *pscalers++ = vtp->v7.sd.Scaler_BusClk;
+  *pscalers++ = vtp->v7.sd.Scaler_Sync;
+  *pscalers++ = vtp->v7.sd.Scaler_Trig1;
+  *pscalers++ = vtp->v7.sd.Scaler_Trig2;
+
+  // Single top triggers
+  for(i=0; i<4; i++)
+  {
+    *pscalers++ = vtp->v7.hpsSingleTriggerTop[i].ScalerTotal;
+    *pscalers++ = vtp->v7.hpsSingleTriggerTop[i].ScalerAccept;
+    *pscalers++ = vtp->v7.hpsSingleTriggerTop[i].ScalerCuts[0];
+    *pscalers++ = vtp->v7.hpsSingleTriggerTop[i].ScalerCuts[1];
+    *pscalers++ = vtp->v7.hpsSingleTriggerTop[i].ScalerCuts[2];
+    *pscalers++ = vtp->v7.hpsSingleTriggerTop[i].ScalerCuts[3];
+    *pscalers++ = vtp->v7.hpsSingleTriggerTop[i].ScalerCuts[4];
+    *pscalers++ = vtp->v7.hpsSingleTriggerTop[i].ScalerCuts[5];
+    *pscalers++ = vtp->v7.hpsSingleTriggerTop[i].ScalerCuts[6];
+    *pscalers++ = vtp->v7.hpsSingleTriggerTop[i].ScalerCuts[7];
+  }
+
+  // Single bottom triggers
+  for(i=0; i<4; i++)
+  {
+    *pscalers++ = vtp->v7.hpsSingleTriggerBot[i].ScalerTotal;
+    *pscalers++ = vtp->v7.hpsSingleTriggerBot[i].ScalerAccept;
+    *pscalers++ = vtp->v7.hpsSingleTriggerBot[i].ScalerCuts[0];
+    *pscalers++ = vtp->v7.hpsSingleTriggerBot[i].ScalerCuts[1];
+    *pscalers++ = vtp->v7.hpsSingleTriggerBot[i].ScalerCuts[2];
+    *pscalers++ = vtp->v7.hpsSingleTriggerBot[i].ScalerCuts[3];
+    *pscalers++ = vtp->v7.hpsSingleTriggerBot[i].ScalerCuts[4];
+    *pscalers++ = vtp->v7.hpsSingleTriggerBot[i].ScalerCuts[5];
+    *pscalers++ = vtp->v7.hpsSingleTriggerBot[i].ScalerCuts[6];
+    *pscalers++ = vtp->v7.hpsSingleTriggerBot[i].ScalerCuts[7];
+  }
+
+  // Pair triggers
+  for(i=0; i<4; i++)
+  {
+    *pscalers++ = vtp->v7.hpsPairTrigger[i].ScalerTotal;
+    *pscalers++ = vtp->v7.hpsPairTrigger[i].ScalerAccept;
+    *pscalers++ = vtp->v7.hpsPairTrigger[i].ScalerCuts[0];
+    *pscalers++ = vtp->v7.hpsPairTrigger[i].ScalerCuts[1];
+    *pscalers++ = vtp->v7.hpsPairTrigger[i].ScalerCuts[2];
+    *pscalers++ = vtp->v7.hpsPairTrigger[i].ScalerCuts[3];
+  }
+
+  // Calibration triggers
+  *pscalers++ = vtp->v7.hpsCalibTrigger.ScalerCosmicTop;
+  *pscalers++ = vtp->v7.hpsCalibTrigger.ScalerCosmicBot;
+  *pscalers++ = vtp->v7.hpsCalibTrigger.ScalerCosmicTopBot;
+  *pscalers++ = vtp->v7.hpsCalibTrigger.ScalerLED;
+  *pscalers++ = vtp->v7.hpsCalibTrigger.ScalerHodoscopeTop;
+  *pscalers++ = vtp->v7.hpsCalibTrigger.ScalerHodoscopeBot;
+  *pscalers++ = vtp->v7.hpsCalibTrigger.ScalerHodoscopeTopBot;
+  *pscalers++ = vtp->v7.hpsCalibTrigger.ScalerPulser;
+
+  // Multiplicity trigger
+  for(i=0; i<2; i++)
+  {
+    *pscalers++ = vtp->v7.hpsMultiplicityTrigger[i].ScalerAccept;
+  }
+
+  // FEE trigger
+  *pscalers++ = vtp->v7.hpsFeeTriggerTop.ScalerAccept;
+  *pscalers++ = vtp->v7.hpsFeeTriggerBot.ScalerAccept;
+
+  vtp->v7.sd.ScalerLatch = 0;
+  VUNLOCK;
+
+  printf("%s - \n", __FUNCTION__);
+  if(!scalers[0])
+  {
+    printf("Error: %s reference time is 0. Reported rates will not be normalized.\n", __func__);
+    ref = 1.0;
+  }
+  else
+  {
+    ref = (double)scalers[0] / (double)33330000;
+  }
+
+  for(i = 0; i < sizeof(scalers)/sizeof(scalers[0]); i++)
+  {
+    rate = (double)scalers[i];
+    rate = rate / ref;
+    if(scalers[i] == 0xFFFFFFFF)
+     printf("   %-25s %10u,%.3fHz [OVERFLOW]\n", scalers_name[i], scalers[i], rate);
+    else
+     printf("   %-25s %10u,%.3fHz\n", scalers_name[i], scalers[i], rate);
+  }
+  return OK;
+}
 
 #ifdef IPC
 int
@@ -2919,78 +3510,50 @@ vtpHPSSendErrors(char *host)
 int
 vtpHPSSendScalers(char *host)
 {
-/*
   char name[100];
   float ref, data[1024];
-  unsigned int val;
+  unsigned int val, idata[32];
   int i;
   CHECKINIT;
 
   printf("%s...", __func__);
+  if(!strcmp(host,"hps2vtp"))
+    return OK;
 
   VLOCK;
-#if VTP_FT_SENDHODOSCALERS
   vtp->v7.sd.ScalerLatch = 1;
   //Read/normalize reference
   val = vtp->v7.sd.Scaler_BusClk;
   if(!val) val = 1;
   ref = 33330000.0f / (float)val;
 
-  for(i=0;i<256;i++)
+  for(i=0;i<32;i++)
   {
-    data[i] = ref * (float)vtp->v7.fthodoScalers.Scalers[i];
-    printf("vtp->v7.fthodoScalers.Scalers[%3d]=%9d\n", i, vtp->v7.fthodoScalers.Scalers[i]);
+    if(i < 4)      data[i] = ref*vtp->v7.hpsSingleTriggerTop[i].ScalerAccept;
+    else if(i<8)   data[i] = ref*vtp->v7.hpsSingleTriggerBot[i-4].ScalerAccept;
+    else if(i<12)  data[i] = ref*vtp->v7.hpsPairTrigger[i-8].ScalerAccept;
+    else if(i==12) data[i] = ref*vtp->v7.hpsCalibTrigger.ScalerLED;
+    else if(i==13) data[i] = ref*vtp->v7.hpsCalibTrigger.ScalerCosmicTopBot;
+    else if(i==14) data[i] = ref*vtp->v7.hpsCalibTrigger.ScalerHodoscopeTopBot;
+    else if(i==15) data[i] = ref*vtp->v7.hpsCalibTrigger.ScalerPulser;
+    else if(i==16) data[i] = ref*vtp->v7.hpsMultiplicityTrigger[0].ScalerAccept;
+    else if(i==17) data[i] = ref*vtp->v7.hpsMultiplicityTrigger[1].ScalerAccept;
+    else if(i==18) data[i] = ref*vtp->v7.hpsFeeTriggerTop.ScalerAccept;
+    else if(i==19) data[i] = ref*vtp->v7.hpsFeeTriggerBot.ScalerAccept;
+    else           data[i] = 0.0;
+
+    idata[i] = vtp->v7.hpsTriggerBits.Prescale[i];
   }
+
   vtp->v7.sd.ScalerLatch = 0;
-  sprintf(name, "%s_VTPFT_HODOSCALERS", host);
-  epics_json_msg_send(name, "float", 256, data);
-#endif
-
-  vtp->v7.ftcalTrigger.HistCtrl = 0x60000000;
-  val = vtp->v7.ftcalTrigger.HistTime;
-  if(!val) val = 1;
-
-  ref = 1000000.0f / (float)val;
-
-  // Cluster position histogram (all)
-  for(i=0;i<1024;i++)
-    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistPos;
-  sprintf(name, "%s_VTPFT_CLUSTERPOSITION", host);
-  epics_json_msg_send(name, "float", 1024, data);
-
-  // Cluster energy histogram (all)
-  for(i=0;i<1024;i++)
-    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistEnergy;
-  sprintf(name, "%s_VTPFT_CLUSTERENERGY", host);
-  epics_json_msg_send(name, "float", 1024, data);
-
-  // Cluster nhits histogram (all)
-  for(i=0;i<9;i++)
-    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistNHits;
-  sprintf(name, "%s_VTPFT_CLUSTERHITS", host);
-  epics_json_msg_send(name, "float", 9, data);
-
-  // Cluster position histogram (hodo tagged)
-  for(i=0;i<1024;i++)
-    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistPosHodo;
-  sprintf(name, "%s_VTPFT_CLUSTERPOSITION_HODO", host);
-  epics_json_msg_send(name, "float", 1024, data);
-
-  // Cluster energy histogram (hodo tagged)
-  for(i=0;i<1024;i++)
-    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistEnergyHodo;
-  sprintf(name, "%s_VTPFT_CLUSTERENERGY_HODO", host);
-  epics_json_msg_send(name, "float", 1024, data);
-
-  // Cluster nhits histogram (hodo tagged)
-  for(i=0;i<9;i++)
-    data[i] = ref * (float)vtp->v7.ftcalTrigger.HistNHitsHodo;
-  sprintf(name, "%s_VTPFT_CLUSTERNHITS_HODO", host);
-  epics_json_msg_send(name, "float", 9, data);
-
-  vtp->v7.ftcalTrigger.HistCtrl = 0x60000000 | 0x7F;
   VUNLOCK;
-*/
+
+  sprintf(name, "%s_VTPHPS_TRIGGERBITS", host);
+  epics_json_msg_send(name, "float", 32, data);
+
+  sprintf(name, "%s_VTPHPS_PRESCALES", host);
+  epics_json_msg_send(name, "int", 32, idata);
+
   return OK;
 }
 

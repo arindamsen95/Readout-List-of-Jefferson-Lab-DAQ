@@ -257,6 +257,94 @@ vtpInitGlobals()
   vtpConf.ftcal.seed_dt = 0;
   vtpConf.ftcal.deadtime = 0;
   vtpConf.ftcal.deadtime_emin = 0x3FFF;
+
+  // HPS configuration
+  vtpConf.hps.cluster.top_nbottom = 0;
+  vtpConf.hps.cluster.hit_dt = 0;
+  vtpConf.hps.cluster.seed_thr = 0;
+
+  vtpConf.hps.hodoscope.hit_dt = 0;
+  vtpConf.hps.hodoscope.fadchit_thr = 0;
+  vtpConf.hps.hodoscope.hodo_thr = 0;
+
+  vtpConf.hps.calib.hodoscope_top_en = 0;
+  vtpConf.hps.calib.hodoscope_bot_en = 0;
+  vtpConf.hps.calib.cosmic_dt = 0;
+  vtpConf.hps.calib.cosmic_top_en = 0;
+  vtpConf.hps.calib.cosmic_bot_en = 0;
+  vtpConf.hps.calib.pulser_freq = 0;
+  vtpConf.hps.calib.pulser_en = 0;
+
+  for(i=0;i<4;i++)
+  {
+    vtpConf.hps.single_trig[i].cluster_emin = 1;
+    vtpConf.hps.single_trig[i].cluster_emax = 8191;
+    vtpConf.hps.single_trig[i].cluster_nmin = 1;
+    vtpConf.hps.single_trig[i].cluster_xmin = -31;
+    vtpConf.hps.single_trig[i].pde_c[0] = 0;
+    vtpConf.hps.single_trig[i].pde_c[1] = 0;
+    vtpConf.hps.single_trig[i].pde_c[2] = 0;
+    vtpConf.hps.single_trig[i].pde_c[3] = 0;
+
+    vtpConf.hps.single_trig[i].cluster_emin_en = 0;
+    vtpConf.hps.single_trig[i].cluster_emax_en = 0;
+    vtpConf.hps.single_trig[i].cluster_nmin_en = 0;
+    vtpConf.hps.single_trig[i].cluster_xmin_en = 0;
+    vtpConf.hps.single_trig[i].pde_en = 0;
+    vtpConf.hps.single_trig[i].hodo_l1_en = 0;
+    vtpConf.hps.single_trig[i].hodo_l2_en = 0;
+    vtpConf.hps.single_trig[i].hodo_l1l2_geom_en = 0;
+    vtpConf.hps.single_trig[i].hodo_l1l2x_geom_en = 0;
+    vtpConf.hps.single_trig[i].en = 0;
+  }
+
+  for(i=0;i<4;i++)
+  {
+    vtpConf.hps.pair_trig[i].cluster_emin = 1;
+    vtpConf.hps.pair_trig[i].cluster_emax = 8191;
+    vtpConf.hps.pair_trig[i].cluster_nmin = 1;
+
+    vtpConf.hps.pair_trig[i].pair_dt = 0;
+    vtpConf.hps.pair_trig[i].pair_esum_min = 0;
+    vtpConf.hps.pair_trig[i].pair_esum_max = 16383;
+    vtpConf.hps.pair_trig[i].pair_ediff_max = 8191;
+    vtpConf.hps.pair_trig[i].pair_ed_factor = 0.0;
+    vtpConf.hps.pair_trig[i].pair_ed_thr = 0;
+    vtpConf.hps.pair_trig[i].pair_coplanarity_tol = 0;
+
+    vtpConf.hps.pair_trig[i].pair_esum_en = 0;
+    vtpConf.hps.pair_trig[i].pair_ediff_en = 0;
+    vtpConf.hps.pair_trig[i].pair_ed_en = 0;
+    vtpConf.hps.pair_trig[i].pair_coplanarity_en = 0;
+    vtpConf.hps.pair_trig[i].en = 0;
+  }
+
+  for(i=0;i<4;i++)
+  {
+    vtpConf.hps.mult_trig[i].cluster_emin = 0;
+    vtpConf.hps.mult_trig[i].cluster_emax = 0;
+    vtpConf.hps.mult_trig[i].cluster_nmin = 0;
+    vtpConf.hps.mult_trig[i].mult_dt = 0;
+    vtpConf.hps.mult_trig[i].mult_top_min = 0;
+    vtpConf.hps.mult_trig[i].mult_bot_min = 0;
+    vtpConf.hps.mult_trig[i].mult_tot_min = 0;
+    vtpConf.hps.mult_trig[i].en = 0;
+  }
+
+  vtpConf.hps.fee_trig.cluster_emin = 1;
+  vtpConf.hps.fee_trig.cluster_emax = 8191;
+  vtpConf.hps.fee_trig.cluster_nmin = 1;
+  vtpConf.hps.fee_trig.en = 0;
+  for(i=0;i<7;i++)
+  {
+    vtpConf.hps.fee_trig.prescale_xmin[i] = -31;
+    vtpConf.hps.fee_trig.prescale_xmax[i] = -31;
+    vtpConf.hps.fee_trig.prescale[i] = 0;
+  }
+
+  vtpConf.hps.trig.latency = 0;
+  for(i=0;i<32;i++)
+    vtpConf.hps.trig.prescale[i] = 1;
 }
 
 
@@ -270,8 +358,8 @@ vtpReadConfigFile(char *filename_in)
   int    jj, ch;
   char   str_tmp[STRLEN], keyword[ROCLEN];
   char   host[ROCLEN], ROC_name[ROCLEN];
-  int    argc,args,i1,i2,i3,i4,i5,i6,i7,i8,i9,i10,i11,msk[16],trg_bit;
-  float  f1;
+  int    argc,args,argi[11],msk[16],trg_bit;
+  float  argf[4];
   unsigned int  ui1;
   char *clonparms;
   int do_parsing;
@@ -347,7 +435,8 @@ vtpReadConfigFile(char *filename_in)
     do_parsing = 0; /* will parse only one file specified above, unless it changed during parsing */
     while ((ch = getc(fd)) != EOF)
     {
-      i1=i2=i3=i4=i5=i6=i7=0;
+      memset(argf, 0, sizeof(argf));
+      memset(argi, 0, sizeof(argi));
       if ( ch == '#' || ch == ' ' || ch == '\t' )
       {
         while ( getc(fd)!='\n' /*&& getc(fd)!=!= EOF*/ ) {} /*ERROR !!!*/
@@ -387,13 +476,13 @@ vtpReadConfigFile(char *filename_in)
 
         else if(!strcmp(keyword,"VTP_W_WIDTH"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.window_width = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.window_width = argi[0];
         }
         else if(!strcmp(keyword,"VTP_W_OFFSET"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.window_offset = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.window_offset = argi[0];
         }
         else if(!strcmp(keyword,"VTP_FIRMWARE"))
         {
@@ -426,75 +515,75 @@ vtpReadConfigFile(char *filename_in)
         }
         else if(!strcmp(keyword,"VTP_EC_INNER_HIT_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.inner.hit_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.inner.hit_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_INNER_HIT_DT"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.inner.hit_dt = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.inner.hit_dt = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_INNER_HIT_DALITZ"))
         {
-          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
-          vtpConf.ec.inner.dalitz_min = i1*8;
-          vtpConf.ec.inner.dalitz_max = i2*8;
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          vtpConf.ec.inner.dalitz_min = argi[0]*8;
+          vtpConf.ec.inner.dalitz_max = argi[1]*8;
         }
         else if(!strcmp(keyword,"VTP_EC_INNER_COSMIC_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.inner.cosmic_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.inner.cosmic_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_INNER_COSMIC_MULTMAX"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.inner.cosmic_multmax = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.inner.cosmic_multmax = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_INNER_COSMIC_HITWIDTH"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.inner.cosmic_hitwidth = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.inner.cosmic_hitwidth = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_INNER_COSMIC_EVALDELAY"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.inner.cosmic_evaldelay = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.inner.cosmic_evaldelay = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_OUTER_HIT_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.outer.hit_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.outer.hit_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_OUTER_HIT_DT"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.outer.hit_dt = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.outer.hit_dt = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_OUTER_HIT_DALITZ"))
         {
-          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
-          vtpConf.ec.outer.dalitz_min = i1*8;
-          vtpConf.ec.outer.dalitz_max = i2*8;
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          vtpConf.ec.outer.dalitz_min = argi[0]*8;
+          vtpConf.ec.outer.dalitz_max = argi[1]*8;
         }
         else if(!strcmp(keyword,"VTP_EC_OUTER_COSMIC_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.outer.cosmic_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.outer.cosmic_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_OUTER_COSMIC_MULTMAX"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.outer.cosmic_multmax = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.outer.cosmic_multmax = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_OUTER_COSMIC_HITWIDTH"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.outer.cosmic_hitwidth = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.outer.cosmic_hitwidth = argi[0];
         }
         else if(!strcmp(keyword,"VTP_EC_OUTER_COSMIC_EVALDELAY"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ec.outer.cosmic_evaldelay = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ec.outer.cosmic_evaldelay = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PC_FADCSUM_CH"))
         {
@@ -511,142 +600,142 @@ vtpReadConfigFile(char *filename_in)
         }
         else if(!strcmp(keyword,"VTP_PC_COSMIC_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pc.cosmic_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pc.cosmic_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PC_COSMIC_MULTMAX"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pc.cosmic_multmax = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pc.cosmic_multmax = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PC_COSMIC_HITWIDTH"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pc.cosmic_hitwidth = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pc.cosmic_hitwidth = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PC_COSMIC_EVALDELAY"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pc.cosmic_evaldelay = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pc.cosmic_evaldelay = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PC_COSMIC_PIXELEN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pc.cosmic_pixelen = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pc.cosmic_pixelen = argi[0];
         }
 
         else if(!strcmp(keyword,"VTP_HTCC_THRESHOLDS"))
         {
-          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
-          vtpConf.htcc.threshold[0] = i1;
-          vtpConf.htcc.threshold[1] = i2;
-          vtpConf.htcc.threshold[2] = i3;
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          vtpConf.htcc.threshold[0] = argi[0];
+          vtpConf.htcc.threshold[1] = argi[1];
+          vtpConf.htcc.threshold[2] = argi[2];
         }
         else if(!strcmp(keyword,"VTP_HTCC_NFRAMES"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.htcc.nframes = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.htcc.nframes = argi[0];
         }
 
         else if(!strcmp(keyword,"VTP_CTOF_THRESHOLDS"))
         {
-          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
-          vtpConf.htcc.ctof_threshold[0] = i1;
-          vtpConf.htcc.ctof_threshold[1] = i2;
-          vtpConf.htcc.ctof_threshold[2] = i3;
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          vtpConf.htcc.ctof_threshold[0] = argi[0];
+          vtpConf.htcc.ctof_threshold[1] = argi[1];
+          vtpConf.htcc.ctof_threshold[2] = argi[2];
         }
         else if(!strcmp(keyword,"VTP_CTOF_NFRAMES"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.htcc.ctof_nframes = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.htcc.ctof_nframes = argi[0];
         }
 
         else if(!strcmp(keyword,"VTP_FTOF_THRESHOLDS"))
         {
-          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
-          vtpConf.ftof.threshold[0] = i1;
-          vtpConf.ftof.threshold[1] = i2;
-          vtpConf.ftof.threshold[2] = i3;
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          vtpConf.ftof.threshold[0] = argi[0];
+          vtpConf.ftof.threshold[1] = argi[1];
+          vtpConf.ftof.threshold[2] = argi[2];
         }
         else if(!strcmp(keyword,"VTP_FTOF_NFRAMES"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ftof.nframes = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ftof.nframes = argi[0];
         }
 
         else if(!strcmp(keyword,"VTP_CND_THRESHOLDS"))
         {
-          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
-          vtpConf.cnd.threshold[0] = i1;
-          vtpConf.cnd.threshold[1] = i2;
-          vtpConf.cnd.threshold[2] = i3;
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          vtpConf.cnd.threshold[0] = argi[0];
+          vtpConf.cnd.threshold[1] = argi[1];
+          vtpConf.cnd.threshold[2] = argi[2];
         }
         else if(!strcmp(keyword,"VTP_CND_NFRAMES"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.cnd.nframes = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.cnd.nframes = argi[0];
         }
 
         else if(!strcmp(keyword,"VTP_PCS_THRESHOLDS"))
         {
-          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
-          vtpConf.pcs.threshold[0] = i1;
-          vtpConf.pcs.threshold[1] = i2;
-          vtpConf.pcs.threshold[2] = i3;
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          vtpConf.pcs.threshold[0] = argi[0];
+          vtpConf.pcs.threshold[1] = argi[1];
+          vtpConf.pcs.threshold[2] = argi[2];
         }
         else if(!strcmp(keyword,"VTP_PCS_NFRAMES"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pcs.nframes = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pcs.nframes = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PCS_DIPFACTOR"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pcs.dipfactor = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pcs.dipfactor = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PCS_NSTRIP"))
         {
-          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
-          vtpConf.pcs.nstrip_min = i1;
-          vtpConf.pcs.nstrip_max = i2;
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          vtpConf.pcs.nstrip_min = argi[0];
+          vtpConf.pcs.nstrip_max = argi[1];
         }
         else if(!strcmp(keyword,"VTP_PCS_DALITZ"))
         {
-          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
-          vtpConf.pcs.dalitz_min = i1;
-          vtpConf.pcs.dalitz_max = i2;
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          vtpConf.pcs.dalitz_min = argi[0];
+          vtpConf.pcs.dalitz_max = argi[1];
         }
         else if(!strcmp(keyword,"VTP_PCS_COSMIC_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pcs.cosmic_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pcs.cosmic_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PCS_COSMIC_MULTMAX"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pcs.cosmic_multmax = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pcs.cosmic_multmax = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PCS_COSMIC_HITWIDTH"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pcs.cosmic_hitwidth = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pcs.cosmic_hitwidth = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PCS_COSMIC_EVALDELAY"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pcs.cosmic_evaldelay = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pcs.cosmic_evaldelay = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PCS_COSMIC_PIXELEN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.pcs.cosmic_pixelen = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.pcs.cosmic_pixelen = argi[0];
         }
         else if(!strcmp(keyword,"VTP_PCU_THRESHOLDS"))
         {
-          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
-          vtpConf.pcs.pcu_threshold[0] = i1;
-          vtpConf.pcs.pcu_threshold[1] = i2;
-          vtpConf.pcs.pcu_threshold[2] = i3;
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          vtpConf.pcs.pcu_threshold[0] = argi[0];
+          vtpConf.pcs.pcu_threshold[1] = argi[1];
+          vtpConf.pcs.pcu_threshold[2] = argi[2];
         }
 
 
@@ -666,85 +755,85 @@ vtpReadConfigFile(char *filename_in)
         }
         else if(!strcmp(keyword,"VTP_ECS_INNER_COSMIC_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ecs.inner.cosmic_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ecs.inner.cosmic_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_ECS_INNER_COSMIC_MULTMAX"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ecs.inner.cosmic_multmax = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ecs.inner.cosmic_multmax = argi[0];
         }
         else if(!strcmp(keyword,"VTP_ECS_INNER_COSMIC_HITWIDTH"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ecs.inner.cosmic_hitwidth = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ecs.inner.cosmic_hitwidth = argi[0];
         }
         else if(!strcmp(keyword,"VTP_ECS_INNER_COSMIC_EVALDELAY"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ecs.inner.cosmic_evaldelay = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ecs.inner.cosmic_evaldelay = argi[0];
         }
         else if(!strcmp(keyword,"VTP_ECS_OUTER_COSMIC_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ecs.outer.cosmic_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ecs.outer.cosmic_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_ECS_OUTER_COSMIC_MULTMAX"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ecs.outer.cosmic_multmax = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ecs.outer.cosmic_multmax = argi[0];
         }
         else if(!strcmp(keyword,"VTP_ECS_OUTER_COSMIC_HITWIDTH"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ecs.outer.cosmic_hitwidth = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ecs.outer.cosmic_hitwidth = argi[0];
         }
         else if(!strcmp(keyword,"VTP_ECS_OUTER_COSMIC_EVALDELAY"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ecs.outer.cosmic_evaldelay = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ecs.outer.cosmic_evaldelay = argi[0];
         }
         else if(!strcmp(keyword,"VTP_ECS_THRESHOLDS"))
         {
-          sscanf (str_tmp, "%*s %d %d %d", &i1, &i2, &i3);
-          vtpConf.ecs.threshold[0] = i1;
-          vtpConf.ecs.threshold[1] = i2;
-          vtpConf.ecs.threshold[2] = i3;
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          vtpConf.ecs.threshold[0] = argi[0];
+          vtpConf.ecs.threshold[1] = argi[1];
+          vtpConf.ecs.threshold[2] = argi[2];
         }
         else if(!strcmp(keyword,"VTP_ECS_NFRAMES"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ecs.nframes = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ecs.nframes = argi[0];
         }
         else if(!strcmp(keyword,"VTP_ECS_DIPFACTOR"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ecs.dipfactor = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ecs.dipfactor = argi[0];
         }
         else if(!strcmp(keyword,"VTP_ECS_NSTRIP"))
         {
-          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
-          vtpConf.ecs.nstrip_min = i1;
-          vtpConf.ecs.nstrip_max = i2;
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          vtpConf.ecs.nstrip_min = argi[0];
+          vtpConf.ecs.nstrip_max = argi[1];
         }
         else if(!strcmp(keyword,"VTP_ECS_DALITZ"))
         {
-          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
-          vtpConf.ecs.dalitz_min = i1;
-          vtpConf.ecs.dalitz_max = i2;
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          vtpConf.ecs.dalitz_min = argi[0];
+          vtpConf.ecs.dalitz_max = argi[1];
         }
 
 
 
         else if(!strcmp(keyword,"VTP_GT_LATENCY"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.gt.trig_latency = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.gt.trig_latency = argi[0];
         }
         else if(!strcmp(keyword,"VTP_GT_WIDTH"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.gt.trig_width = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.gt.trig_width = argi[0];
         }
 
 
@@ -759,145 +848,145 @@ vtpReadConfigFile(char *filename_in)
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_SSP_STRIGGER_MASK"))
         {
-          argc = sscanf (str_tmp, "%*s 0x%X 0x%X",&i1,&i2);
+          argc = sscanf (str_tmp, "%*s 0x%X 0x%X",&argi[0],&argi[1]);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].ssp_strigger_bit_mask[0] = i1;
-          if(argc>=2) vtpConf.gt.trgbits[trg_bit].ssp_strigger_bit_mask[1] = i2;
+          vtpConf.gt.trgbits[trg_bit].ssp_strigger_bit_mask[0] = argi[0];
+          if(argc>=2) vtpConf.gt.trgbits[trg_bit].ssp_strigger_bit_mask[1] = argi[1];
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_SSP_CTRIGGER_MASK"))
         {
-          sscanf (str_tmp, "%*s 0x%X", &i1);
+          sscanf (str_tmp, "%*s 0x%X", &argi[0]);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].ssp_ctrigger_bit_mask = i1;
+          vtpConf.gt.trgbits[trg_bit].ssp_ctrigger_bit_mask = argi[0];
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_SSP_SECTOR_MASK"))
         {
-          argc = sscanf (str_tmp, "%*s 0x%X 0x%X",&i1,&i2);
+          argc = sscanf (str_tmp, "%*s 0x%X 0x%X",&argi[0],&argi[1]);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].ssp_sector_mask[0] = i1;
-          if(argc>=2) vtpConf.gt.trgbits[trg_bit].ssp_sector_mask[1] = i2;
+          vtpConf.gt.trgbits[trg_bit].ssp_sector_mask[0] = argi[0];
+          if(argc>=2) vtpConf.gt.trgbits[trg_bit].ssp_sector_mask[1] = argi[1];
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_SSP_SECTOR_MULT_MIN"))
         {
-          argc = sscanf (str_tmp, "%*s %d %d", &i1,&i2);
+          argc = sscanf (str_tmp, "%*s %d %d", &argi[0],&argi[1]);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].sector_mult_min[0] = i1;
-          if(argc>=2) vtpConf.gt.trgbits[trg_bit].sector_mult_min[1] = i2;
+          vtpConf.gt.trgbits[trg_bit].sector_mult_min[0] = argi[0];
+          if(argc>=2) vtpConf.gt.trgbits[trg_bit].sector_mult_min[1] = argi[1];
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_SSP_SECTOR_WIDTH"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
+          sscanf (str_tmp, "%*s %d", &argi[0]);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].sector_coin_width = i1;
+          vtpConf.gt.trgbits[trg_bit].sector_coin_width = argi[0];
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_PULSER_FREQ"))
         {
-          sscanf (str_tmp, "%*s %f", &f1);
+          sscanf (str_tmp, "%*s %f", &argf[0]);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].pulser_freq = f1;
+          vtpConf.gt.trgbits[trg_bit].pulser_freq = argf[0];
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_DELAY"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
+          sscanf (str_tmp, "%*s %d", &argi[0]);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].delay = i1;
+          vtpConf.gt.trgbits[trg_bit].delay = argi[0];
         }
         else if(!strcmp(keyword,"VTP_GT_TRG_PRESCALE"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
+          sscanf (str_tmp, "%*s %d", &argi[0]);
           if(trg_bit<0 || trg_bit>=32)
           {
             printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",trg_bit);
             return(-4);
           }
-          vtpConf.gt.trgbits[trg_bit].prescale = i1;
+          vtpConf.gt.trgbits[trg_bit].prescale = argi[0];
         }
         else if(!strcmp(keyword,"VTP_GT_TRGBIT"))
         {
-          argc = sscanf (str_tmp, "%*s %d %d %d %d %d %d %d %d",&i1,&i2,&i3,&i4,&i5,&i6,&i7,&i8);
-          if(i1<0 || i1>=32)
+          argc = sscanf (str_tmp, "%*s %d %d %d %d %d %d %d %d",&argi[0],&argi[1],&argi[2],&argi[3],&argi[4],&argi[5],&argi[6],&argi[7]);
+          if(argi[0]<0 || argi[0]>=32)
           {
-            printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",i1);
+            printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",argi[0]);
             return(-4);
           }
-          vtpConf.gt.trgbits[i1].ssp_strigger_bit_mask[0] = i2;
-          vtpConf.gt.trgbits[i1].ssp_strigger_bit_mask[1] = 0;
-          vtpConf.gt.trgbits[i1].ssp_sector_mask[0] = i3;
-          vtpConf.gt.trgbits[i1].ssp_sector_mask[1] = 0;
-          vtpConf.gt.trgbits[i1].sector_mult_min[0] = i4;
-          vtpConf.gt.trgbits[i1].sector_mult_min[1] = 0;
-          vtpConf.gt.trgbits[i1].sector_coin_width = i5;
-          vtpConf.gt.trgbits[i1].ssp_ctrigger_bit_mask = i6;
-          if(argc>=7) vtpConf.gt.trgbits[i1].delay = i7;
-          if(argc>=8) vtpConf.gt.trgbits[i1].prescale = i8;
+          vtpConf.gt.trgbits[argi[0]].ssp_strigger_bit_mask[0] = argi[1];
+          vtpConf.gt.trgbits[argi[0]].ssp_strigger_bit_mask[1] = 0;
+          vtpConf.gt.trgbits[argi[0]].ssp_sector_mask[0] = argi[2];
+          vtpConf.gt.trgbits[argi[0]].ssp_sector_mask[1] = 0;
+          vtpConf.gt.trgbits[argi[0]].sector_mult_min[0] = argi[3];
+          vtpConf.gt.trgbits[argi[0]].sector_mult_min[1] = 0;
+          vtpConf.gt.trgbits[argi[0]].sector_coin_width = argi[4];
+          vtpConf.gt.trgbits[argi[0]].ssp_ctrigger_bit_mask = argi[5];
+          if(argc>=7) vtpConf.gt.trgbits[argi[0]].delay = argi[6];
+          if(argc>=8) vtpConf.gt.trgbits[argi[0]].prescale = argi[7];
         }
         else if(!strcmp(keyword,"VTP_GT_TRGBIT2"))
         {
-          argc = sscanf (str_tmp, "%*s %d %d %d %d %d %d %d %d %d %d %d",&i1,&i2,&i3,&i4,&i5,&i6,&i7,&i8,&i9,&i10,&i11);
-          if(i1<0 || i1>=32)
+          argc = sscanf (str_tmp, "%*s %d %d %d %d %d %d %d %d %d %d %d",&argi[0],&argi[1],&argi[2],&argi[3],&argi[4],&argi[5],&argi[6],&argi[7],&argi[8],&argi[9],&argi[10]);
+          if(argi[0]<0 || argi[0]>=32)
           {
-            printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",i1);
+            printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",argi[0]);
             return(-4);
           }
-          vtpConf.gt.trgbits[i1].ssp_strigger_bit_mask[0] = i2;
-          vtpConf.gt.trgbits[i1].ssp_sector_mask[0] = i3;
-          vtpConf.gt.trgbits[i1].sector_mult_min[0] = i4;
-          vtpConf.gt.trgbits[i1].ssp_strigger_bit_mask[1] = i5;
-          vtpConf.gt.trgbits[i1].ssp_sector_mask[1] = i6;
-          vtpConf.gt.trgbits[i1].sector_mult_min[1] = i7;
-          vtpConf.gt.trgbits[i1].sector_coin_width = i8;
-          vtpConf.gt.trgbits[i1].ssp_ctrigger_bit_mask = i9;
-          vtpConf.gt.trgbits[i1].delay = i10;
-          vtpConf.gt.trgbits[i1].prescale = i11;
+          vtpConf.gt.trgbits[argi[0]].ssp_strigger_bit_mask[0] = argi[1];
+          vtpConf.gt.trgbits[argi[0]].ssp_sector_mask[0] = argi[2];
+          vtpConf.gt.trgbits[argi[0]].sector_mult_min[0] = argi[3];
+          vtpConf.gt.trgbits[argi[0]].ssp_strigger_bit_mask[1] = argi[4];
+          vtpConf.gt.trgbits[argi[0]].ssp_sector_mask[1] = argi[5];
+          vtpConf.gt.trgbits[argi[0]].sector_mult_min[1] = argi[6];
+          vtpConf.gt.trgbits[argi[0]].sector_coin_width = argi[7];
+          vtpConf.gt.trgbits[argi[0]].ssp_ctrigger_bit_mask = argi[8];
+          vtpConf.gt.trgbits[argi[0]].delay = argi[9];
+          vtpConf.gt.trgbits[argi[0]].prescale = argi[10];
         }
 
         else if(!strcmp(keyword,"VTP_DC_SEGTHR"))
         {
-          sscanf (str_tmp, "%*s %d %d", &i1, &i2);
-          if(i1 < 0 || i1 > 2)
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0] < 0 || argi[0] > 2)
           {
-            printf("\n%s: ERROR - invalid keyword %s instance %d\n", __func__, keyword, i1);
+            printf("\n%s: ERROR - invalid keyword %s instance %d\n", __func__, keyword, argi[0]);
             return -1;
           }
-          vtpConf.dc.dcsegfind_threshold[i1] = i2;
+          vtpConf.dc.dcsegfind_threshold[argi[0]] = argi[1];
         }
         else if(!strcmp(keyword,"VTP_HCAL_HIT_DT"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.hcal.hit_dt = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hcal.hit_dt = argi[0];
         }
         else if(!strcmp(keyword,"VTP_HCAL_HIT_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.hcal.cluster_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hcal.cluster_emin = argi[0];
         }
 
 
@@ -916,33 +1005,395 @@ vtpReadConfigFile(char *filename_in)
         }
         else if(!strcmp(keyword,"VTP_FTCAL_SEED_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ftcal.seed_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ftcal.seed_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_FTCAL_SEED_DT"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ftcal.seed_dt = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ftcal.seed_dt = argi[0];
         }
         else if(!strcmp(keyword,"VTP_FTCAL_HODO_DT"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ftcal.hodo_dt = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ftcal.hodo_dt = argi[0];
         }
         else if(!strcmp(keyword,"VTP_FTHODO_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.fthodo.hit_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.fthodo.hit_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_FTCAL_CLUSTER_DEADTIME_EMIN"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ftcal.deadtime_emin = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ftcal.deadtime_emin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_FTCAL_CLUSTER_DEADTIME"))
         {
-          sscanf (str_tmp, "%*s %d", &i1);
-          vtpConf.ftcal.deadtime = i1;
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.ftcal.deadtime = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_ECAL_TOP"))
+        {
+          vtpConf.hps.cluster.top_nbottom = 1;
+        }
+        else if(!strcmp(keyword,"VTP_HPS_ECAL_BOTTOM"))
+        {
+          vtpConf.hps.cluster.top_nbottom = 0;
+        }
+        else if(!strcmp(keyword,"VTP_HPS_ECAL_CLUSTER_HIT_DT"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.cluster.hit_dt = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_ECAL_CLUSTER_SEED_THR"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.cluster.seed_thr = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_HODOSCOPE_FADCHIT_THR"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.hodoscope.fadchit_thr = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_HODOSCOPE_HODO_THR"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.hodoscope.hodo_thr = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_HODOSCOPE_HODO_DT"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.hodoscope.hit_dt = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_CALIB_HODOSCOPE_TOP_EN"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.calib.hodoscope_top_en = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_CALIB_HODOSCOPE_BOT_EN"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.calib.hodoscope_bot_en = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_CALIB_COSMIC_DT"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.calib.cosmic_dt = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_CALIB_COSMIC_TOP_EN"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.calib.cosmic_top_en = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_CALIB_COSMIC_BOT_EN"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.calib.cosmic_bot_en = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_CALIB_PULSER_EN"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.calib.pulser_en = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_CALIB_PULSER_FREQ"))
+        {
+          sscanf (str_tmp, "%*s %f", &argf[0]);
+          vtpConf.hps.calib.pulser_freq = argf[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_SINGLE_EMIN"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong singles bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+    
+          vtpConf.hps.single_trig[argi[0]].cluster_emin = argi[1];
+          vtpConf.hps.single_trig[argi[0]].cluster_emin_en = argi[2];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_SINGLE_EMAX"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong singles bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+    
+          vtpConf.hps.single_trig[argi[0]].cluster_emax = argi[1];
+          vtpConf.hps.single_trig[argi[0]].cluster_emax_en = argi[2];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_SINGLE_NMIN"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong singles bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+    
+          vtpConf.hps.single_trig[argi[0]].cluster_nmin = argi[1];
+          vtpConf.hps.single_trig[argi[0]].cluster_nmin_en = argi[2];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_SINGLE_XMIN"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong singles bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.single_trig[argi[0]].cluster_xmin = argi[1];
+          vtpConf.hps.single_trig[argi[0]].cluster_xmin_en = argi[2];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_SINGLE_PDE"))
+        {
+          sscanf (str_tmp, "%*s %d %f %f %f %f %d", &argi[0], &argf[0], &argf[1], &argf[2], &argf[3], &argi[1]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong singles bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.single_trig[argi[0]].pde_c[0] = argf[0];
+          vtpConf.hps.single_trig[argi[0]].pde_c[1] = argf[1];
+          vtpConf.hps.single_trig[argi[0]].pde_c[2] = argf[2];
+          vtpConf.hps.single_trig[argi[0]].pde_c[3] = argf[3];
+          vtpConf.hps.single_trig[argi[0]].pde_en   = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_SINGLE_HODO"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d %d %d", &argi[0], &argi[1], &argi[2], &argi[3], &argi[4]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong singles bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.single_trig[argi[0]].hodo_l1_en = argi[1];
+          vtpConf.hps.single_trig[argi[0]].hodo_l2_en = argi[2];
+          vtpConf.hps.single_trig[argi[0]].hodo_l1l2_geom_en = argi[3];
+          vtpConf.hps.single_trig[argi[0]].hodo_l1l2x_geom_en = argi[4];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_SINGLE_EN"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong singles bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.single_trig[argi[0]].en = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_PAIR_EMIN"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong pair bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+    
+          vtpConf.hps.pair_trig[argi[0]].cluster_emin = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_PAIR_EMAX"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong singles bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+    
+          vtpConf.hps.pair_trig[argi[0]].cluster_emax = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_PAIR_NMIN"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong pair bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+    
+          vtpConf.hps.pair_trig[argi[0]].pair_dt = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_PAIR_TIMECOINCIDENCE"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong pair bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.pair_trig[argi[0]].pair_dt = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_PAIR_SUMMAX_MIN"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1], &argi[2], &argi[3]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong pair bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.pair_trig[argi[0]].pair_esum_max = argi[1];
+          vtpConf.hps.pair_trig[argi[0]].pair_esum_min = argi[2];
+          vtpConf.hps.pair_trig[argi[0]].pair_esum_en  = argi[3];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_PAIR_DIFFMAX"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong pair bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.pair_trig[argi[0]].pair_ediff_max = argi[1];
+          vtpConf.hps.pair_trig[argi[0]].pair_ediff_en  = argi[2];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_PAIR_ENERGYDIST"))
+        {
+          sscanf (str_tmp, "%*s %d %f %d %d", &argi[0], &argf[0], &argi[1], &argi[2]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong pair bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.pair_trig[argi[0]].pair_ed_factor = argf[0];
+          vtpConf.hps.pair_trig[argi[0]].pair_ed_thr = argi[1];
+          vtpConf.hps.pair_trig[argi[0]].pair_ed_en  = argi[2];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_PAIR_COPLANARITY"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d", &argi[0], &argi[1], &argi[2]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong pair bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.pair_trig[argi[0]].pair_coplanarity_tol = argi[1];
+          vtpConf.hps.pair_trig[argi[0]].pair_coplanarity_en  = argi[2];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_PAIR_EN"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong pair bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.pair_trig[argi[0]].en = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_MULT_EMIN"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=2)
+          {
+            printf("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.mult_trig[argi[0]].cluster_emin = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_MULT_EMAX"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=2)
+          {
+            printf("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.mult_trig[argi[0]].cluster_emax = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_MULT_NMIN"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=2)
+          {
+            printf("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.mult_trig[argi[0]].cluster_nmin = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_MULT_MIN"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1], &argi[2], &argi[3]);
+          if(argi[0]<0 || argi[0]>=2)
+          {
+            printf("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.mult_trig[argi[0]].mult_top_min = argi[1];
+          vtpConf.hps.mult_trig[argi[0]].mult_bot_min = argi[2];
+          vtpConf.hps.mult_trig[argi[0]].mult_tot_min = argi[3];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_MULT_DT"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=2)
+          {
+            printf("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.mult_trig[argi[0]].mult_dt = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_MULT_EN"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=2)
+          {
+            printf("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.mult_trig[argi[0]].en = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_FEE_EN"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.fee_trig.en = argi[1];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_FEE_PRESCALE"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1], &argi[2], &argi[3]);
+          if(argi[0]<0 || argi[0]>6)
+          {
+            printf("\nReadConfigFile: Wrong FEE region %d\n\n",argi[0]);
+            return(-4);
+          }
+          vtpConf.hps.fee_trig.prescale_xmin[argi[0]] = argi[1];
+          vtpConf.hps.fee_trig.prescale_xmax[argi[0]] = argi[2];
+          vtpConf.hps.fee_trig.prescale[argi[0]]      = argi[3];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_LATENCY"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.trig.latency = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_PRESCALE"))
+        {
+          sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+          if(argi[0]<0 || argi[0]>=32)
+          {
+            printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+        
+          vtpConf.hps.trig.prescale[argi[0]] = argi[1];
         }
         else
         {
@@ -961,6 +1412,7 @@ vtpReadConfigFile(char *filename_in)
 int
 vtpDownloadAll()
 {
+  int enable_flags;
   int ii;  
 //  char fname[FNLEN];
 //  char *clonparms;
@@ -1147,13 +1599,122 @@ vtpDownloadAll()
     vtpSetFTHODOemin(vtpConf.fthodo.hit_emin);
   }
 
+  if(vtpConf.fw_type == VTP_FW_TYPE_HPS)
+  {
+    vtpSetHPS_Cluster(vtpConf.hps.cluster.top_nbottom, vtpConf.hps.cluster.hit_dt, vtpConf.hps.cluster.seed_thr);
+    vtpSetHPS_Hodoscope(vtpConf.hps.hodoscope.hit_dt, vtpConf.hps.hodoscope.fadchit_thr, vtpConf.hps.hodoscope.hodo_thr);
+
+    for(ii=0;ii<4;ii++)
+    {
+      enable_flags = 0;
+      enable_flags |= vtpConf.hps.single_trig[ii].cluster_emin_en    ? (1<< 0) : 0;
+      enable_flags |= vtpConf.hps.single_trig[ii].cluster_emax_en    ? (1<< 1) : 0;
+      enable_flags |= vtpConf.hps.single_trig[ii].cluster_nmin_en    ? (1<< 2) : 0;
+      enable_flags |= vtpConf.hps.single_trig[ii].cluster_xmin_en    ? (1<< 3) : 0;
+      enable_flags |= vtpConf.hps.single_trig[ii].pde_en             ? (1<< 4) : 0;
+      enable_flags |= vtpConf.hps.single_trig[ii].hodo_l1_en         ? (1<< 5) : 0;
+      enable_flags |= vtpConf.hps.single_trig[ii].hodo_l2_en         ? (1<< 6) : 0;
+      enable_flags |= vtpConf.hps.single_trig[ii].hodo_l1l2_geom_en  ? (1<< 7) : 0;
+      enable_flags |= vtpConf.hps.single_trig[ii].hodo_l1l2x_geom_en ? (1<< 8) : 0;
+      enable_flags |= vtpConf.hps.single_trig[ii].en                 ? (1<<31) : 0;
+
+      vtpSetHPS_SingleTrigger(ii, 0,
+          vtpConf.hps.single_trig[ii].cluster_emin,
+          vtpConf.hps.single_trig[ii].cluster_emax,
+          vtpConf.hps.single_trig[ii].cluster_nmin,
+          vtpConf.hps.single_trig[ii].cluster_xmin,
+          vtpConf.hps.single_trig[ii].pde_c,
+          enable_flags
+        );
+
+      vtpSetHPS_SingleTrigger(ii, 1,
+          vtpConf.hps.single_trig[ii].cluster_emin,
+          vtpConf.hps.single_trig[ii].cluster_emax,
+          vtpConf.hps.single_trig[ii].cluster_nmin,
+          vtpConf.hps.single_trig[ii].cluster_xmin,
+          vtpConf.hps.single_trig[ii].pde_c,
+          enable_flags
+        );
+    }
+
+    for(ii=0;ii<4;ii++)
+    {
+      enable_flags = 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].pair_esum_en        ? (1<< 0) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].pair_ediff_en       ? (1<< 1) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].pair_ed_en          ? (1<< 2) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].pair_coplanarity_en ? (1<< 3) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].en                  ? (1<<31) : 0;
+
+      vtpSetHPS_PairTrigger(ii,
+          vtpConf.hps.pair_trig[ii].cluster_emin,
+          vtpConf.hps.pair_trig[ii].cluster_emax,
+          vtpConf.hps.pair_trig[ii].cluster_nmin,
+          vtpConf.hps.pair_trig[ii].pair_dt,
+          vtpConf.hps.pair_trig[ii].pair_esum_min,
+          vtpConf.hps.pair_trig[ii].pair_esum_max,
+          vtpConf.hps.pair_trig[ii].pair_ediff_max,
+          vtpConf.hps.pair_trig[ii].pair_ed_factor,
+          vtpConf.hps.pair_trig[ii].pair_ed_thr,
+          vtpConf.hps.pair_trig[ii].pair_coplanarity_tol,
+          enable_flags
+        );
+    }
+
+    for(ii=0;ii<2;ii++)
+    {
+      enable_flags = 0;
+      enable_flags |= vtpConf.hps.mult_trig[ii].en     ? (1<<31) : 0;
+      vtpSetHPS_MultiplicityTrigger(
+          ii,
+          vtpConf.hps.mult_trig[ii].cluster_emin,
+          vtpConf.hps.mult_trig[ii].cluster_emax,
+          vtpConf.hps.mult_trig[ii].cluster_nmin,
+          vtpConf.hps.mult_trig[ii].mult_dt,
+          vtpConf.hps.mult_trig[ii].mult_top_min,
+          vtpConf.hps.mult_trig[ii].mult_bot_min,
+          vtpConf.hps.mult_trig[ii].mult_tot_min,
+          enable_flags
+        );
+    }
+
+    enable_flags = 0;
+    enable_flags |= vtpConf.hps.fee_trig.en     ? (1<<31) : 0;
+    vtpSetHPS_FeeTrigger(
+        vtpConf.hps.fee_trig.cluster_emin,
+        vtpConf.hps.fee_trig.cluster_emax,
+        vtpConf.hps.fee_trig.cluster_nmin, 
+        vtpConf.hps.fee_trig.prescale_xmin, 
+        vtpConf.hps.fee_trig.prescale_xmax, 
+        vtpConf.hps.fee_trig.prescale, 
+        enable_flags
+      );
+
+    enable_flags = 0;
+    enable_flags |= vtpConf.hps.calib.cosmic_top_en     ? (1<< 8) : 0;
+    enable_flags |= vtpConf.hps.calib.cosmic_bot_en     ? (1<< 9) : 0;
+    enable_flags |= vtpConf.hps.calib.hodoscope_top_en  ? (1<<16) : 0;
+    enable_flags |= vtpConf.hps.calib.hodoscope_bot_en  ? (1<<17) : 0;
+    enable_flags |= vtpConf.hps.calib.pulser_en         ? (1<<31) : 0;
+    vtpSetHPS_CalibrationTrigger(
+        enable_flags,
+        vtpConf.hps.calib.cosmic_dt,
+        vtpConf.hps.calib.pulser_freq
+      );
+
+    vtpSetHPS_TriggerLatency(vtpConf.hps.trig.latency);
+
+    for(ii=0;ii<32;ii++)
+      vtpSetHPS_TriggerPrescale(ii, vtpConf.hps.trig.prescale[ii]);
+  }
+
   return(0);
 }
 
 int
 vtpUploadAll(char *string, int length)
 {
-  int i, len1, len2;
+  int i, len1, len2, enable_flags;
   char *str, sss[4096];
 
   vtpConf.fw_rev = vtpV7GetFW_Version();
@@ -1314,6 +1875,115 @@ vtpUploadAll(char *string, int length)
   if(vtpConf.fw_type == VTP_FW_TYPE_FTHODO)
   {
     vtpGetFTHODOemin(&vtpConf.fthodo.hit_emin);
+  }
+
+  if(vtpConf.fw_type == VTP_FW_TYPE_HPS)
+  {
+    vtpGetHPS_Cluster(&vtpConf.hps.cluster.top_nbottom, &vtpConf.hps.cluster.hit_dt, &vtpConf.hps.cluster.seed_thr);
+    vtpGetHPS_Hodoscope(&vtpConf.hps.hodoscope.hit_dt, &vtpConf.hps.hodoscope.fadchit_thr, &vtpConf.hps.hodoscope.hodo_thr);
+
+    for(i=0;i<4;i++)
+    {
+      vtpGetHPS_SingleTrigger(i, 0,
+          &vtpConf.hps.single_trig[i].cluster_emin,
+          &vtpConf.hps.single_trig[i].cluster_emax,
+          &vtpConf.hps.single_trig[i].cluster_nmin,
+          &vtpConf.hps.single_trig[i].cluster_xmin,
+          &vtpConf.hps.single_trig[i].pde_c[0],
+          &enable_flags
+        );
+
+      /*
+      vtpGetHPS_SingleTrigger(i, 1,
+          &vtpConf.hps.single_trig[i].cluster_emin,
+          &vtpConf.hps.single_trig[i].cluster_emax,
+          &vtpConf.hps.single_trig[i].cluster_nmin,
+          &vtpConf.hps.single_trig[i].cluster_xmin,
+          &vtpConf.hps.single_trig[i].pde_c[0],
+          &enable_flags
+        );
+      */
+
+      vtpConf.hps.single_trig[i].cluster_emin_en    = (enable_flags & 0x00000001) ? 1 : 0;
+      vtpConf.hps.single_trig[i].cluster_emax_en    = (enable_flags & 0x00000002) ? 1 : 0;
+      vtpConf.hps.single_trig[i].cluster_nmin_en    = (enable_flags & 0x00000004) ? 1 : 0;
+      vtpConf.hps.single_trig[i].cluster_xmin_en    = (enable_flags & 0x00000008) ? 1 : 0;
+      vtpConf.hps.single_trig[i].pde_en             = (enable_flags & 0x00000010) ? 1 : 0;
+      vtpConf.hps.single_trig[i].hodo_l1_en         = (enable_flags & 0x00000020) ? 1 : 0;
+      vtpConf.hps.single_trig[i].hodo_l2_en         = (enable_flags & 0x00000040) ? 1 : 0;
+      vtpConf.hps.single_trig[i].hodo_l1l2_geom_en  = (enable_flags & 0x00000080) ? 1 : 0;
+      vtpConf.hps.single_trig[i].hodo_l1l2x_geom_en = (enable_flags & 0x00000100) ? 1 : 0;
+      vtpConf.hps.single_trig[i].en                 = (enable_flags & 0x80000000) ? 1 : 0;
+    }
+
+    for(i=0;i<4;i++)
+    {
+      vtpGetHPS_PairTrigger(i,
+          &vtpConf.hps.pair_trig[i].cluster_emin,
+          &vtpConf.hps.pair_trig[i].cluster_emax,
+          &vtpConf.hps.pair_trig[i].cluster_nmin,
+          &vtpConf.hps.pair_trig[i].pair_dt,
+          &vtpConf.hps.pair_trig[i].pair_esum_min,
+          &vtpConf.hps.pair_trig[i].pair_esum_max,
+          &vtpConf.hps.pair_trig[i].pair_ediff_max,
+          &vtpConf.hps.pair_trig[i].pair_ed_factor,
+          &vtpConf.hps.pair_trig[i].pair_ed_thr,
+          &vtpConf.hps.pair_trig[i].pair_coplanarity_tol,
+          &enable_flags
+        );
+
+      vtpConf.hps.pair_trig[i].pair_esum_en        = (enable_flags & 0x00000001) ? 1 : 0;
+      vtpConf.hps.pair_trig[i].pair_ediff_en       = (enable_flags & 0x00000002) ? 1 : 0;
+      vtpConf.hps.pair_trig[i].pair_ed_en          = (enable_flags & 0x00000004) ? 1 : 0;
+      vtpConf.hps.pair_trig[i].pair_coplanarity_en = (enable_flags & 0x00000008) ? 1 : 0;
+      vtpConf.hps.pair_trig[i].en                  = (enable_flags & 0x80000000) ? 1 : 0;
+    }
+
+    for(i=0;i<4;i++)
+    {
+      vtpGetHPS_MultiplicityTrigger(
+          i,
+          &vtpConf.hps.mult_trig[i].cluster_emin,
+          &vtpConf.hps.mult_trig[i].cluster_emax,
+          &vtpConf.hps.mult_trig[i].cluster_nmin,
+          &vtpConf.hps.mult_trig[i].mult_dt,
+          &vtpConf.hps.mult_trig[i].mult_top_min,
+          &vtpConf.hps.mult_trig[i].mult_bot_min,
+          &vtpConf.hps.mult_trig[i].mult_tot_min,
+          &enable_flags
+        );
+      vtpConf.hps.mult_trig[i].en     = (enable_flags & 0x80000000) ? 1 : 0;
+    }
+
+
+    vtpGetHPS_FeeTrigger(
+        &vtpConf.hps.fee_trig.cluster_emin,
+        &vtpConf.hps.fee_trig.cluster_emax,
+        &vtpConf.hps.fee_trig.cluster_nmin, 
+        vtpConf.hps.fee_trig.prescale_xmin, 
+        vtpConf.hps.fee_trig.prescale_xmax, 
+        vtpConf.hps.fee_trig.prescale, 
+        &enable_flags
+      );
+    vtpConf.hps.fee_trig.en             = (enable_flags & 0x80000000) ? 1 : 0;
+
+
+    vtpGetHPS_CalibrationTrigger(
+        &enable_flags,
+        &vtpConf.hps.calib.cosmic_dt,
+        &vtpConf.hps.calib.pulser_freq
+      );
+    vtpConf.hps.calib.cosmic_top_en     = (enable_flags & 0x00000100) ? 1 : 0;
+    vtpConf.hps.calib.cosmic_bot_en     = (enable_flags & 0x00000200) ? 1 : 0;
+    vtpConf.hps.calib.hodoscope_top_en  = (enable_flags & 0x00010000) ? 1 : 0;
+    vtpConf.hps.calib.hodoscope_bot_en  = (enable_flags & 0x00020000) ? 1 : 0;
+    vtpConf.hps.calib.pulser_en         = (enable_flags & 0x80000000) ? 1 : 0;
+
+
+    vtpGetHPS_TriggerLatency(&vtpConf.hps.trig.latency);
+
+    for(i=0;i<32;i++)
+      vtpGetHPS_TriggerPrescale(i, &vtpConf.hps.trig.prescale[i]);
   }
 
   if(length)
@@ -1506,6 +2176,81 @@ vtpUploadAll(char *string, int length)
     {
       sprintf(sss, "VTP_FTHODO_EMIN %d\n", vtpConf.fthodo.hit_emin); ADD_TO_STRING;
     }
+
+    if(vtpConf.fw_type == VTP_FW_TYPE_HPS)
+    {
+      sprintf(sss, "VTP_FTHODO_EMIN %d\n", vtpConf.fthodo.hit_emin); ADD_TO_STRING;
+
+      if(vtpConf.hps.cluster.top_nbottom)
+      {
+        sprintf(sss, "VTP_HPS_ECAL_TOP\n"); ADD_TO_STRING;
+      }
+      else
+      {
+        sprintf(sss, "VTP_HPS_ECAL_BOT\n"); ADD_TO_STRING;
+      }
+
+      sprintf(sss, "VTP_HPS_ECAL_CLUSTER_HIT_DT %d\n", vtpConf.hps.cluster.hit_dt); ADD_TO_STRING;
+
+      sprintf(sss, "VTP_HPS_ECAL_CLUSTER_SEED_THR %d\n",  vtpConf.hps.cluster.seed_thr); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_HODOSCOPE_FADCHIT_THR %d\n",  vtpConf.hps.hodoscope.fadchit_thr); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_HODOSCOPE_HODO_THR %d\n",     vtpConf.hps.hodoscope.hodo_thr); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_HODOSCOPE_HODO_DT %d\n",      vtpConf.hps.hodoscope.hit_dt); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_CALIB_HODOSCOPE_TOP_EN %d\n", vtpConf.hps.calib.hodoscope_top_en); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_CALIB_HODOSCOPE_BOT_EN %d\n", vtpConf.hps.calib.hodoscope_bot_en); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_CALIB_COSMIC_DT %d\n",        vtpConf.hps.calib.cosmic_dt); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_CALIB_COSMIC_TOP_EN %d\n",    vtpConf.hps.calib.cosmic_top_en); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_CALIB_COSMIC_BOT_EN %d\n",    vtpConf.hps.calib.cosmic_bot_en); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_CALIB_PULSER_EN %d\n",        vtpConf.hps.calib.pulser_en); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_CALIB_PULSER_FREQ %f\n",      vtpConf.hps.calib.pulser_freq); ADD_TO_STRING;
+
+      for(i=0;i<4;i++)
+      {
+        sprintf(sss, "VTP_HPS_SINGLE_EMIN %d %d %d\n", i, vtpConf.hps.single_trig[i].cluster_emin, vtpConf.hps.single_trig[i].cluster_emin_en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_SINGLE_EMAX %d %d %d\n", i, vtpConf.hps.single_trig[i].cluster_emax, vtpConf.hps.single_trig[i].cluster_emax_en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_SINGLE_NMIN %d %d %d\n", i, vtpConf.hps.single_trig[i].cluster_nmin, vtpConf.hps.single_trig[i].cluster_nmin_en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_SINGLE_XMIN %d %d %d\n", i, vtpConf.hps.single_trig[i].cluster_xmin, vtpConf.hps.single_trig[i].cluster_xmin_en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_SINGLE_PDE %d %f %f %f %f %d\n", i, vtpConf.hps.single_trig[i].pde_c[0], vtpConf.hps.single_trig[i].pde_c[1], vtpConf.hps.single_trig[i].pde_c[2], vtpConf.hps.single_trig[i].pde_c[3], vtpConf.hps.single_trig[i].pde_en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_SINGLE_HODO %d %d %d %d %d\n", i, vtpConf.hps.single_trig[i].hodo_l1_en, vtpConf.hps.single_trig[i].hodo_l2_en, vtpConf.hps.single_trig[i].hodo_l1l2_geom_en, vtpConf.hps.single_trig[i].hodo_l1l2x_geom_en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_SINGLE_EN %d %d\n", i, vtpConf.hps.single_trig[i].en); ADD_TO_STRING;
+      }
+
+      for(i=0;i<4;i++)
+      {
+        sprintf(sss, "VTP_HPS_PAIR_EMIN %d %d\n", i, vtpConf.hps.pair_trig[i].cluster_emin); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_PAIR_EMAX %d %d\n", i, vtpConf.hps.pair_trig[i].cluster_emax); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_PAIR_NMIN %d %d\n", i, vtpConf.hps.pair_trig[i].pair_dt); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_PAIR_TIMECOINCIDENCE %d %d\n", i, vtpConf.hps.pair_trig[i].pair_dt); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_PAIR_SUMMAX_MIN %d %d %d %d\n", i, vtpConf.hps.pair_trig[i].pair_esum_max, vtpConf.hps.pair_trig[i].pair_esum_min, vtpConf.hps.pair_trig[i].pair_esum_en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_PAIR_DIFFMAX %d %d %d\n", i, vtpConf.hps.pair_trig[i].pair_ediff_max, vtpConf.hps.pair_trig[i].pair_ediff_en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_PAIR_ENERGYDIST %d %f %d %d\n", i, vtpConf.hps.pair_trig[i].pair_ed_factor, vtpConf.hps.pair_trig[i].pair_ed_thr, vtpConf.hps.pair_trig[i].pair_ed_en);
+        sprintf(sss, "VTP_HPS_PAIR_COPLANARITY %d %d %d\n", i, vtpConf.hps.pair_trig[i].pair_coplanarity_tol, vtpConf.hps.pair_trig[i].pair_coplanarity_en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_PAIR_EN %d %d\n", i, vtpConf.hps.pair_trig[i].en); ADD_TO_STRING;
+      }
+
+      for(i=0;i<2;i++)
+      {
+        sprintf(sss, "VTP_HPS_MULT_EMIN %d\n", vtpConf.hps.mult_trig[i].cluster_emin); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_EMAX %d\n", vtpConf.hps.mult_trig[i].cluster_emax); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_NMIN %d\n", vtpConf.hps.mult_trig[i].cluster_nmin); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_MIN %d %d %d\n", vtpConf.hps.mult_trig[i].mult_top_min, vtpConf.hps.mult_trig[i].mult_bot_min, vtpConf.hps.mult_trig[i].mult_tot_min); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_DT %d\n", vtpConf.hps.mult_trig[i].mult_dt); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_EN %d\n", vtpConf.hps.mult_trig[i].en); ADD_TO_STRING;
+      }
+
+      sprintf(sss, "VTP_HPS_FEE_EN %d\n", vtpConf.hps.fee_trig.en); ADD_TO_STRING;
+      for(i=0;i<7;i++)
+      {
+        sprintf(sss, "VTP_HPS_FEE_PRESCALE %d %d %d %d\n", i, vtpConf.hps.fee_trig.prescale_xmin[i], vtpConf.hps.fee_trig.prescale_xmax[i], vtpConf.hps.fee_trig.prescale[i]); ADD_TO_STRING;
+      } 
+
+      sprintf(sss, "VTP_HPS_LATENCY %d\n", vtpConf.hps.trig.latency); ADD_TO_STRING;
+      for(i=0;i<32;i++)
+      {
+        sprintf(sss, "VTP_HPS_PRESCALE %d %d\n", i, vtpConf.hps.trig.prescale[i]); ADD_TO_STRING;
+      }
+    }
+
     CLOSE_STRING;
   }
   return(0);
