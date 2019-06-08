@@ -86,6 +86,7 @@ typedef struct {
   
   int fw_rev;
   int fw_type;
+  int refclk;
   
   int window_width;
   int window_offset;

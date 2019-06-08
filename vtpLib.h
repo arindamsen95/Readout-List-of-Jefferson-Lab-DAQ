@@ -453,7 +453,7 @@ typedef struct HPSFeeTrigger_Struct
   /** 0x0048 */ volatile uint32_t ScalerCuts[7];
   /** 0x0064 */ BLANK[(0x068-0x064)/4];
   /** 0x0068 */ volatile uint32_t ScalerAcceptLive;
-  /** 0x0034 */ BLANK[(0x080-0x06C)/4];
+  /** 0x006C */ BLANK[(0x080-0x06C)/4];
 } HPSFEETRIGGER_REGS;
 
 typedef struct HPSTrigger_Struct
@@ -669,6 +669,8 @@ typedef struct v7_bridge_struct
   /** 0x43C15E00 */ HPSCALIBTRIGGER_REGS hpsCalibTrigger;
 
   /** 0x43C15E40 */ HPSMULTTRIGGER_REGS hpsMultiplicityTrigger[2];
+  
+  /** 0x43C15EC0 */ BLANK[(0x5F00 - 0x5EC0)/4];
 
   /** 0x43C15F00 */ HPSTRIGGER_REGS hpsTriggerBits;
 
@@ -711,7 +713,8 @@ typedef struct zync_reg_struct
 /* Initialization Flags */
 #define VTP_INIT_CLK_MASK            0x0000000F
 #define VTP_INIT_CLK_INT             (1<<0)
-#define VTP_INIT_CLK_VXS             (2<<0)
+#define VTP_INIT_CLK_VXS_250         (2<<0)
+#define VTP_INIT_CLK_VXS_125         (3<<0)
 #define VTP_INIT_SKIP                (1<<16)
 #define VTP_INIT_SKIP_FIRMWARE_CHECK (1<<18)
 
@@ -751,6 +754,7 @@ int  vtpSerdesStatusAll();
 int  vtpSerdesCheckLinks();
 
 int  vtpV7PllReset(int enable);
+int  vtpV7PllLocked();
 
 int  vtpV7CtrlInit();
 int  vtpV7SetReset(int val);

@@ -11,7 +11,7 @@
 //#include "xxxConfig.h"
 
 #undef DEBUG
-#define DEBUG
+//#define DEBUG
 
 #define ADD_TO_STRING \
   len1 = strlen(str); \
@@ -116,6 +116,8 @@ vtpInitGlobals()
   vtpConf.fw_type = -1;
   vtpConf.window_width = 0;
   vtpConf.window_offset = 0;
+
+  vtpConf.refclk = 250;
   
   vtpConf.payload_en = 0;
   vtpConf.fiber_en = 0;
@@ -488,6 +490,10 @@ vtpReadConfigFile(char *filename_in)
         {
           sscanf(str_tmp, "%*s %250s", vtpConf.fw_filename);
           printf("VTP_FIRMWARE = %s\n", vtpConf.fw_filename);
+        }
+        else if(!strcmp(keyword,"VTP_REFCLK"))
+        {
+          sscanf(str_tmp, "%*s %d", &vtpConf.refclk);
         }
         else if(!strcmp(keyword,"VTP_PAYLOAD_EN"))
         {
@@ -1314,7 +1320,7 @@ vtpReadConfigFile(char *filename_in)
             return(-4);
           }
 
-          vtpConf.hps.mult_trig[argi[0]].cluster_emax = argi[0];
+          vtpConf.hps.mult_trig[argi[0]].cluster_emax = argi[1];
         }
         else if(!strcmp(keyword,"VTP_HPS_MULT_NMIN"))
         {
@@ -1325,7 +1331,7 @@ vtpReadConfigFile(char *filename_in)
             return(-4);
           }
 
-          vtpConf.hps.mult_trig[argi[0]].cluster_nmin = argi[0];
+          vtpConf.hps.mult_trig[argi[0]].cluster_nmin = argi[1];
         }
         else if(!strcmp(keyword,"VTP_HPS_MULT_MIN"))
         {
@@ -1365,7 +1371,7 @@ vtpReadConfigFile(char *filename_in)
         else if(!strcmp(keyword,"VTP_HPS_FEE_EN"))
         {
           sscanf (str_tmp, "%*s %d", &argi[0]);
-          vtpConf.hps.fee_trig.en = argi[1];
+          vtpConf.hps.fee_trig.en = argi[0];
         }
         else if(!strcmp(keyword,"VTP_HPS_FEE_PRESCALE"))
         {
@@ -1378,6 +1384,21 @@ vtpReadConfigFile(char *filename_in)
           vtpConf.hps.fee_trig.prescale_xmin[argi[0]] = argi[1];
           vtpConf.hps.fee_trig.prescale_xmax[argi[0]] = argi[2];
           vtpConf.hps.fee_trig.prescale[argi[0]]      = argi[3];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_FEE_EMIN"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.fee_trig.cluster_emin = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_FEE_EMAX"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.fee_trig.cluster_emax = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_HPS_FEE_NMIN"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.hps.fee_trig.cluster_nmin = argi[0];
         }
         else if(!strcmp(keyword,"VTP_HPS_LATENCY"))
         {
@@ -1436,8 +1457,18 @@ vtpDownloadAll()
 //  snprintf(fname, FNLEN, "%s/firmwares/%s", clonparms, vtpConf.fw_filename);
 //  if(vtpV7CfgLoad(fname) != OK)
 //    exit(1);
-  
-  vtpInit(VTP_INIT_CLK_VXS);
+ 
+ 
+  if(vtpConf.refclk == 125)
+    vtpInit(VTP_INIT_CLK_VXS_125);
+  else if(vtpConf.refclk == 250)
+    vtpInit(VTP_INIT_CLK_VXS_250);
+  else
+  {
+    printf("ERROR - unknown reference clock specified...\n");
+    exit(1);
+  }
+
 
   // Check firmware type
   vtpConf.fw_rev = vtpV7GetFW_Version();
@@ -2219,7 +2250,7 @@ vtpUploadAll(char *string, int length)
       {
         sprintf(sss, "VTP_HPS_PAIR_EMIN %d %d\n", i, vtpConf.hps.pair_trig[i].cluster_emin); ADD_TO_STRING;
         sprintf(sss, "VTP_HPS_PAIR_EMAX %d %d\n", i, vtpConf.hps.pair_trig[i].cluster_emax); ADD_TO_STRING;
-        sprintf(sss, "VTP_HPS_PAIR_NMIN %d %d\n", i, vtpConf.hps.pair_trig[i].pair_dt); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_PAIR_NMIN %d %d\n", i, vtpConf.hps.pair_trig[i].cluster_nmin); ADD_TO_STRING;
         sprintf(sss, "VTP_HPS_PAIR_TIMECOINCIDENCE %d %d\n", i, vtpConf.hps.pair_trig[i].pair_dt); ADD_TO_STRING;
         sprintf(sss, "VTP_HPS_PAIR_SUMMAX_MIN %d %d %d %d\n", i, vtpConf.hps.pair_trig[i].pair_esum_max, vtpConf.hps.pair_trig[i].pair_esum_min, vtpConf.hps.pair_trig[i].pair_esum_en); ADD_TO_STRING;
         sprintf(sss, "VTP_HPS_PAIR_DIFFMAX %d %d %d\n", i, vtpConf.hps.pair_trig[i].pair_ediff_max, vtpConf.hps.pair_trig[i].pair_ediff_en); ADD_TO_STRING;
@@ -2230,15 +2261,18 @@ vtpUploadAll(char *string, int length)
 
       for(i=0;i<2;i++)
       {
-        sprintf(sss, "VTP_HPS_MULT_EMIN %d\n", vtpConf.hps.mult_trig[i].cluster_emin); ADD_TO_STRING;
-        sprintf(sss, "VTP_HPS_MULT_EMAX %d\n", vtpConf.hps.mult_trig[i].cluster_emax); ADD_TO_STRING;
-        sprintf(sss, "VTP_HPS_MULT_NMIN %d\n", vtpConf.hps.mult_trig[i].cluster_nmin); ADD_TO_STRING;
-        sprintf(sss, "VTP_HPS_MULT_MIN %d %d %d\n", vtpConf.hps.mult_trig[i].mult_top_min, vtpConf.hps.mult_trig[i].mult_bot_min, vtpConf.hps.mult_trig[i].mult_tot_min); ADD_TO_STRING;
-        sprintf(sss, "VTP_HPS_MULT_DT %d\n", vtpConf.hps.mult_trig[i].mult_dt); ADD_TO_STRING;
-        sprintf(sss, "VTP_HPS_MULT_EN %d\n", vtpConf.hps.mult_trig[i].en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_EMIN %d %d\n", i, vtpConf.hps.mult_trig[i].cluster_emin); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_EMAX %d %d\n", i, vtpConf.hps.mult_trig[i].cluster_emax); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_NMIN %d %d\n", i, vtpConf.hps.mult_trig[i].cluster_nmin); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_MIN %d %d %d %d\n", i, vtpConf.hps.mult_trig[i].mult_top_min, vtpConf.hps.mult_trig[i].mult_bot_min, vtpConf.hps.mult_trig[i].mult_tot_min); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_DT %d %d\n", i, vtpConf.hps.mult_trig[i].mult_dt); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_MULT_EN %d %d\n", i, vtpConf.hps.mult_trig[i].en); ADD_TO_STRING;
       }
 
       sprintf(sss, "VTP_HPS_FEE_EN %d\n", vtpConf.hps.fee_trig.en); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_FEE_EMIN %d\n", vtpConf.hps.fee_trig.cluster_emin); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_FEE_EMAX %d\n", vtpConf.hps.fee_trig.cluster_emax); ADD_TO_STRING;
+      sprintf(sss, "VTP_HPS_FEE_NMIN %d\n", vtpConf.hps.fee_trig.cluster_nmin); ADD_TO_STRING;
       for(i=0;i<7;i++)
       {
         sprintf(sss, "VTP_HPS_FEE_PRESCALE %d %d %d %d\n", i, vtpConf.hps.fee_trig.prescale_xmin[i], vtpConf.hps.fee_trig.prescale_xmax[i], vtpConf.hps.fee_trig.prescale[i]); ADD_TO_STRING;

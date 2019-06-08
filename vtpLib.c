@@ -157,8 +157,9 @@ vtpSetDebugMask(uint32_t mask)
  *   iFlag: 18 bit integer
  *      bit 3-0:  Defines trig/sync/clock source
  *             1 Internal clock, software trig & sync
- *             2 VXS clock, trig, sync
- *             0,2-15 undefined
+ *             2 VXS clock 250MHz, trig, sync
+ *             3 VXS clock 125MHz, trig, sync
+ *             0,4-15 undefined
  *
  *
  *      bit 16:  Exit before board initialization
@@ -191,17 +192,23 @@ vtpInit(int iFlag)
       clkSrc = SI5341_IN_SEL_LOCAL;
       break;
 
-    case VTP_INIT_CLK_VXS:
+    case VTP_INIT_CLK_VXS_250:
       syncSrc = VTP_SD_SYNCSEL_VXS;
       trig1Src = VTP_SD_TRIG1SEL_VXS;
-      clkSrc = SI5341_IN_SEL_VXS;
+      clkSrc = SI5341_IN_SEL_VXS_250;
+      break;
+
+    case VTP_INIT_CLK_VXS_125:
+      syncSrc = VTP_SD_SYNCSEL_VXS;
+      trig1Src = VTP_SD_TRIG1SEL_VXS;
+      clkSrc = SI5341_IN_SEL_VXS_125;
       break;
 
     default:
       printf("%s: ERROR invalid trig/sync/clock source specification.\n", __func__);
       break;
   }
-
+  
   if(iFlag & VTP_INIT_SKIP)
   {
     VTP_FW_Version = vtpV7GetFW_Version();
@@ -212,57 +219,62 @@ vtpInit(int iFlag)
 
   vtpLock();
 
-  vtpV7SetReset(1);
-  vtpV7SetResetSoft(1);
-
-  vtpV7SetReset(0);
-  vtpV7SetResetSoft(0);
-
-  VTP_FW_Type = vtpV7GetFW_Type();
-  VTP_FW_Version = vtpV7GetFW_Version();
-  printf("%s: VTP_FW_Version=%d, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
-
   if(clkSrc == SI5341_IN_SEL_LOCAL)
-  {
     printf("%s: Setting up VTP PLL for local reference\n", __func__);
-    si5341_Init(SI5341_IN_SEL_LOCAL);
-  }
-  else if(clkSrc == SI5341_IN_SEL_VXS)
+  else if(clkSrc == SI5341_IN_SEL_VXS_250)
+    printf("%s: Setting up VTP PLL for 250MHz VXS reference\n", __func__);
+  else if(clkSrc == SI5341_IN_SEL_VXS_125)
+    printf("%s: Setting up VTP PLL for 125MHz VXS reference\n", __func__);
+  else
   {
-    switch(VTP_FW_Type)
-    {
-      case VTP_FW_TYPE_EC:
-      case VTP_FW_TYPE_PC:
-      case VTP_FW_TYPE_GT:
-      case VTP_FW_TYPE_HCAL:
-      case VTP_FW_TYPE_PCS:
-      case VTP_FW_TYPE_HTCC:
-      case VTP_FW_TYPE_FTOF:
-      case VTP_FW_TYPE_CND:
-      case VTP_FW_TYPE_ECS:
-      case VTP_FW_TYPE_FTCAL:
-      case VTP_FW_TYPE_FTHODO:
-      case VTP_FW_TYPE_HPS:
-        printf("%s: Setting up VTP PLL for 250MHz VXS reference\n", __func__);
-        si5341_Init(SI5341_IN_SEL_VXS_250);
-        break;
-
-      case VTP_FW_TYPE_DC:
-        printf("%s: Setting up VTP PLL for 125MHz VXS reference\n", __func__);
-        si5341_Init(SI5341_IN_SEL_VXS_125);
-        break;
-
-      default:
-        printf("%s: ERROR - unknown firmware type %d. Unable to setup VTP PLL.\n", __func__, VTP_FW_Type);
-        vtpUnlock();
-        return ERROR;
-    }
+    printf("%s: ERROR - unknown reference clock specified. Unable to setup VTP PLL.\n", __func__);
+    vtpUnlock();
+    return ERROR;
   }
+  si5341_Init(clkSrc);
+
+  vtpV7SetReset(1);
+  vtpV7SetReset(0);
+  usleep(10000);
 
   vtpV7PllReset(1);
   vtpV7PllReset(0);
 
+  if(vtpV7PllLocked() != OK)
+  {
+    printf("%s: ERROR - PLL not locked.\n", __func__);
+    return ERROR;
+  }
+
+  vtpV7SetResetSoft(1);
+  vtpV7SetResetSoft(0);
+
+  VTP_FW_Type = vtpV7GetFW_Type();
+  VTP_FW_Version = vtpV7GetFW_Version();
   vtpUnlock();
+
+  printf("%s: VTP_FW_Version=%d, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
+
+  switch(VTP_FW_Type)
+  {
+    case VTP_FW_TYPE_EC:
+    case VTP_FW_TYPE_PC:
+    case VTP_FW_TYPE_GT:
+    case VTP_FW_TYPE_HCAL:
+    case VTP_FW_TYPE_PCS:
+    case VTP_FW_TYPE_HTCC:
+    case VTP_FW_TYPE_FTOF:
+    case VTP_FW_TYPE_CND:
+    case VTP_FW_TYPE_ECS:
+    case VTP_FW_TYPE_FTCAL:
+    case VTP_FW_TYPE_FTHODO:
+    case VTP_FW_TYPE_HPS:
+    case VTP_FW_TYPE_DC:
+      break;
+    default:
+      printf("%s: ERROR - unknown firmware type %d. Unable to setup VTP PLL.\n", __func__, VTP_FW_Type);
+      return ERROR;
+  }
 
   vtpSetTrig1Source(trig1Src);
   vtpSetSyncSource(syncSrc);
@@ -501,6 +513,69 @@ vtpCheckAddresses()
   if(offset != expected)
     {
       printf("%s: ERROR VTPp->v7.eb not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
+  offset = ((unsigned long) &test.v7.hpsFeeTriggerTop) - base;
+  expected = 0x15600;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->v7.hpsFeeTriggerTop not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
+  offset = ((unsigned long) &test.v7.hpsFeeTriggerBot) - base;
+  expected = 0x15680;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->v7.hpsFeeTriggerBot not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
+  offset = ((unsigned long) &test.v7.hpsCluster) - base;
+  expected = 0x15800;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->v7.hpsCluster not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
+  offset = ((unsigned long) &test.v7.hpsSingleTriggerTop[0]) - base;
+  expected = 0x15900;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->v7.hpsSingleTriggerTop[0] not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
+  offset = ((unsigned long) &test.v7.hpsSingleTriggerBot[0]) - base;
+  expected = 0x15B00;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->v7.hpsSingleTriggerBot[0] not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
+  offset = ((unsigned long) &test.v7.hpsMultiplicityTrigger[0]) - base;
+  expected = 0x15E40;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->v7.hpsMultiplicityTrigger[0] not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
+  offset = ((unsigned long) &test.v7.gtBit[0]) - base;
+  expected = 0x16000;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->v7.gtBit[0] not at offset = 0x%lx (@ 0x%lx)\n",
 	     __func__,expected,offset);
       rval = ERROR;
     }
@@ -795,6 +870,29 @@ vtpSerdesSettings(int type, uint16_t idx, int txpre, int txpost, int txswing, in
 }
 
 int
+vtpV7PllLocked()
+{
+  int status;
+
+  VLOCK;
+  status = vtp->v7.clk.Status;
+  VUNLOCK;
+  if(status & VTP_V7CLK_STATUS_GCLK_LOCKED)
+  {
+    printf("%s: PLL successfully locked\n",
+      __func__);
+  }
+  else
+  {
+    printf("%s: PLL not locked\n",
+      __func__);
+    return ERROR;
+  }
+
+  return OK;
+}
+
+int
 vtpV7PllReset(int enable)
 {
   int status;
@@ -831,7 +929,7 @@ vtpV7PllReset(int enable)
   }
 
   return OK;
-}
+} 
 
 int
 vtpV7GetFW_Version()
@@ -2839,14 +2937,14 @@ vtpGetHPS_MultiplicityTrigger(
   *cluster_emin  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emin;
   *cluster_emax  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emax;
   *cluster_nmin  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Nmin;
-  *enable_flags  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult & 0x8000000;
+  *enable_flags  = vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult & 0x80000000;
   *mult_dt       = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>12) & 0xF;
   *mult_tot_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>8) & 0xF;
   *mult_bot_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>4) & 0xF;
   *mult_top_min  = (vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult>>0) & 0xF;
   VUNLOCK;
 
-  *mult_dt*= 4;
+  *mult_dt = (*mult_dt) *4;
   return OK;
 }
 
@@ -3122,6 +3220,7 @@ vtpHPSPrintConfig()
   int pair_dt, pair_esum_min, pair_esum_max, pair_ediff_max, pair_ed_thr, pair_coplanarity_tol;
   int mult_dt, mult_top_min, mult_bot_min, mult_tot_min, latency, prescale[32], cosmic_dt;
   float cluster_pde_c[4], pair_ed_factor, pulser_freq;
+  int prescale_xmin[7], prescale_xmax[7];
 
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
@@ -3192,6 +3291,17 @@ vtpHPSPrintConfig()
     printf("  Enabled:                %d\n",    (enable_flags & 0x80000000)?1:0);
     printf("\n");
   }
+
+  vtpGetHPS_FeeTrigger(&cluster_emin, &cluster_emax, &cluster_nmin, prescale_xmin, prescale_xmax, prescale, &enable_flags);
+  printf("FEE Cluster Trigger Top:\n");
+  printf("  Cluster emin:           %dMeV\n", cluster_emin);
+  printf("  Cluster emax:           %dMeV\n", cluster_emax);
+  printf("  Cluster nmin:           %d\n",    cluster_nmin);
+  printf("  Region, Xmin, Xmax, Prescale:\n");
+  for(i=0;i<7;i++)
+    printf("    %d, %d, %d, %d\n", i, prescale_xmin[i], prescale_xmax[i], prescale[i]);
+  printf("  Enabled:                %d\n",    (enable_flags & 0x80000000)?1:0);
+  printf("\n");
 
   vtpGetHPS_CalibrationTrigger(&enable_flags, &cosmic_dt, &pulser_freq);
   char *cosmic_mode;
