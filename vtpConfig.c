@@ -1226,7 +1226,7 @@ vtpReadConfigFile(char *filename_in)
             return(-4);
           }
     
-          vtpConf.hps.pair_trig[argi[0]].pair_dt = argi[1];
+          vtpConf.hps.pair_trig[argi[0]].cluster_nmin = argi[1];
         }
         else if(!strcmp(keyword,"VTP_HPS_PAIR_TIMECOINCIDENCE"))
         {
