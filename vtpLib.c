@@ -2785,6 +2785,8 @@ vtpGetHPS_SingleTrigger(
     *cluster_nmin = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Nmin;
     *cluster_xmin = vtp->v7.hpsSingleTriggerTop[inst].Cluster_Xmin;
 
+    if(*cluster_xmin & 0x20) *cluster_xmin|= 0xFFFFFFC0;
+
     for(i=0;i<4;i++)
       c[i] = vtp->v7.hpsSingleTriggerTop[inst].Cluster_PDE_C[i];
   }

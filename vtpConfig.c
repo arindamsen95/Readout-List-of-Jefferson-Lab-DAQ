@@ -1970,7 +1970,7 @@ vtpUploadAll(char *string, int length)
       vtpConf.hps.pair_trig[i].en                  = (enable_flags & 0x80000000) ? 1 : 0;
     }
 
-    for(i=0;i<4;i++)
+    for(i=0;i<2;i++)
     {
       vtpGetHPS_MultiplicityTrigger(
           i,
