@@ -12,7 +12,7 @@
 #
 #
 
-USE_IPC  ?= 1
+USE_IPC  ?= 0
 USE_CODA ?= 0
 
 # Uncomment DEBUG line, to include some debugging info ( -g and -Wall)
@@ -28,24 +28,25 @@ CC			= gcc
 AR                      = ar
 RANLIB                  = ranlib
 CFLAGS			= -L.
-INCS			= -I. -I/usr/local/include -I$(CODA)/src/ipc/ipc.s -I$(CODA)/src/codautil/codautil.s
+INCS			= -I. -I/usr/local/include
+
 
 LIBS			= lib${BASENAME}.a
 
 ifeq ($(USE_CODA),1)
-LIBNAMES        = $(CODA)/src/codautil/Linux_armv7l/lib/libcodautil.a
+	LIBNAMES        = $(CODA)/src/codautil/Linux_armv7l/lib/libcodautil.a
+	INCS		+= -I$(CODA)/src/codautil/codautil.s
 endif
 ifeq ($(USE_IPC),1)
-LIBNAMES        = $(CODA)/src/ipc/Linux_armv7l/lib/libipc.a
+	LIBNAMES        = $(CODA)/src/ipc/Linux_armv7l/lib/libipc.a
+	INCS		+= -I$(CODA)/src/ipc/ipc.s
+	CFLAGS		+= -DIPC
 endif
 
 ifdef DEBUG
-CFLAGS			+= -Wall -g
+	CFLAGS		+= -Wall -g
 else
-CFLAGS			+= -O2
-endif
-ifeq ($(USE_IPC),1)
-CFLAGS			+= -DIPC
+	CFLAGS		+= -O2
 endif
 
 SRC			= vtpLib.c vtpConfig.c vtp-i2c.c vtp-spi.c si5341_cfg.c vtp-ltm.c
@@ -89,10 +90,11 @@ clean:
 realclean: clean
 	$(Q)rm -vf *~
 
-install:
-	-cp *.a $(CODA)/Linux_armv7l/lib/
-	-cp *.so $(CODA)/Linux_armv7l/lib/
-	-cp *.h $(CODA)/common/include/
+install: echoarch $(LIBS)
+	@echo " INST   ${LIBS} $(LIBS:.a=.so) ${HDRS}"
+	-$(Q)cp *.a $(HOME)/Linux-armv7l/lib/
+	-$(Q)cp *.so $(HOME)/Linux-armv7l/lib/
+	-$(Q)cp *.h $(HOME)/Linux-armv7l/include/
 
 echoarch:
 	@echo "Make for $(ARCH)"

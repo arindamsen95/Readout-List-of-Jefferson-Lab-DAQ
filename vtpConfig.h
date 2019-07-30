@@ -65,6 +65,10 @@ typedef struct
   int pair_ediff_en;
   int pair_ed_en;
   int pair_coplanarity_en;
+  int hodo_l1_en;
+  int hodo_l2_en;
+  int hodo_l1l2_geom_en;
+  int hodo_l1l2x_geom_en;
   int en;
 } hps_pair_trig;
 

@@ -2681,7 +2681,7 @@ vtpSetHPS_Hodoscope(int hit_width, int fadchit_thr, int hodo_thr)
 
   hit_width/= 4;
 
-  CHECKRANGE_INT(hit_width,   0,    7);
+  CHECKRANGE_INT(hit_width,   0,   15);
   CHECKRANGE_INT(fadchit_thr, 1, 8191);
   CHECKRANGE_INT(hodo_thr,    1, 8191);
 
@@ -2703,7 +2703,7 @@ vtpGetHPS_Hodoscope(int *hit_width, int *fadchit_thr, int *hodo_thr)
   val = vtp->v7.hpsHodoscope.Ctrl;
   VUNLOCK;
 
-  *hit_width   = (val>>26) & 0x7;
+  *hit_width   = (val>>26) & 0xF;
   *hodo_thr    = (val>>13) & 0x1FFF;
   *fadchit_thr = (val>>0)  & 0x1FFF;
 
@@ -3275,7 +3275,11 @@ vtpHPSPrintConfig()
     printf("  Pair ediff max (req=%d):       %dMeV\n",                  (enable_flags & 0x00000002)?1:0, pair_ediff_max);
     printf("  Pair coplanarity tol (req=%d): +/-%ddegrees\n",           (enable_flags & 0x00000004)?1:0, pair_coplanarity_tol);
     printf("  Pair energy,dist (req=%d):     %dMeV <= dist*%fMeV/mm\n", (enable_flags & 0x00000008)?1:0, pair_ed_thr, pair_ed_factor);
-    printf("  Enabled:                       %d\n",               (enable_flags & 0x80000000)?1:0);
+    printf("  Hodo l1 hit (req=%d)\n",                                 (enable_flags & 0x00000010)?1:0);
+    printf("  Hodo l2 hit (req=%d)\n",                                 (enable_flags & 0x00000020)?1:0);
+    printf("  Hodo l1<->l2 (req=%d)\n",                                (enable_flags & 0x00000040)?1:0);
+    printf("  Hodo l1<->ClusterX<->l2 (req=%d)\n",                     (enable_flags & 0x00000080)?1:0);
+    printf("  Enabled:                       %d\n",                    (enable_flags & 0x80000000)?1:0);
     printf("\n");
   }
 

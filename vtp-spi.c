@@ -92,7 +92,8 @@ vtpSPIOpen()
        * bits per word
        */
 #ifdef SETDEFAULT
-      VTP_DBGN(VTP_DEBUG_INIT, "set SPI bits per word = 0x%x\n", vtpSpiBits);
+      VTP_DBGN(VTP_DEBUG_INIT, "set SPI bits per word = 0x%x\n",
+	       (uint32_t) vtpSpiBits);
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_BITS_PER_WORD, &vtpSpiBits);
       if (ret == -1)
         perror("can't set bits per word");
@@ -106,7 +107,8 @@ vtpSPIOpen()
        * max speed hz
        */
 #ifdef SETDEFAULT
-      VTP_DBGN(VTP_DEBUG_INIT, "set SPI max speed = 0x%x\n", vtpSpiSpeed);
+      VTP_DBGN(VTP_DEBUG_INIT, "set SPI max speed = 0x%x\n",
+	       (uint32_t) vtpSpiSpeed);
       ret = ioctl(vtpSPIFD[iid], SPI_IOC_WR_MAX_SPEED_HZ, &vtpSpiSpeed);
       if (ret == -1)
         perror("can't set max speed hz");
