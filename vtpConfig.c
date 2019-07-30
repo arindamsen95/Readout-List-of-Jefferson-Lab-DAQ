@@ -318,6 +318,10 @@ vtpInitGlobals()
     vtpConf.hps.pair_trig[i].pair_ediff_en = 0;
     vtpConf.hps.pair_trig[i].pair_ed_en = 0;
     vtpConf.hps.pair_trig[i].pair_coplanarity_en = 0;
+    vtpConf.hps.pair_trig[i].hodo_l1_en = 0;
+    vtpConf.hps.pair_trig[i].hodo_l2_en = 0;
+    vtpConf.hps.pair_trig[i].hodo_l1l2_geom_en = 0;
+    vtpConf.hps.pair_trig[i].hodo_l1l2x_geom_en = 0;
     vtpConf.hps.pair_trig[i].en = 0;
   }
 
@@ -1289,6 +1293,20 @@ vtpReadConfigFile(char *filename_in)
           vtpConf.hps.pair_trig[argi[0]].pair_coplanarity_tol = argi[1];
           vtpConf.hps.pair_trig[argi[0]].pair_coplanarity_en  = argi[2];
         }
+        else if(!strcmp(keyword,"VTP_HPS_PAIR_HODO"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d %d %d", &argi[0], &argi[1], &argi[2], &argi[3], &argi[4]);
+          if(argi[0]<0 || argi[0]>=4)
+          {
+            printf("\nReadConfigFile: Wrong singles bit  number %d\n\n",argi[0]);
+            return(-4);
+          }
+
+          vtpConf.hps.pair_trig[argi[0]].hodo_l1_en = argi[1];
+          vtpConf.hps.pair_trig[argi[0]].hodo_l2_en = argi[2];
+          vtpConf.hps.pair_trig[argi[0]].hodo_l1l2_geom_en = argi[3];
+          vtpConf.hps.pair_trig[argi[0]].hodo_l1l2x_geom_en = argi[4];
+        }
         else if(!strcmp(keyword,"VTP_HPS_PAIR_EN"))
         {
           sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
@@ -1671,11 +1689,15 @@ vtpDownloadAll()
     for(ii=0;ii<4;ii++)
     {
       enable_flags = 0;
-      enable_flags |= vtpConf.hps.pair_trig[ii].pair_esum_en        ? (1<< 0) : 0;
-      enable_flags |= vtpConf.hps.pair_trig[ii].pair_ediff_en       ? (1<< 1) : 0;
-      enable_flags |= vtpConf.hps.pair_trig[ii].pair_ed_en          ? (1<< 2) : 0;
-      enable_flags |= vtpConf.hps.pair_trig[ii].pair_coplanarity_en ? (1<< 3) : 0;
-      enable_flags |= vtpConf.hps.pair_trig[ii].en                  ? (1<<31) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].pair_esum_en         ? (1<< 0) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].pair_ediff_en        ? (1<< 1) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].pair_coplanarity_en  ? (1<< 2) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].pair_ed_en           ? (1<< 3) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].hodo_l1_en           ? (1<< 4) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].hodo_l2_en           ? (1<< 5) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].hodo_l1l2_geom_en    ? (1<< 6) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].hodo_l1l2x_geom_en   ? (1<< 7) : 0;
+      enable_flags |= vtpConf.hps.pair_trig[ii].en                   ? (1<<31) : 0;
 
       vtpSetHPS_PairTrigger(ii,
           vtpConf.hps.pair_trig[ii].cluster_emin,
@@ -1965,9 +1987,14 @@ vtpUploadAll(char *string, int length)
 
       vtpConf.hps.pair_trig[i].pair_esum_en        = (enable_flags & 0x00000001) ? 1 : 0;
       vtpConf.hps.pair_trig[i].pair_ediff_en       = (enable_flags & 0x00000002) ? 1 : 0;
-      vtpConf.hps.pair_trig[i].pair_ed_en          = (enable_flags & 0x00000004) ? 1 : 0;
-      vtpConf.hps.pair_trig[i].pair_coplanarity_en = (enable_flags & 0x00000008) ? 1 : 0;
+      vtpConf.hps.pair_trig[i].pair_coplanarity_en = (enable_flags & 0x00000004) ? 1 : 0;
+      vtpConf.hps.pair_trig[i].pair_ed_en          = (enable_flags & 0x00000008) ? 1 : 0;
+      vtpConf.hps.pair_trig[i].hodo_l1_en          = (enable_flags & 0x00000010) ? 1 : 0;
+      vtpConf.hps.pair_trig[i].hodo_l2_en          = (enable_flags & 0x00000020) ? 1 : 0;
+      vtpConf.hps.pair_trig[i].hodo_l1l2_geom_en   = (enable_flags & 0x00000040) ? 1 : 0;
+      vtpConf.hps.pair_trig[i].hodo_l1l2x_geom_en  = (enable_flags & 0x00000080) ? 1 : 0;
       vtpConf.hps.pair_trig[i].en                  = (enable_flags & 0x80000000) ? 1 : 0;
+
     }
 
     for(i=0;i<2;i++)
@@ -2254,9 +2281,10 @@ vtpUploadAll(char *string, int length)
         sprintf(sss, "VTP_HPS_PAIR_TIMECOINCIDENCE %d %d\n", i, vtpConf.hps.pair_trig[i].pair_dt); ADD_TO_STRING;
         sprintf(sss, "VTP_HPS_PAIR_SUMMAX_MIN %d %d %d %d\n", i, vtpConf.hps.pair_trig[i].pair_esum_max, vtpConf.hps.pair_trig[i].pair_esum_min, vtpConf.hps.pair_trig[i].pair_esum_en); ADD_TO_STRING;
         sprintf(sss, "VTP_HPS_PAIR_DIFFMAX %d %d %d\n", i, vtpConf.hps.pair_trig[i].pair_ediff_max, vtpConf.hps.pair_trig[i].pair_ediff_en); ADD_TO_STRING;
-        sprintf(sss, "VTP_HPS_PAIR_ENERGYDIST %d %f %d %d\n", i, vtpConf.hps.pair_trig[i].pair_ed_factor, vtpConf.hps.pair_trig[i].pair_ed_thr, vtpConf.hps.pair_trig[i].pair_ed_en);
+        sprintf(sss, "VTP_HPS_PAIR_ENERGYDIST %d %f %d %d\n", i, vtpConf.hps.pair_trig[i].pair_ed_factor, vtpConf.hps.pair_trig[i].pair_ed_thr, vtpConf.hps.pair_trig[i].pair_ed_en); ADD_TO_STRING;
         sprintf(sss, "VTP_HPS_PAIR_COPLANARITY %d %d %d\n", i, vtpConf.hps.pair_trig[i].pair_coplanarity_tol, vtpConf.hps.pair_trig[i].pair_coplanarity_en); ADD_TO_STRING;
         sprintf(sss, "VTP_HPS_PAIR_EN %d %d\n", i, vtpConf.hps.pair_trig[i].en); ADD_TO_STRING;
+        sprintf(sss, "VTP_HPS_PAIR_HODO %d %d %d %d %d\n", i, vtpConf.hps.pair_trig[i].hodo_l1_en, vtpConf.hps.pair_trig[i].hodo_l2_en, vtpConf.hps.pair_trig[i].hodo_l1l2_geom_en, vtpConf.hps.pair_trig[i].hodo_l1l2x_geom_en); ADD_TO_STRING;
       }
 
       for(i=0;i<2;i++)
