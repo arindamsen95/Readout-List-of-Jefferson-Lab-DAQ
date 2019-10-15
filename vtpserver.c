@@ -85,8 +85,11 @@ load_firmware()
 int
 main(int argc, char *argv[])
 {
-  int stat, count;
+  int stat;
+#ifdef IPC
+  int count;
   pthread_t gScalerThread;
+#endif // IPC
 
   if(signal(SIGINT, sig_handler) == SIG_ERR)
   {
