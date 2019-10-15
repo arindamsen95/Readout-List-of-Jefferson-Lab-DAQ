@@ -5,3 +5,4 @@
 *.ko
 *.mod.c
 *~
+vtpserver

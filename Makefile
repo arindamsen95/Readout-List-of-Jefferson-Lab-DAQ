@@ -49,10 +49,11 @@ else
 	CFLAGS		+= -O2
 endif
 
-SRC			= vtpLib.c vtpConfig.c vtp-i2c.c vtp-spi.c si5341_cfg.c vtp-ltm.c
+SRC			= vtpLib.c vtpConfig.c vtp-i2c.c vtp-spi.c \
+				 si5341_cfg.c vtp-ltm.c
 HDRS			= $(SRC:.c=.h)
 OBJ			= $(SRC:.c=.o)
-DEPS			= $(SRC:.c=.d)
+DEPS			= $(SRC:.c=.d) vtpserver.d
 
 ifeq ($(QUIET),1)
 	Q = @
@@ -61,7 +62,7 @@ else
 endif
 
 
-all: echoarch $(LIBS)
+all: echoarch $(LIBS) vtpserver
 
 %.o: %.c
 	@echo " CC     $@"
@@ -82,6 +83,11 @@ $(LIBS): $(OBJ)
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 
+vtpserver: vtpserver.o
+	@echo " CC     $@"
+	$(Q)$(CC) $(CFLAGS) $(LIBNAMES) $(INCS) -o $@ $<
+
+
 -include $(DEPS)
 
 clean:
@@ -90,11 +96,12 @@ clean:
 realclean: clean
 	$(Q)rm -vf *~
 
-install: echoarch $(LIBS)
+install: echoarch $(LIBS) vtpserver
 	@echo " INST   ${LIBS} $(LIBS:.a=.so) ${HDRS}"
 	-$(Q)cp *.a $(HOME)/Linux-armv7l/lib/
 	-$(Q)cp *.so $(HOME)/Linux-armv7l/lib/
 	-$(Q)cp *.h $(HOME)/Linux-armv7l/include/
+	-$(Q)cp vtpserver $(HOME)/Linux-armv7l/bin/
 
 echoarch:
 	@echo "Make for $(ARCH)"
