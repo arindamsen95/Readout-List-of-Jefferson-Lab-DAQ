@@ -27,11 +27,12 @@ KERNEL_VERSION=${shell uname -r}
 CC			= gcc
 AR                      = ar
 RANLIB                  = ranlib
-CFLAGS			= -L.
+CFLAGS			= -DLinux_$(ARCH) -L.
 INCS			= -I. -I/usr/local/include
 
 
 LIBS			= lib${BASENAME}.a
+SOLIBS			= lib${BASENAME}.so
 
 ifeq ($(USE_CODA),1)
 	LIBNAMES        = $(CODA)/src/codautil/Linux_armv7l/lib/libcodautil.a
@@ -68,13 +69,13 @@ all: echoarch $(LIBS) vtpserver
 	@echo " CC     $@"
 	$(Q)$(CC) $(CFLAGS) $(INCS) -c -o $@ $<
 
-$(LIBS): $(OBJ)
-	@echo " CC     $(@:%.a=%.so)"
-	$(Q)$(CC) -fpic -shared $(CFLAGS) $(LIBNAMES) $(INCS) -o $(@:%.a=%.so) $(SRC)
-	@echo " AR     $(@)"
-	$(Q)$(AR) r $@ $(OBJ)
-	@echo " RANLIB $(@)"
-	$(Q)$(RANLIB) $@
+$(SOLIBS): $(OBJ)
+	@echo " CC     $@"
+	$(Q)$(CC) -fpic -shared $(CFLAGS) $(LIBNAMES) $(INCS) -o $@ $(SRC)
+	@echo " AR     $(LIBS)"
+	$(Q)$(AR) r $(LIBS) $(OBJ)
+	@echo " RANLIB $(LIBS)"
+	$(Q)$(RANLIB) $(LIBS)
 
 %.d: %.c
 	@echo " DEP    $@"
@@ -83,15 +84,15 @@ $(LIBS): $(OBJ)
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 
-vtpserver: vtpserver.o
+vtpserver: vtpserver.c $(SOLIBS)
 	@echo " CC     $@"
-	$(Q)$(CC) $(CFLAGS) $(LIBNAMES) $(INCS) -o $@ $<
+	$(Q)$(CC) $(CFLAGS) -lvtp -lrt -lm -li2c $(LIBNAMES) $(INCS) -o $@ $<
 
 
 -include $(DEPS)
 
 clean:
-	$(Q)rm -vf ${OBJ} ${LIBS} $(LIBS:.a=.so) ${DEPS} ${DEPS}.*
+	$(Q)rm -vf ${OBJ} ${LIBS} $(LIBS:.a=.so) ${DEPS} ${DEPS}.* vtpserver
 
 realclean: clean
 	$(Q)rm -vf *~
