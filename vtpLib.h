@@ -243,6 +243,15 @@ typedef struct Serdes_Struct
 #define VTP_SERDES_VXS   0
 #define VTP_SERDES_QSFP  1
 
+typedef struct Compton_Trigger_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x080-0x004)/4];
+} COMPTONTRIGGER_REGS;
+
+#define VTP_COMPTON_TRIGGER_CTRL_FADC_THRESHOLD_MASK 0x00001FFF
+
+
 typedef struct ECTrigger_Struct
 {
   /** 0x0000 */ volatile uint32_t Hit;
@@ -669,14 +678,18 @@ typedef struct v7_bridge_struct
   /** 0x43C15E00 */ HPSCALIBTRIGGER_REGS hpsCalibTrigger;
 
   /** 0x43C15E40 */ HPSMULTTRIGGER_REGS hpsMultiplicityTrigger[2];
-  
+
   /** 0x43C15EC0 */ BLANK[(0x5F00 - 0x5EC0)/4];
 
   /** 0x43C15F00 */ HPSTRIGGER_REGS hpsTriggerBits;
 
   /** 0x43C16000 */ GTBIT_REGS gtBit[16]; /* 128 bytes */
 
-  /** 0x43C16800 */ BLANK[(0xFFF4 - 0x6800)/4];
+  /** 0x43C16800 */ BLANK[(0x9000 - 0x6800)/4];
+
+  /** 0x43C19000 */ COMPTONTRIGGER_REGS comptonTrigger;
+
+  /** 0x43C19084 */ BLANK[(0xFFF4 - 0x9084)/4];
 
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
@@ -732,6 +745,8 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_FTOF              11
 #define VTP_FW_TYPE_CND               12
 #define VTP_FW_TYPE_HPS               13
+#define VTP_FW_TYPE_COMPTON           15
+
 
 /* Routine prototypes */
 int  vtpSetDebugMask(uint32_t mask);
@@ -924,6 +939,10 @@ int vtpGetHPS_TriggerPrescale(int inst, int *prescale);
 int  vtpHPSSendErrors(char *host);
 int  vtpHPSSendScalers(char *host);
 #endif
+
+// VTP_FW_TYPE_COMPTON functions
+int  vtpSetCompton_Trigger(int fadc_threshold);
+int  vtpGetCompton_Trigger(int *fadc_threshold);
 
 // VTP_FT_TYPE_HTCC functions
 #ifdef IPC

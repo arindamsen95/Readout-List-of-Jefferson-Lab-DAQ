@@ -270,6 +270,7 @@ vtpInit(int iFlag)
     case VTP_FW_TYPE_FTCAL:
     case VTP_FW_TYPE_FTHODO:
     case VTP_FW_TYPE_HPS:
+    case VTP_FW_TYPE_COMPTON:
     case VTP_FW_TYPE_DC:
       break;
     default:
@@ -702,6 +703,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
     case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
     case VTP_FW_TYPE_HPS:
+    case VTP_FW_TYPE_COMPTON:
       ctrl = vtp->v7.fadcDec.Ctrl;
       break;
     case VTP_FW_TYPE_GT:
@@ -1423,6 +1425,7 @@ vtpEnableTriggerPayloadMask(int pp_mask)
     case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
     case VTP_FW_TYPE_HPS:
+    case VTP_FW_TYPE_COMPTON:
       vtp->v7.fadcDec.Ctrl = pp_mask;
       break;
     case VTP_FW_TYPE_GT:
@@ -1464,6 +1467,7 @@ vtpGetTriggerPayloadMask()
     case VTP_FW_TYPE_CND:
     case VTP_FW_TYPE_FTHODO:
     case VTP_FW_TYPE_HPS:
+    case VTP_FW_TYPE_COMPTON:
       pp_mask = vtp->v7.fadcDec.Ctrl;
       break;
     case VTP_FW_TYPE_GT:
@@ -3676,12 +3680,33 @@ vtpHPSSendScalers(char *host)
 
 #endif
 
+/* Hall A Compton functions */
+int
+vtpSetCompton_Trigger(int fadc_threshold)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+  CHECKRANGE_INT(fadc_threshold, 0, 0x1FFF);
 
+  VLOCK;
+  vtp->v7.comptonTrigger.Ctrl = (fadc_threshold & VTP_COMPTON_TRIGGER_CTRL_FADC_THRESHOLD_MASK);
+  VUNLOCK;
 
+  return OK;
+}
 
+int
+vtpGetCompton_Trigger(int *fadc_threshold)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_COMPTON);
 
+  VLOCK;
+  *fadc_threshold = (vtp->v7.comptonTrigger.Ctrl & VTP_COMPTON_TRIGGER_CTRL_FADC_THRESHOLD_MASK);
+  VUNLOCK;
 
-
+  return OK;
+}
 
 /* HTCC functions */
 
@@ -5630,7 +5655,11 @@ vtpTiLinkStatus()
   val = vtp->eb.LinkStatus;
   VUNLOCK;
 
-  printf("%s: LinkStatus = 0x%08X RxReady=%u, RxLocked=%u,PllLocked=%u,RxErrorCnt = %u\n",
+  printf("%s: LinkStatus   = 0x%08X\n"
+	 "      RxReady    = %u\n"
+	 "      RxLocked   = %u\n"
+	 "      PllLocked  = %u\n"
+	 "      RxErrorCnt = %u\n",
          __func__, val,
          (val & VTP_EB_LINKSTATUS_RX_READY) ? 1:0,
          (val & VTP_EB_LINKSTATYS_RX_LOCKED) ? 1:0,

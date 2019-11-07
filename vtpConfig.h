@@ -5,7 +5,7 @@
 
 /****************************************************************************
  *
- *  vtpConfig.h  -  configuration library header file for VTP board 
+ *  vtpConfig.h  -  configuration library header file for VTP board
  *
  */
 
@@ -60,7 +60,7 @@ typedef struct
   float pair_ed_factor;
   int pair_ed_thr;
   int pair_coplanarity_tol;
-  
+
   int pair_esum_en;
   int pair_ediff_en;
   int pair_ed_en;
@@ -87,17 +87,17 @@ typedef struct
 /** VTP configuration parameters **/
 typedef struct {
   char fw_filename[FNLEN];
-  
+
   int fw_rev;
   int fw_type;
   int refclk;
-  
+
   int window_width;
   int window_offset;
 
   int payload_en;
   int fiber_en;
-  
+
   struct
   {
     unsigned int fadcsum_ch_en[16];
@@ -124,7 +124,7 @@ typedef struct {
       int cosmic_evaldelay;
     } outer;
   } ec;
-  
+
   struct
   {
     unsigned int fadcsum_ch_en[16];
@@ -134,7 +134,7 @@ typedef struct {
     int cosmic_evaldelay;
     int cosmic_pixelen;
   } pc;
-  
+
   struct
   {
     int threshold[3];
@@ -197,20 +197,20 @@ typedef struct {
       int cosmic_evaldelay;
     } outer;
   } ecs;
-  
+
   struct
   {
     int trig_latency;
     int trig_width;
     trgbit trgbits[32];
   } gt;
-  
+
   struct
   {
     int dcsegfind_threshold[2];
     char roadid[9];
   } dc;
-  
+
   struct
   {
     int hit_dt;
@@ -284,6 +284,11 @@ typedef struct {
       int prescale[32];
     } trig;
   } hps;
+
+  struct
+  {
+    int fadc_threshold;
+  } compton;
 
 } VTP_CONF;
 
