@@ -208,7 +208,7 @@ vtpInit(int iFlag)
       printf("%s: ERROR invalid trig/sync/clock source specification.\n", __func__);
       break;
   }
-  
+
   if(iFlag & VTP_INIT_SKIP)
   {
     VTP_FW_Version = vtpV7GetFW_Version();
@@ -243,6 +243,7 @@ vtpInit(int iFlag)
   if(vtpV7PllLocked() != OK)
   {
     printf("%s: ERROR - PLL not locked.\n", __func__);
+    vtpUnlock();
     return ERROR;
   }
 
@@ -929,7 +930,7 @@ vtpV7PllReset(int enable)
   }
 
   return OK;
-} 
+}
 
 int
 vtpV7GetFW_Version()
@@ -2647,7 +2648,7 @@ vtpSetHPS_Cluster(int top_nbottom, int hit_dt, int seed_thr)
   CHECKRANGE_INT(seed_thr,    1, 8191);
 
   VLOCK;
-  vtp->v7.hpsCluster.Ctrl = (top_nbottom<<31) | (hit_dt<<16) | (seed_thr<<0); 
+  vtp->v7.hpsCluster.Ctrl = (top_nbottom<<31) | (hit_dt<<16) | (seed_thr<<0);
   VUNLOCK;
 
   return OK;
@@ -2686,7 +2687,7 @@ vtpSetHPS_Hodoscope(int hit_width, int fadchit_thr, int hodo_thr)
   CHECKRANGE_INT(hodo_thr,    1, 8191);
 
   VLOCK;
-  vtp->v7.hpsHodoscope.Ctrl = (hit_width<<26) | (hodo_thr<<13) | (fadchit_thr<<0); 
+  vtp->v7.hpsHodoscope.Ctrl = (hit_width<<26) | (hodo_thr<<13) | (fadchit_thr<<0);
   VUNLOCK;
 
   return OK;
@@ -2912,7 +2913,7 @@ vtpSetHPS_MultiplicityTrigger(
   vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emin  = cluster_emin;
   vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Emax  = cluster_emax;
   vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Nmin  = cluster_nmin;
-  vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult  = enable_flags | 
+  vtp->v7.hpsMultiplicityTrigger[inst].Cluster_Mult  = enable_flags |
                                                        (mult_dt<<12) |
                                                        (mult_tot_min<<8) |
                                                        (mult_bot_min<<4) |
@@ -2990,7 +2991,7 @@ vtpGetHPS_CalibrationTrigger(
   val = vtp->v7.hpsCalibTrigger.Ctrl;
   *enable_flags  = val & 0xFFFFFF00;
   *cosmic_dt     = val & 0x000000FF;
-  
+
   val            = vtp->v7.hpsCalibTrigger.Pulser;
   if(val)
     *pulser_freq   = 250.0E6 / val;
@@ -3184,7 +3185,7 @@ vtpSetHPS_TriggerPrescale(
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
-  
+
   CHECKRANGE_INT(inst,   0, 31);
 
   VLOCK;
@@ -3201,7 +3202,7 @@ vtpGetHPS_TriggerPrescale(
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_HPS);
-  
+
   CHECKRANGE_INT(inst,   0, 31);
 
   VLOCK;
@@ -3324,7 +3325,7 @@ vtpHPSPrintConfig()
 
   printf("Calibration Trigger:\n");
   printf("  Cosmic dt:       %dns\n", cosmic_dt);
-  printf("  Cosmic mode:     %s\n", cosmic_mode); 
+  printf("  Cosmic mode:     %s\n", cosmic_mode);
   printf("  Hodoscope mode:  %s\n", hodoscope_mode);
   printf("  LED mode:        enabled\n");
   printf("  Pulser frequency: %fHz\n", (enable_flags & 0x80000000)?pulser_freq:0.0);
@@ -5059,6 +5060,38 @@ vtpGtSendScalers(char *host)
 #endif
 
 int
+vtpSDPrintScalers()
+{
+  int i;
+  unsigned int gtscalers[4];
+  const char *scalers_name[4] = {
+    "BusClk",
+    "Sync",
+    "Trig1",
+    "Trig2"};
+
+  CHECKINIT;
+
+
+  VLOCK;
+  vtp->v7.sd.ScalerLatch = 1;
+  gtscalers[0] = vtp->v7.sd.Scaler_BusClk;
+  gtscalers[1] = vtp->v7.sd.Scaler_Sync;
+  gtscalers[2] = vtp->v7.sd.Scaler_Trig1;
+  gtscalers[3] = vtp->v7.sd.Scaler_Trig2;
+  vtp->v7.sd.ScalerLatch = 0;
+  VUNLOCK;
+
+
+  printf("%s - \n", __FUNCTION__);
+  for(i = 0; i < 4; i++)
+    {
+      printf("   %-25s %10u\n", scalers_name[i], gtscalers[i]);
+    }
+  return OK;
+}
+
+int
 vtpGtPrintScalers()
 {
   double ref, rate;
@@ -5444,7 +5477,7 @@ vtpGetDc_RoadId(char *id_str)
       id_str[i] = '!';
   }
   id_str[8] = 0;
-  
+
   return OK;
 }
 
@@ -5590,7 +5623,7 @@ vtpTiLinkInit()
 int
 vtpTiLinkStatus()
 {
-  int val;
+  int val, rval = OK;
   CHECKINIT;
 
   VLOCK;
@@ -5605,7 +5638,12 @@ vtpTiLinkStatus()
          (val & VTP_EB_LINKSTATUS_RX_ERROR_CNT_MASK)
         );
 
-  return OK;
+  if((val & VTP_EB_LINKSTATUS_RX_ERROR_CNT_MASK) > 1000)
+    {
+      rval = ERROR;
+    }
+
+  return rval;
 }
 
 int
@@ -5663,7 +5701,7 @@ vtpDmaInit(int id)
   if(!pDma)
     return ERROR;
 
-  printf("%s: start", __func__);
+  printf("%s: start\n", __func__);
   vtpDmaStatus(id);
 
   VLOCK;
@@ -5678,7 +5716,7 @@ vtpDmaInit(int id)
     (0<<2);     // 1-reset DMA engine
   VUNLOCK;
 
-  printf("%s: end  ", __func__);
+  printf("%s: end \n", __func__);
   vtpDmaStatus(id);
 
   return OK;
@@ -5955,7 +5993,9 @@ vtpBReady()
   // bit 0 = ti event buffer empty flag
   // bit 1 = vtp event buffer empty flag
   //if(status & 0x3) return(0); /* both TI and VTP: not ready */
+
   if(status & 0x1) return(0); /* TI only: not ready */
+
   return(1);
 }
 
