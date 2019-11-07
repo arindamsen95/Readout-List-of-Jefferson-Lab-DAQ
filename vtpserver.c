@@ -30,7 +30,8 @@ load_firmware()
   char buf[1000], host[100], hostfile[100], z7file[100], v7file[100];
   int i;
 
-  sprintf(buf, "/home/daq/src/vtp/firmware/vtp_firmware.txt");
+  sprintf(buf, "%s/firmwares/vtp_firmware.txt", getenv("COMPTON_PARAMS"));
+
   f = fopen(buf, "rt");
   if(!f)
   {
@@ -58,14 +59,14 @@ load_firmware()
       {
         printf("%s: Found host %s, z7file: %s, v7file: %s\n", __func__, hostfile, z7file, v7file);
 
-        sprintf(buf, "/home/daq/src/vtp/firmware/%s", z7file);
+        sprintf(buf, "%s/firmwares/%s", getenv("COMPTON_PARAMS"), z7file);
         if(vtpZ7CfgLoad(buf) != OK)
         {
           printf("Z7 programming failed...\n");
           return -1;
         }
 
-        sprintf(buf, "/home/daq/src/vtp/firmware/%s", v7file);
+        sprintf(buf, "%s/firmwares/%s", getenv("COMPTON_PARAMS"), v7file);
         if(vtpV7CfgLoad(buf) != OK)
         {
           printf("V7 programming failed...\n");
@@ -106,7 +107,7 @@ main(int argc, char *argv[])
   /* read vtp firmware table and load into vtp here */
   if(load_firmware())
   {
-    printf("Unabled to load firmware - exiting...\n");
+    printf("Unable to load firmware - exiting...\n");
     goto CLOSE;
   }
 

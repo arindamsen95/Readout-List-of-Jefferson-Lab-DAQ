@@ -370,7 +370,7 @@ vtpReadConfigFile(char *filename_in)
   int    argc,args,argi[11],msk[16],trg_bit;
   float  argf[4];
   unsigned int  ui1;
-  char *clonparms;
+  char *comptonparms;
   int do_parsing;
 
   gethostname(host,ROCLEN);  /* obtain our hostname */
@@ -383,7 +383,7 @@ vtpReadConfigFile(char *filename_in)
 	}
     }
 
-  clonparms = getenv("CLON_PARMS");
+  comptonparms = getenv("COMPTON_PARAMS");
   printf("\nvtpConfig: using config file >%s<\n\n",filename_in);
 
   if(expid==NULL)
@@ -409,7 +409,7 @@ vtpReadConfigFile(char *filename_in)
 	    }
 	  else
 	    {
-	      sprintf(fname, "%s/vtp/%s", clonparms, filename);
+	      sprintf(fname, "%s/vtp/%s", comptonparms, filename);
 	    }
 
 	  if((fd=fopen(fname,"r")) == NULL)
@@ -420,10 +420,10 @@ vtpReadConfigFile(char *filename_in)
 	}
       else if(do_parsing<2) /* filename does not specified */
 	{
-	  sprintf(fname, "%s/vtp/%s.cnf", clonparms, host);
+	  sprintf(fname, "%s/vtp/%s.cnf", comptonparms, host);
 	  if((fd=fopen(fname,"r")) == NULL)
 	    {
-	      sprintf(fname, "%s/vtp/%s.cnf", clonparms, expid);
+	      sprintf(fname, "%s/vtp/%s.cnf", comptonparms, expid);
 	      if((fd=fopen(fname,"r")) == NULL)
 		{
 		  printf("\nReadConfigFile: Can't open config file >%s<\n",fname);
@@ -1463,15 +1463,15 @@ vtpDownloadAll()
   int enable_flags;
   int ii;
   //  char fname[FNLEN];
-  //  char *clonparms;
+  //  char *comptonparms;
 
-  //  clonparms = getenv("CLON_PARMS");
+  //  comptonparms = getenv("COMPTON_PARAMS");
 
   // Open VTP hardware interfaces
   vtpOpen(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
 
   // Load VTP Zynq FPGA image
-  //  snprintf(fname, FNLEN, "%s/firmwares/%s", clonparms, "fe_vtp_hallb_z7.bin");
+  //  snprintf(fname, FNLEN, "%s/firmwares/%s", comptonparms, "fe_vtp_hallb_z7.bin");
   //  if(vtpZ7CfgLoad(fname) != OK)
   //    exit(1);
 
@@ -1481,7 +1481,7 @@ vtpDownloadAll()
   //    return(0);
   //  }
 
-  //  snprintf(fname, FNLEN, "%s/firmwares/%s", clonparms, vtpConf.fw_filename);
+  //  snprintf(fname, FNLEN, "%s/firmwares/%s", comptonparms, vtpConf.fw_filename);
   //  if(vtpV7CfgLoad(fname) != OK)
   //    exit(1);
 
