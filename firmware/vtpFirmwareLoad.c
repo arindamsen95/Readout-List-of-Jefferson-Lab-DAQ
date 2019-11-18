@@ -7,7 +7,7 @@
  *
  */
 
-
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -15,32 +15,80 @@
 
 char *progName;
 
-int  vtpV7Load(char *filename);
 void Usage();
 
-int 
+int
 main(int argc, char *argv[])
 {
-  
+
   int stat=0;
-  char *bin_filename;
-  char inputchar[16];
+  char fwConfigFilename[1000];
+  char hostname[100], hostfile[100], z7file[100], v7file[100];
+  FILE *f;
 
   printf("\nJLAB VTP firmware load\n");
   printf("----------------------------\n");
-  
+
   progName = argv[0];
-  
-  if(argc<2)
+
+  if(argc==2)
     {
-      printf(" ERROR: Must specify one argument\n");
+      strcpy(fwConfigFilename, argv[1]);
+    }
+  else if (argc > 2)
+    {
+      printf(" ERROR: too many arguments (%d))\n", argc-1);
       Usage();
       exit(-1);
     }
   else
     {
-      bin_filename = argv[1];
+      sprintf(fwConfigFilename, "%s/firmwares/vtp_firmware.txt", getenv("COMPTON_PARAMS"));
     }
+
+  f = fopen(fwConfigFilename, "r");
+  if(!f)
+  {
+    perror("fopen");
+    printf("ERROR - failed to open: %s\n",
+	   fwConfigFilename);
+    return -1;
+  }
+
+  if(gethostname(hostname,sizeof(hostname)) < 0)
+    {
+      perror("gethostname");
+      exit(-1);
+    }
+
+  /* Strip out the domain if it is included */
+  int i;
+  for(i=0; i<strlen(hostname); i++)
+    {
+      if(hostname[i] == '.')
+	{
+	  hostname[i] = '\0';
+	  break;
+	}
+    }
+
+  char buf[1000];
+  while(!feof(f))
+    {
+      fgets(buf, sizeof(buf), f);
+
+      if(sscanf(buf, "%100s %100s %100s", hostfile, z7file, v7file) >= 3)
+	{
+	  if(!strcmp(hostname, hostfile))
+	    {
+	      printf("Found host %s, z7file: %s, v7file: %s\n",
+		     hostfile, z7file, v7file);
+	      break;
+	    }
+	}
+    }
+  fclose(f);
+
 
   /* Initialize library */
   stat = vtpOpen(VTP_FPGA_OPEN | VTP_I2C_OPEN | VTP_SPI_OPEN);
@@ -50,65 +98,59 @@ main(int argc, char *argv[])
       goto CLOSE;
     }
 
-  /* Get firmware version? */
-  printf(" Will load firmware for VTP - V7 FPGA ");
-
-  printf(" with file: \n   %s",bin_filename);
-
- REPEAT2:
-  printf(" Press y and <ENTER> to continue... n or q and <ENTER> to quit without firmware load\n");
-
-  scanf("%s",(char *)inputchar);
-
-  if((strcmp(inputchar,"q")==0) || (strcmp(inputchar,"Q")==0) ||
-     (strcmp(inputchar,"n")==0) || (strcmp(inputchar,"N")==0) )
+  /* Load firmware here */
+  sprintf(buf, "%s/firmwares/%s", getenv("COMPTON_PARAMS"), z7file);
+  if(vtpZ7CfgLoad(buf) != OK)
     {
-      printf(" Exiting without firmware load\n");
-      goto CLOSE;
+      printf("Z7 programming failed...\n");
+      return -1;
     }
-  else if((strcmp(inputchar,"y")==0) || (strcmp(inputchar,"Y")==0))
-    {}
-  else
-    goto REPEAT2;
 
-  if(vtpV7Load(bin_filename) != OK)
+  sprintf(buf, "%s/firmwares/%s", getenv("COMPTON_PARAMS"), v7file);
+  if(vtpV7CfgLoad(buf) != OK)
     {
-      printf(" ERROR: Firmware load failed!\n");
+      printf("V7 programming failed...\n");
+      return -1;
     }
-  
+
+
+  ltm4676_print_status();
+
+  if(vtpInit(VTP_INIT_CLK_INT))
+  {
+    printf("VTP Init failed - exiting...\n");
+    goto CLOSE;
+  }
+
  CLOSE:
   vtpClose(VTP_FPGA_OPEN | VTP_I2C_OPEN | VTP_SPI_OPEN);
-    
+
   exit(0);
 }
-
-int
-vtpV7Load(char *filename)
-{
-  vtpV7CtrlInit();
-  
-  vtpV7SetReset(1);
-  vtpV7SetResetSoft(1);
-  
-  if(vtpV7CfgStart() != OK)
-    return ERROR;
-  if(vtpV7CfgLoad(filename) != OK)
-    return ERROR;
-  if(vtpV7CfgEnd() != OK)
-    return ERROR;
-  
-  vtpV7SetReset(0);
-  vtpV7SetResetSoft(0);
-  
-  return OK;
-}
-
 
 void
 Usage()
 {
+  /* Two arguments:
+      0: program name
+      1: Name of Text file with format:
+
+      hostname    [z7 firmware filename]   [v7 firmware filename]
+
+      e.g.
+
+      hallavtp1	  fe_vtp_hallb_z7.bin      fe_vtp_halla_v7_compton.bin
+
+  */
+
   printf("\n");
   printf("%s <firmware .bin file>\n",progName);
   printf("\n");
 
 }
+
+/*
+  Local Variables:
+  compile-command: "make -k vtpFirmwareLoad"
+  End:
+ */
