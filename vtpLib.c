@@ -88,7 +88,7 @@ pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define CHECKTYPE(v) {        \
     if( (v != VTP_FW_TYPE_COMMON) && (v != VTP_FW_Type) ) { \
-      printf("%s: ERROR: VTP wrong firmware type\n",__func__);  \
+      printf("%s: ERROR: VTP wrong firmware type (%d)\n",__func__,v);	\
       return ERROR;           \
     }               \
   }
@@ -213,7 +213,7 @@ vtpInit(int iFlag)
   {
     VTP_FW_Version = vtpV7GetFW_Version();
     VTP_FW_Type = vtpV7GetFW_Type();
-    printf("%s: VTP_FW_Version=%d, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
+    printf("%s: VTP_FW_Version=0x%x, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
     return rval;
   }
 
@@ -254,7 +254,7 @@ vtpInit(int iFlag)
   VTP_FW_Version = vtpV7GetFW_Version();
   vtpUnlock();
 
-  printf("%s: VTP_FW_Version=%d, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
+  printf("%s: VTP_FW_Version=0x%x, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
 
   switch(VTP_FW_Type)
   {

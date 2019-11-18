@@ -689,7 +689,7 @@ typedef struct v7_bridge_struct
 
   /** 0x43C19000 */ COMPTONTRIGGER_REGS comptonTrigger;
 
-  /** 0x43C19084 */ BLANK[(0xFFF4 - 0x9084)/4];
+  /** 0x43C19080 */ BLANK[(0xFFF4 - 0x9080)/4];
 
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
