@@ -370,7 +370,7 @@ vtpReadConfigFile(char *filename_in)
   int    argc,args,argi[11],msk[16],trg_bit;
   float  argf[4];
   unsigned int  ui1;
-  char *comptonparms;
+  char *envDir;
   int do_parsing;
 
   gethostname(host,ROCLEN);  /* obtain our hostname */
@@ -383,8 +383,23 @@ vtpReadConfigFile(char *filename_in)
 	}
     }
 
-  comptonparms = getenv("COMPTON_PARAMS");
-  printf("\nvtpConfig: using config file >%s<\n\n",filename_in);
+#ifdef VTP_CONFIG_GET_ENV
+  envDir = getenv(VTP_CONFIG_GET_ENV);
+  if(envDir == NULL)
+    strcpy(envDir,"./");
+  else
+    {
+      printf("%s: VTP Config Environment Variable:\n"
+	     " %s = %s\n",
+	     __func__,
+	     VTP_CONFIG_GET_ENV, envDir);
+    }
+#else
+  strcpy(envDir,"./");
+#endif
+
+  printf("\n%s: using config file >%s<\n\n",
+	 __func__, filename_in);
 
   if(expid==NULL)
     {
@@ -409,7 +424,7 @@ vtpReadConfigFile(char *filename_in)
 	    }
 	  else
 	    {
-	      sprintf(fname, "%s/vtp/%s", comptonparms, filename);
+	      sprintf(fname, "%s/vtp/%s", envDir, filename);
 	    }
 
 	  if((fd=fopen(fname,"r")) == NULL)
@@ -420,10 +435,10 @@ vtpReadConfigFile(char *filename_in)
 	}
       else if(do_parsing<2) /* filename does not specified */
 	{
-	  sprintf(fname, "%s/vtp/%s.cnf", comptonparms, host);
+	  sprintf(fname, "%s/vtp/%s.cnf", envDir, host);
 	  if((fd=fopen(fname,"r")) == NULL)
 	    {
-	      sprintf(fname, "%s/vtp/%s.cnf", comptonparms, expid);
+	      sprintf(fname, "%s/vtp/%s.cnf",  envDir, expid);
 	      if((fd=fopen(fname,"r")) == NULL)
 		{
 		  printf("\nReadConfigFile: Can't open config file >%s<\n",fname);
@@ -474,7 +489,7 @@ vtpReadConfigFile(char *filename_in)
 		    }
 		  else
 		    {
-		      printf("\nReadConfigFile: crate = %s  host = %s - disactivated\n",ROC_name,host);
+		      printf("\nReadConfigFile: crate = %s  host = %s - deactivated\n",ROC_name,host);
 		      active = 0;
 		    }
 		  continue;
@@ -1463,15 +1478,15 @@ vtpDownloadAll()
   int enable_flags;
   int ii;
   //  char fname[FNLEN];
-  //  char *comptonparms;
+  //  char *envDir;
 
-  //  comptonparms = getenv("COMPTON_PARAMS");
+  //  envDir = getenv("COMPTON_PARAMS");
 
   // Open VTP hardware interfaces
   vtpOpen(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
 
   // Load VTP Zynq FPGA image
-  //  snprintf(fname, FNLEN, "%s/firmwares/%s", comptonparms, "fe_vtp_hallb_z7.bin");
+  //  snprintf(fname, FNLEN, "%s/firmwares/%s", envDir, "fe_vtp_hallb_z7.bin");
   //  if(vtpZ7CfgLoad(fname) != OK)
   //    exit(1);
 
@@ -1481,7 +1496,7 @@ vtpDownloadAll()
   //    return(0);
   //  }
 
-  //  snprintf(fname, FNLEN, "%s/firmwares/%s", comptonparms, vtpConf.fw_filename);
+  //  snprintf(fname, FNLEN, "%s/firmwares/%s", envDir, vtpConf.fw_filename);
   //  if(vtpV7CfgLoad(fname) != OK)
   //    exit(1);
 
@@ -1501,7 +1516,8 @@ vtpDownloadAll()
   vtpConf.fw_rev = vtpV7GetFW_Version();
   vtpConf.fw_type = vtpV7GetFW_Type();
 
-  printf("vtpConfig type = %d\n",vtpConf.fw_type);
+  printf("%s: vtpConfig type = %d\n",
+	 __func__, vtpConf.fw_type);
 
   // Set parameters based on firmware type
   vtpSetWindow(vtpConf.window_offset, vtpConf.window_width);

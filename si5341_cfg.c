@@ -849,7 +849,7 @@ si5341_revb_register_t si5431_regs_vxs_125[] =
     { 0x0B25, 0x02 }
   };
 
-  
+
 int
 si5341_write(uint8_t addr, uint8_t data)
 {
@@ -917,13 +917,26 @@ si5341_readStatus(int print)
 
   if(print)
     {
-      printf("%s: status = %02X, ", __func__, status);
+      printf("%s: status = %02X, %s\n",
+	     __func__,
+	     status,
+	     status ? "* ERROR *" : "OK");
 
-      printf("in cal=%d, ",	(status>>0) & 0x1);
-      printf("losxaxb=%d, ",	(status>>1) & 0x1);
-      printf("losref=%d, ",	(status>>2) & 0x1);
-      printf("plllol=%d, ",	(status>>3) & 0x1);
-      printf("smtimeout=%d",	(status>>4) & 0x1);
+      printf("\tSYSINCAL      %d, %s\n",
+	     (status>>0) & 0x1,
+	     ((status>>0) & 0x1) ? "* Calibrating *" : "OK");
+      printf("\tLOSXAXB       %d, %s\n",
+	     (status>>1) & 0x1,
+	     ((status>>1) & 0x1) ? "* No Signal at XA pin *" : "OK");
+      printf("\tLOSREF        %d, %s\n",
+	     (status>>2) & 0x1,
+	     ((status>>2) & 0x1) ? "* Phase Freq detector does nto have signal *" : "OK");
+      printf("\tLOL           %d, %s\n",
+	     (status>>3) & 0x1,
+	     ((status>>3) & 0x1) ? "* DSPLL is out of lock *" : "OK");
+      printf("\tSMBUS_TIMEOUT %d, %s\n",
+	     (status>>4) & 0x1,
+	     ((status>>4) & 0x1) ? "* SMBus timeout error *" : "OK");
       printf("\n");
     }
 
@@ -1064,7 +1077,7 @@ si5341_Setup()
 #endif
   if(si5341_checkBasePart() != OK)
     return ERROR;
-  
+
   return OK;
 }
 

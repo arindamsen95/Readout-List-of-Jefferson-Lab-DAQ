@@ -58,9 +58,8 @@ vtpSPIOpen()
     {
       if(vtpSPIFD[iid] > 0)
 	{
-	  printf("%s: ERROR: VTP SPI already opened.\n",
-		 __func__);
-	  return ERROR;
+	  VTP_DBGN(VTP_DEBUG_INIT, "VTP SPI already opened.\n");
+	  return OK;
 	}
 
       VTP_DBGN(VTP_DEBUG_INIT, "open SPI device = %s\n", vtpSPIDev[iid]);

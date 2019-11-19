@@ -72,7 +72,7 @@ static volatile ZYNC_REGS *vtp = NULL;
 static int vtpEbTiEventReadErrors;
 static int vtpEbEventReadErrors;
 
-uint32_t vtpDebugMask = VTP_DEBUG_INIT;
+uint32_t vtpDebugMask = 0;
 
 /* Mutex to guard VTP read/writes */
 pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -684,16 +684,18 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
 {
   volatile SERDES_REGS *sdev;
   uint32_t status = 0, ctrl = 0, ctrl2, latency = 0;
+  uint32_t chmask = 0;
   int index;
   CHECKINIT;
   CHECKTYPEDEV;
+
 
   VLOCK;
   ctrl2 = sdev->Ctrl;
   status = sdev->Status;
   latency = sdev->Latency;
   switch(VTP_FW_Type)
-  {
+    {
     case VTP_FW_TYPE_ECS:
     case VTP_FW_TYPE_PCS:
     case VTP_FW_TYPE_EC:
@@ -718,79 +720,91 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
     case VTP_FW_TYPE_FTCAL:
       ctrl = vtp->v7.ftcalDec.Ctrl;
       break;
-  }
+    }
   VUNLOCK;
+
+  if(type == VTP_SERDES_VXS)
+    chmask = ctrl & 0xFFFF;
+  else
+    chmask = (ctrl >> 16) & 0xFFFF;
 
 
   if(pflag==1) /* print */
-  {
-    if(dev==0)
     {
-      printf("\n");
-      if(type == VTP_SERDES_VXS)
-      {
-        printf("    ---Lane---    Error  Link  Trg Latency(ns)\n");
-        printf("PP  0 1 2 3    Ch Count  Reset En  RX     TX\n");
-      }
-      else
-      {
-        printf("    ---Lane---    Error  Link  Trg Latency(ns)\n");
-        printf("FB  0 1 2 3    Ch Count  Reset En  RX     TX\n");
-      }
-      printf("------------------------------------------------------------------------------\n");
+      if((dev==0) && (chmask != 0))
+	{
+	  printf("\n");
+	  printf("    -Lane--  Channel  Error  Link   Trg   Latency [ns]\n");
+	  if(type == VTP_SERDES_VXS)
+	    {
+	      printf("PP  0 1 2 3  Status   Count  Reset  En    RX     TX\n");
+	    }
+	  else
+	    {
+	      printf("FB  0 1 2 3  Status   Count  Reset  En    RX     TX\n");
+	    }
+	  printf("------------------------------------------------------------------------------\n");
+	}
+
+      if((1 << dev) & chmask)
+	{
+	  printf("%2d  ", dev);
+
+	  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(0))?"U":"-");
+	  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(1))?"U":"-");
+	  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(2))?"U":"-");
+	  printf("%s   ", (status & VTP_SERDES_STATUS_LANE_UP(3))?"U":"-");
+
+	  printf("%s      ", (status & VTP_SERDES_STATUS_CHUP)?" UP ":"DOWN");
+
+	  printf("%3d  ", (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>24);
+
+	  printf("%d      ", (ctrl2 & VTP_SERDES_CTRL_GT_RESET) ? 1 : 0);
+
+	  printf("%d     ", (chmask & (1<<dev)) ? 1 : 0);
+
+	  printf("%5d  ", ((latency>>16)&0xFFFF)*4);
+
+	  printf("%5d ", ((latency>>0)&0xFFFF)*4);
+
+	  printf("\n");
+	}
     }
-
-  printf("%2d  ", dev);
-  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(0))?"U":"D");
-  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(1))?"U":"D");
-  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(2))?"U":"D");
-  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(3))?"U":"D");
-  printf("%s  ", (status & VTP_SERDES_STATUS_CHUP)?"U":"D");
-  printf("%3d    ", (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>24);
-  printf("%s     ", (ctrl2 & VTP_SERDES_CTRL_GT_RESET)?"1":"0");
-  if(type == VTP_SERDES_VXS)
-  printf("%s", (ctrl & (1<<dev)) ? "1   ":"0   ");
-  else
-    printf("%s", (ctrl & (1<<(dev+16))) ?  "1   ":"0   ");
-  printf("%5d ", ((latency>>16)&0xFFFF)*4);
-  printf("%5d ", ((latency>>0)&0xFFFF)*4);
-  printf("\n");
-  }
   else /* send */
-  {
-    index = 0;
+    {
+      index = 0;
 
-    data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(0)) ? 1 : 0;
-    if(index>NSERDES) return(OK);
+      data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(0)) ? 1 : 0;
+      if(index>NSERDES) return(OK);
 
-    data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(1)) ? 1 : 0;
-    if(index>NSERDES) return(OK);
+      data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(1)) ? 1 : 0;
+      if(index>NSERDES) return(OK);
 
-    data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(2)) ? 1 : 0;
-    if(index>NSERDES) return(OK);
+      data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(2)) ? 1 : 0;
+      if(index>NSERDES) return(OK);
 
-    data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(3)) ? 1 : 0;
-    if(index>NSERDES) return(OK);
+      data[index++] = (status & VTP_SERDES_STATUS_LANE_UP(3)) ? 1 : 0;
+      if(index>NSERDES) return(OK);
 
-    data[index++] = (status & VTP_SERDES_STATUS_CHUP) ? 1 : 0;
-    if(index>NSERDES) return(OK);
+      data[index++] = (status & VTP_SERDES_STATUS_CHUP) ? 1 : 0;
+      if(index>NSERDES) return(OK);
 
-    data[index++] = (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>24;
-    if(index>NSERDES) return(OK);
+      data[index++] = (status & VTP_SERDES_STATUS_SOFT_ERR_CNT_MASK)>>24;
+      if(index>NSERDES) return(OK);
 
-    data[index++] = (ctrl2 & VTP_SERDES_CTRL_GT_RESET) ? 1 : 0;
-    if(index>NSERDES) return(OK);
+      data[index++] = (ctrl2 & VTP_SERDES_CTRL_GT_RESET) ? 1 : 0;
+      if(index>NSERDES) return(OK);
 
-    if(type == VTP_SERDES_VXS) data[index++] = (ctrl & (1<<dev)) ? 1 : 0;
-    else                       data[index++] = (ctrl & (1<<(dev+16))) ? 1 : 0;
-    if(index>NSERDES) return(OK);
+      if(type == VTP_SERDES_VXS) data[index++] = (ctrl & (1<<dev)) ? 1 : 0;
+      else                       data[index++] = (ctrl & (1<<(dev+16))) ? 1 : 0;
+      if(index>NSERDES) return(OK);
 
-    data[index++] = ((latency>>16)&0xFFFF)*4;
-    if(index>NSERDES) return(OK);
+      data[index++] = ((latency>>16)&0xFFFF)*4;
+      if(index>NSERDES) return(OK);
 
-    data[index++] = ((latency>>0)&0xFFFF)*4;
-    if(index>NSERDES) return(OK);
-  }
+      data[index++] = ((latency>>0)&0xFFFF)*4;
+      if(index>NSERDES) return(OK);
+    }
 
   return OK;
 }
@@ -5109,7 +5123,7 @@ vtpSDPrintScalers()
 
 
   printf("%s - \n", __FUNCTION__);
-  for(i = 0; i < 4; i++)
+  for(i = 1; i < 4; i++)
     {
       printf("   %-25s %10u\n", scalers_name[i], gtscalers[i]);
     }
@@ -5703,6 +5717,7 @@ vtpDmaStatus(int id)
 {
   AXI_DMA_REGS *pDma = vtpDmaGet(id);
   uint32_t cr, sr, len, da;
+  uint32_t eb_stat, eb_ctrl;
   CHECKINIT;
 
   if(!pDma)
@@ -5713,10 +5728,26 @@ vtpDmaStatus(int id)
   sr  = pDma->S2MM_DMASR;
   len = pDma->S2MM_LENGTH;
   da  = pDma->S2MM_DA;
+  eb_stat = vtp->eb.EbStatus;
+  eb_ctrl = vtp->eb.EbCtrl;
   VUNLOCK;
 
-  printf("%s: cr=0x%08X, sr=0x%08X, len=%d, da=0x%08X\n", __func__,  cr, sr, len, da);
-  printf("%s: eb status=0x%08X, ctrl=0x%08X\n", __func__, vtp->eb.EbStatus, vtp->eb.EbCtrl);
+  printf("\n");
+  printf("  DMA Control       : 0x%08x\n", cr);
+  printf("      Status        : 0x%08x (%s)\n",
+	 sr,
+	 (sr & AXI_DMA_STATUS_IDLE) ? "IDLE" : "NOT IDLE" );
+  if(sr & AXI_DMA_STATUS_ERROR_MASK)
+    printf("         * ERROR *\n");
+  if(sr & AXI_DMA_STATUS_IRQ_MASK)
+    printf("         * INTERRUPT GENERATED *\n");
+  printf("      Buffer Length : 0x%08x (%d)\n", len, len);
+  printf("      Dest Address  : 0x%08x\n", da);
+  printf("\n");
+  printf("  Event Builder Status  : 0x%08x\n", eb_stat);
+  printf("                Control : 0x%08x\n", eb_ctrl);
+  printf("\n");
+
   return OK;
 }
 
@@ -5852,41 +5883,134 @@ vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
 
   int retry=100;
   while(cnt < maxsize)
-  {
-    VLOCK;
-    status = vtp->eb.EbStatus;
-    VUNLOCK;
+    {
+      VLOCK;
+      status = vtp->eb.EbStatus;
+      VUNLOCK;
 
-    if(status & 0x1)
+      if(status & 0x1)
 	{
-      if(retry-- > 0)
-	  {
-        continue;
-	  }
-      else
-	  {
-        vtpEbTiEventReadErrors++;
-        printf("vtpEbTiReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpEbTiEventReadErrors);
-        break;
-	  }
+	  if(retry-- > 0)
+	    {
+	      continue;
+	    }
+	  else
+	    {
+	      vtpEbTiEventReadErrors++;
+	      printf("vtpEbTiReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpEbTiEventReadErrors);
+	      break;
+	    }
 	}
 
-    VLOCK;
-    *pBuf++ = vtp->eb.TiFifo;
-    VUNLOCK;
+      VLOCK;
+      *pBuf++ = vtp->eb.TiFifo;
+      VUNLOCK;
 
-    if(status & 0x10000)
-      break;
+      if(status & 0x10000)
+	break;
 
-    if(++cnt > maxsize)
-    {
-      printf("too many event words...exiting\n");
-      break;
+      if(++cnt > maxsize)
+	{
+	  printf("too many event words...exiting\n");
+	  break;
+	}
     }
-  }
 
   return cnt;
 }
+
+int
+vtpTIData2TriggerBank(volatile uint32_t *data, int ndata)
+{
+  uint32_t word;
+  int iword=0, iblkhead, iblktrl, rval = OK;
+
+#define TI_DATA_TYPE_DEFINE_MASK           0x80000000
+#define TI_WORD_TYPE_MASK                  0x78000000
+#define TI_FILLER_WORD_TYPE                0x78000000
+#define TI_BLOCK_HEADER_WORD_TYPE          0x00000000
+#define TI_BLOCK_TRAILER_WORD_TYPE         0x08000000
+
+  /* Work down to find index of block header */
+  while(iword<ndata)
+    {
+
+      word = data[iword];
+
+      if(word & TI_DATA_TYPE_DEFINE_MASK)
+	{
+	  if(((word & TI_WORD_TYPE_MASK)) == TI_BLOCK_HEADER_WORD_TYPE)
+	    {
+	      iblkhead = iword;
+	      break;
+	    }
+	}
+      iword++;
+    }
+
+  /* Check if the index is valid */
+  if(iblkhead == -1)
+    {
+      printf("%s: ERROR: Failed to find TI Block Header\n",
+	     __func__);
+
+      return ERROR;
+    }
+
+  if(iblkhead != 0)
+    {
+      printf("%s: WARN: Invalid index (%d) for the TI Block header.\n",
+	     __func__, iblkhead);
+    }
+
+  /* Work up to find index of block trailer */
+  iword=ndata-1;
+  while(iword>=0)
+    {
+
+      word = data[iword];
+
+      if(word & TI_DATA_TYPE_DEFINE_MASK)
+	{
+	  if(((word & TI_WORD_TYPE_MASK)) == TI_BLOCK_TRAILER_WORD_TYPE)
+	    {
+	      iblktrl = iword;
+	      break;
+	    }
+	}
+      iword--;
+    }
+
+  /* Check if the index is valid */
+  if(iblktrl == -1)
+    {
+      printf("%s: ERROR: Failed to find TI Block Trailer\n",
+	     __func__);
+
+      return ERROR;
+    }
+
+  /* Get the block trailer, and check the number of words contained in it */
+  word = data[iblktrl];
+
+  if((iblktrl - iblkhead + 1) != (word & 0x3fffff))
+    {
+      printf("%s: Number of words inconsistent (index count = %d, block trailer count = %d\n",
+	     __func__,
+	     (iblktrl - iblkhead + 1), word & 0x3fffff);
+
+      return ERROR;
+    }
+
+  /* Modify the total words returned */
+  rval = iblktrl - iblkhead;
+
+  /* Write in the Trigger Bank Length */
+  data[iblkhead] = rval-1;
+
+  return rval;
+}
+
 
 #define VTP_EB_NRETRIES   10000
 
@@ -6138,9 +6262,8 @@ vtpFPGAOpen()
 
   if(vtpFPGAFD > 0)
     {
-      printf("%s: ERROR: VTP FPGA already opened.\n",
-	     __func__);
-      return ERROR;
+      VTP_DBGN(VTP_DEBUG_INIT, "VTP FPGA already opened\n");
+      return OK;
     }
 
   VTP_DBGN(VTP_DEBUG_INIT, "open FPGA device = %s\n", vtpFPGADev);

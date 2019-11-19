@@ -3,6 +3,8 @@
 
 #include "vtpLib.h"
 
+#define VTP_CONFIG_GET_ENV "COMPTON_PARAMS"
+
 /****************************************************************************
  *
  *  vtpConfig.h  -  configuration library header file for VTP board

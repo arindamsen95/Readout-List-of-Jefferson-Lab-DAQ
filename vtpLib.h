@@ -101,6 +101,17 @@ typedef struct AxiDma_Struct
   /** 0x005C */ BLANK[(0x1000-0x5C)/4];
 } AXI_DMA_REGS;
 
+#define AXI_DMA_STATUS_HALTED      (1<<0)
+#define AXI_DMA_STATUS_IDLE        (1<<1)
+#define AXI_DMA_STATUS_DMA_INT_ERR (1<<4)
+#define AXI_DMA_STATUS_DMA_SLV_ERR (1<<5)
+#define AXI_DMA_STATUS_DMA_DEC_ERR (1<<6)
+#define AXI_DMA_STATUS_SG_INT_ERR  (1<<8)
+#define AXI_DMA_STATUS_SG_SLV_ERR  (1<<9)
+#define AXI_DMA_STATUS_SG_DEC_ERR  (1<<10)
+#define AXI_DMA_STATUS_ERROR_MASK  0x00000770
+#define AXI_DMA_STATUS_IRQ_MASK    0x00007000
+
 typedef struct V7Clk_Struct
 {
   /** 0x0000 */ volatile uint32_t Ctrl;
@@ -874,6 +885,7 @@ int  vtpGetGtTriggerBit(int inst, int *strigger_mask0, int *sector_mask0, int *m
 #ifdef IPC
 int  vtpGtSendScalers(char *host);
 #endif
+int  vtpSDPrintScalers();
 
 // VTP_FW_TYPE_DC functions
 int  vtpSetDc_SegmentThresholdMin(int inst, int threshold);
@@ -995,10 +1007,12 @@ int  vtpGetTriggerPayloadMask();
 int  vtpGetTriggerFiberMask();
 int  vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize);
 int  vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize);
+int  vtpTIData2TriggerBank(volatile uint32_t *data, int ndata);
 int  vtpEbDecodeEvent(uint32_t *pBuf, uint32_t size);
 int  vtpEbReadAndDecodeEvent();
 int  vtpSetWindow(int, int);
 int  vtpTiLinkInit();
+int  vtpTiLinkStatus();
 int  vtpEbResetFifo();
 int  vtpEbBuildTestEvent(int len);
 int  vtpEbReset();

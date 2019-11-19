@@ -57,9 +57,9 @@ vtpI2COpen()
     {
       if(vtpI2CFD[iid] > 0)
 	{
-	  printf("%s: ERROR: VTP I2C-%d already open.\n",
-		 __func__, iid);
-	  return ERROR;
+	  VTP_DBGN(VTP_DEBUG_INIT, "VTP I2C-%d already open.\n",
+		   iid);
+	  return OK;
 	}
 
       VTP_DBGN(VTP_DEBUG_INIT, "open I2C device = %s\n", vtpI2CDev[iid]);
