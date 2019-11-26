@@ -880,6 +880,8 @@ int  vtpSetGt_latency(int latency);
 int  vtpGetGt_latency();
 int  vtpSetGt_width(int width);
 int  vtpGetGt_width();
+int  vtpSetTriggerBitPrescaler(int inst, int prescale);
+int  vtpGetTriggerBitPrescaler(int inst);
 int  vtpSetGtTriggerBit(int inst, int strigger_mask0, int sector_mask0, int mult_min0, int strigger_mask1, int sector_mask1, int mult_min1, int coin_width, int ctrigger_mask, int delay, float pulser_freq, int prescale);
 int  vtpGetGtTriggerBit(int inst, int *strigger_mask0, int *sector_mask0, int *mult_min0, int *strigger_mask1, int *sector_mask1, int *mult_min1, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq, int *prescale);
 #ifdef IPC

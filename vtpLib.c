@@ -4888,7 +4888,7 @@ int
 vtpSetGt_latency(int latency)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_GT);
+  CHECKTYPE(VTP_FW_TYPE_COMMON);
 
   VLOCK;
   vtp->v7.trigOut.Latency = latency/4;
@@ -4902,7 +4902,7 @@ vtpGetGt_latency()
 {
   int latency;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_GT);
+  CHECKTYPE(VTP_FW_TYPE_COMMON);
 
   VLOCK;
   latency = vtp->v7.trigOut.Latency;
@@ -4915,7 +4915,7 @@ int
 vtpSetGt_width(int width)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_GT);
+  CHECKTYPE(VTP_FW_TYPE_COMMON);
 
   VLOCK;
   vtp->v7.trigOut.Width = width;
@@ -4929,13 +4929,52 @@ vtpGetGt_width()
 {
   int width;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_GT);
+  CHECKTYPE(VTP_FW_TYPE_COMMON);
 
   VLOCK;
   width = vtp->v7.trigOut.Width;
   VUNLOCK;
 
   return width;
+}
+
+int
+vtpSetTriggerBitPrescaler(int inst, int prescale)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_COMMON);
+
+  if((inst < 0) || (inst > 32))
+    {
+      printf("%s: ERROR - invalid trigger bit %d\n", __func__, inst);
+      return ERROR;
+    }
+
+  VLOCK;
+  vtp->v7.trigOut.Prescaler[inst] = prescale;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetTriggerBitPrescaler(int inst)
+{
+  int rval = 0;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_COMMON);
+
+  if((inst < 0) || (inst > 32))
+    {
+      printf("%s: ERROR - invalid trigger bit %d\n", __func__, inst);
+      return ERROR;
+    }
+
+  VLOCK;
+  rval = vtp->v7.trigOut.Prescaler[inst];
+  VUNLOCK;
+
+  return rval;
 }
 
 int
