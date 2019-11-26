@@ -354,6 +354,12 @@ vtpInitGlobals()
 
   // Compton Configuration
   vtpConf.compton.fadc_threshold = 0;
+  vtpConf.compton.trig.latency = 1000;
+  vtpConf.compton.trig.width = 100;
+  for(i=0;i<32;i++)
+    {
+      vtpConf.compton.trig.prescale[i] = 0;
+    }
 }
 
 
@@ -863,8 +869,6 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf (str_tmp, "%*s %d", &argi[0]);
 		  vtpConf.gt.trig_width = argi[0];
 		}
-
-
 	      else if(!strcmp(keyword,"VTP_GT_TRG"))
 		{
 		  sscanf (str_tmp, "%*s %d", &trg_bit);
@@ -1457,6 +1461,27 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf (str_tmp, "%*s %d", &argi[0]);
 		  vtpConf.compton.fadc_threshold = argi[0];
 		}
+	      else if(!strcmp(keyword,"VTP_COMPTON_LATENCY"))
+		{
+		  sscanf (str_tmp, "%*s %d", &argi[0]);
+		  vtpConf.compton.trig.latency = argi[0];
+		}
+	      else if(!strcmp(keyword,"VTP_COMPTON_WIDTH"))
+		{
+		  sscanf (str_tmp, "%*s %d", &argi[0]);
+		  vtpConf.compton.trig.width = argi[0];
+		}
+	      else if(!strcmp(keyword,"VTP_COMPTON_PRESCALE"))
+		{
+		  sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+		  if(argi[0]<0 || argi[0]>=32)
+		    {
+		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",argi[0]);
+		      return(-4);
+		    }
+
+		  vtpConf.compton.trig.prescale[argi[0]] = argi[1];
+		}
 	      else
 		{
 		  printf("Error: VTP unknown line: fgets returns %s so keyword=%s\n\n",str_tmp,keyword);
@@ -1789,6 +1814,11 @@ vtpDownloadAll()
   if(vtpConf.fw_type == VTP_FW_TYPE_COMPTON)
     {
       vtpSetCompton_Trigger(vtpConf.compton.fadc_threshold);
+      vtpSetGt_latency(vtpConf.compton.trig.latency);
+      vtpSetGt_width(vtpConf.compton.trig.width);
+
+      for(ii=0;ii<32;ii++)
+	vtpSetTriggerBitPrescaler(ii, vtpConf.compton.trig.prescale[ii]);
     }
 
   return(0);
@@ -2074,9 +2104,14 @@ vtpUploadAll(char *string, int length)
 	vtpGetHPS_TriggerPrescale(i, &vtpConf.hps.trig.prescale[i]);
     }
 
-  if(vtpConf.fw_type == VTP_FW_TYPE_HPS)
+  if(vtpConf.fw_type == VTP_FW_TYPE_COMPTON)
     {
       vtpGetCompton_Trigger(&vtpConf.compton.fadc_threshold);
+      vtpConf.compton.trig.latency = vtpGetGt_latency();
+      vtpConf.compton.trig.width = vtpGetGt_width();
+
+      for(i=0;i<32;i++)
+	vtpConf.compton.trig.prescale[i] = vtpGetTriggerBitPrescaler(i);
     }
 
   if(length)
@@ -2348,10 +2383,22 @@ vtpUploadAll(char *string, int length)
 	    }
 	}
 
-      if(vtpConf.fw_type == VTP_FW_TYPE_HPS)
+      if(vtpConf.fw_type == VTP_FW_TYPE_COMPTON)
 	{
 	  sprintf(sss, "VTP_COMTPON_FADC_THRESHOLD %d\n",
 		  vtpConf.compton.fadc_threshold); ADD_TO_STRING;
+
+	  sprintf(sss, "VTP_COMPTON_LATENCY %d\n",
+		  vtpConf.compton.trig.latency); ADD_TO_STRING;
+
+	  sprintf(sss, "VTP_COMPTON_WIDTH %d\n",
+		  vtpConf.compton.trig.width); ADD_TO_STRING;
+
+	  for(i=0;i<32;i++)
+	    {
+	      sprintf(sss, "VTP_COMPTON_PRESCALE %d %d\n",
+		      i, vtpConf.compton.trig.prescale[i]); ADD_TO_STRING;
+	    }
 	}
       CLOSE_STRING;
     }

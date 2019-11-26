@@ -465,18 +465,15 @@ next_port:
 	  }
 	  */
 
-      if( strncmp(address,"129.57.167.",11) &&
-          strncmp(address,"129.57.160.",11) &&
-          strncmp(address,"129.57.68.",10)  &&
-          strncmp(address,"129.57.69.",10)  &&
-          strncmp(address,"129.57.86.",10) &&
-          strncmp(address,"129.57.29.",10) )
-	  {
-        printf("ListenerThread:  ignore request from %s (port %d)\n",
-	       address, port);fflush(stdout);
-        /*close(lsock);*/
-        continue;
-	  }
+      if( (strncmp(address,"129.57.37.",10) != 0) &&
+	  (strncmp(address,"129.57.192.",11) != 0) &&
+	  (strncmp(address,"129.57.193.",11) != 0) )
+	{
+	  printf("ListenerThread:  ignore request from %s (port %d)\n",
+		 address, port);fflush(stdout);
+	  /*close(lsock);*/
+	  continue;
+	}
 
 	}
 

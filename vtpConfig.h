@@ -290,6 +290,14 @@ typedef struct {
   struct
   {
     int fadc_threshold;
+    
+    struct
+    {
+      int latency;
+      int width;
+      int prescale[32];
+    } trig;
+    
   } compton;
 
 } VTP_CONF;
