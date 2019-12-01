@@ -22,8 +22,7 @@ extern void vtpInitGlobals();
     vtpInitGlobals();					\
     vtpConfig("");					\
     if(rol->usrConfig)					\
-      if(strncasecmp(rol->usrConfig,"none",4))		\
-	vtpConfig(rol->usrConfig);			\
+      vtpConfig(rol->usrConfig);			\
   }
 
 /* Prototypes for user defined routines */

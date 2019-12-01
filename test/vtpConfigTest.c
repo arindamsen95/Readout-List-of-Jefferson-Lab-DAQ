@@ -16,18 +16,15 @@
 
 extern int nfadc;
 
-int 
-main(int argc, char *argv[]) 
+int
+main(int argc, char *argv[])
 {
-  if(argc != 2)
-  {
-    printf("Error: must specify VTP config file to run.\n");
-    exit(-1);
-  }
-  
+  char *rol_usrConfig = "none";
+
   vtpInitGlobals();
-  vtpConfig(argv[1]);
-  
+  vtpConfig("");
+  if(strncasecmp(rol_usrConfig,"none",4))
+    vtpConfig(rol_usrConfig);
+
   exit(0);
 }
-
