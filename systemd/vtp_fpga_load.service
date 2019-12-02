@@ -1,0 +1,15 @@
+[Unit]
+Description=Zync FPGA Firmware Loading Service
+Wants=remote-fs.target
+After=remote-fs.target
+Before=DiagGui.service
+
+[Service]
+Type=oneshot
+Environment="LD_LIBRARY_PATH=/home/daq/Linux-armv7l/lib"
+Environment="COMPTON_PARAMS=/home/daq/params/"
+User=daq
+ExecStart=/home/daq/src/vtp/firmware/vtpFirmwareLoad
+
+[Install]
+WantedBy=multi-user.target
