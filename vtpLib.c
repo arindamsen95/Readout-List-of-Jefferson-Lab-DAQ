@@ -5009,7 +5009,10 @@ vtpGetGtTriggerBit(int inst, int *strigger_mask0, int *sector_mask0, int *mult_m
   if(pulser & 0x80000000)
   {
     pulser &= 0x7FFFFFFF;
-    *pulser_freq = ((float)pulser) / 250000000.0f;
+    if(pulser)
+      *pulser_freq = 250000000.0f / ((float)pulser);
+    else
+      *pulser_freq = 0.0;
   }
   else
     *pulser_freq = 0.0f;
