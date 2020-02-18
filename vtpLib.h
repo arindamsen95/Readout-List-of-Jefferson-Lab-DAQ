@@ -256,11 +256,15 @@ typedef struct Serdes_Struct
 
 typedef struct Compton_Trigger_Struct
 {
-  /** 0x0000 */ volatile uint32_t Ctrl;
-  /** 0x0004 */ BLANK[(0x080-0x004)/4];
+  /** 0x0000 */ volatile uint32_t Ctrl[5];
+  /** 000014 */ volatile uint32_t FadcMask[3];
+  /** 0x0020 */ BLANK[(0x100-0x020)/4];
 } COMPTONTRIGGER_REGS;
 
 #define VTP_COMPTON_TRIGGER_CTRL_FADC_THRESHOLD_MASK 0x00001FFF
+#define VTP_COMPTON_TRIGGER_CTRL_VETROC_PULSE_WIDTH_MASK 0x00FF0000
+#define VTP_COMPTON_TRIGGER_CTRL_EPLANE_MULT_MIN_MASK 0x07000000
+#define VTP_COMPTON_TRIGGER_CTRL_EPLANE_MASK 0xF0000000
 
 
 typedef struct ECTrigger_Struct
@@ -700,7 +704,7 @@ typedef struct v7_bridge_struct
 
   /** 0x43C19000 */ COMPTONTRIGGER_REGS comptonTrigger;
 
-  /** 0x43C19080 */ BLANK[(0xFFF4 - 0x9080)/4];
+  /** 0x43C19100 */ BLANK[(0xFFF4 - 0x9100)/4];
 
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
@@ -882,6 +886,8 @@ int  vtpSetGt_width(int width);
 int  vtpGetGt_width();
 int  vtpSetTriggerBitPrescaler(int inst, int prescale);
 int  vtpGetTriggerBitPrescaler(int inst);
+int  vtpSetTriggerBitDelay(int inst, int delay);
+int  vtpGetTriggerBitDelay(int inst, int *delay);
 int  vtpSetGtTriggerBit(int inst, int strigger_mask0, int sector_mask0, int mult_min0, int strigger_mask1, int sector_mask1, int mult_min1, int coin_width, int ctrigger_mask, int delay, float pulser_freq, int prescale);
 int  vtpGetGtTriggerBit(int inst, int *strigger_mask0, int *sector_mask0, int *mult_min0, int *strigger_mask1, int *sector_mask1, int *mult_min1, int *coin_width, int *ctrigger_mask, int *delay, float *pulser_freq, int *prescale);
 #ifdef IPC
@@ -955,8 +961,12 @@ int  vtpHPSSendScalers(char *host);
 #endif
 
 // VTP_FW_TYPE_COMPTON functions
-int  vtpSetCompton_Trigger(int fadc_threshold);
-int  vtpGetCompton_Trigger(int *fadc_threshold);
+int  vtpSetCompton_EnableScalerReadout(int en);
+int  vtpGetCompton_EnableScalerReadout(int *en);
+int  vtpSetCompton_VetrocWidth(int vetroc_width);
+int  vtpGetCompton_VetrocWidth(int *vetroc_width);
+int  vtpSetCompton_Trigger(int inst, int fadc_threshold, int eplane_mult_min, int eplane_mask, int fadc_mask);
+int  vtpGetCompton_Trigger(int inst, int *fadc_threshold, int *eplane_mult_min, int *eplane_mask, int *fadc_mask);
 
 // VTP_FT_TYPE_HTCC functions
 #ifdef IPC
@@ -1044,3 +1054,4 @@ unsigned long vtpDmaMemGetPhysAddress(int buffer_id);
 unsigned long vtpDmaMemGetLocalAddress(int buffer_id);
 
 #endif /* VTPLIB_H */
+

@@ -3696,28 +3696,133 @@ vtpHPSSendScalers(char *host)
 
 /* Hall A Compton functions */
 int
-vtpSetCompton_Trigger(int fadc_threshold)
+vtpSetCompton_VetrocWidth(int vetroc_width)
 {
+  uint32_t reg;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_COMPTON);
-  CHECKRANGE_INT(fadc_threshold, 0, 0x1FFF);
+  CHECKRANGE_INT(vetroc_width, 0, 0xFF);
 
   VLOCK;
-  vtp->v7.comptonTrigger.Ctrl = (fadc_threshold & VTP_COMPTON_TRIGGER_CTRL_FADC_THRESHOLD_MASK);
+  reg = vtp->v7.comptonTrigger.Ctrl[0];
+  reg &= 0xFF00FFFF;
+  reg |= (vetroc_width<<16);
+  vtp->v7.comptonTrigger.Ctrl[0] = reg;
   VUNLOCK;
 
   return OK;
 }
 
 int
-vtpGetCompton_Trigger(int *fadc_threshold)
+vtpGetCompton_VetrocWidth(int *vetroc_width)
 {
+  uint32_t reg = 0;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_COMPTON);
 
   VLOCK;
-  *fadc_threshold = (vtp->v7.comptonTrigger.Ctrl & VTP_COMPTON_TRIGGER_CTRL_FADC_THRESHOLD_MASK);
+  reg = vtp->v7.comptonTrigger.Ctrl[0];
+  *vetroc_width    = (reg & VTP_COMPTON_TRIGGER_CTRL_VETROC_PULSE_WIDTH_MASK) >> 16;
   VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpSetCompton_EnableScalerReadout(int en)
+{
+  uint32_t reg;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+  CHECKRANGE_INT(en, 0, 1);
+
+  VLOCK;
+  reg = vtp->v7.comptonTrigger.Ctrl[0];
+  reg &= 0xFFFF7FFF;
+  reg |= (en<<15);
+  vtp->v7.comptonTrigger.Ctrl[0] = reg;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetCompton_EnableScalerReadout(int *en)
+{
+  uint32_t reg = 0;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+
+  VLOCK;
+  reg = vtp->v7.comptonTrigger.Ctrl[0];
+  *en    = (reg & 0x8000) >> 15;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpSetCompton_Trigger(int inst, int fadc_threshold, int eplane_mult_min, int eplane_mask, int fadc_mask)
+{
+  int reg;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+  CHECKRANGE_INT(inst, 0, 4);
+  CHECKRANGE_INT(fadc_threshold, 0, 0x1FFF);
+  CHECKRANGE_INT(eplane_mult_min, 0, 4);
+
+printf("%s: inst=%d, fadc_thresold=%d, eplane_mult_min=%d, eplane_mask=%d, fadc_mask=%d\n", __func__,
+    inst, fadc_threshold, eplane_mult_min, eplane_mask, fadc_mask);
+
+  VLOCK;
+  reg = vtp->v7.comptonTrigger.Ctrl[inst];
+  reg &= 0xFF00FFFF;
+  reg |= (fadc_threshold & VTP_COMPTON_TRIGGER_CTRL_FADC_THRESHOLD_MASK) |
+         ((eplane_mult_min << 24) & VTP_COMPTON_TRIGGER_CTRL_EPLANE_MULT_MIN_MASK) |
+		 ((eplane_mask << 28) & VTP_COMPTON_TRIGGER_CTRL_EPLANE_MASK);
+  vtp->v7.comptonTrigger.Ctrl[inst] = reg;
+
+  reg = vtp->v7.comptonTrigger.FadcMask[inst/2];
+  if(inst & 0x1)
+  {
+    reg &= 0x0000FFFF;
+	reg |= (fadc_mask<<16);
+  }
+  else
+  {
+    reg &= 0xFFFF0000;
+	reg |= (fadc_mask<<0);
+  }
+  vtp->v7.comptonTrigger.FadcMask[inst/2] = reg;
+
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetCompton_Trigger(int inst, int *fadc_threshold, int *eplane_mult_min, int *eplane_mask, int *fadc_mask)
+{
+  uint32_t reg = 0;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+  CHECKRANGE_INT(inst, 0, 4);
+
+  VLOCK;
+  reg = vtp->v7.comptonTrigger.Ctrl[inst];
+  *fadc_threshold  = (reg & VTP_COMPTON_TRIGGER_CTRL_FADC_THRESHOLD_MASK);
+  *eplane_mult_min = (reg & VTP_COMPTON_TRIGGER_CTRL_EPLANE_MULT_MIN_MASK) >> 24;
+  *eplane_mask     = (reg & VTP_COMPTON_TRIGGER_CTRL_EPLANE_MASK) >> 28;
+
+  reg = vtp->v7.comptonTrigger.FadcMask[inst/2];
+  if(inst & 0x1)
+	*fadc_mask = (reg & 0xFFFF0000)>>16;
+  else
+	*fadc_mask = (reg & 0x0000FFFF)>>0;
+  VUNLOCK;
+
+printf("%s: inst=%d, fadc_thresold=%d, eplane_mult_min=%d, eplane_mask=%d, fadc_mask=0x%04X\n", __func__,
+    inst, *fadc_threshold, *eplane_mult_min, *eplane_mask, *fadc_mask);
 
   return OK;
 }
@@ -4939,8 +5044,35 @@ vtpGetGt_width()
 }
 
 int
-vtpSetTriggerBitPrescaler(int inst, int prescale)
+vtpSetTriggerBitDelay(int inst, int delay)
 {
+  int val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_COMMON);
+
+  if((inst < 0) || (inst > 32))
+    {
+      printf("%s: ERROR - invalid trigger bit %d\n", __func__, inst);
+      return ERROR;
+    }
+
+  CHECKRANGE_INT(delay, 0, 1020);
+  delay = delay/4;
+
+  VLOCK;
+  val = vtp->v7.trigOut.Prescaler[inst] & 0xFF00FFFF;
+  val|= delay<<16;
+  vtp->v7.trigOut.Prescaler[inst] = val;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetTriggerBitDelay(int inst, int *delay)
+{
+  int rval = 0;
+
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_COMMON);
 
@@ -4951,7 +5083,33 @@ vtpSetTriggerBitPrescaler(int inst, int prescale)
     }
 
   VLOCK;
-  vtp->v7.trigOut.Prescaler[inst] = prescale;
+  rval = (vtp->v7.trigOut.Prescaler[inst] >> 16) & 0xFF;
+  VUNLOCK;
+
+  *delay = rval*4;
+
+  return OK;
+}
+
+int
+vtpSetTriggerBitPrescaler(int inst, int prescale)
+{
+  int val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_COMMON);
+
+  if((inst < 0) || (inst > 32))
+    {
+      printf("%s: ERROR - invalid trigger bit %d\n", __func__, inst);
+      return ERROR;
+    }
+
+  CHECKRANGE_INT(prescale, 0, 65535);
+
+  VLOCK;
+  val = vtp->v7.trigOut.Prescaler[inst] & 0xFFFF0000;
+  val|= prescale;
+  vtp->v7.trigOut.Prescaler[inst] = val;
   VUNLOCK;
 
   return OK;
@@ -4971,7 +5129,7 @@ vtpGetTriggerBitPrescaler(int inst)
     }
 
   VLOCK;
-  rval = vtp->v7.trigOut.Prescaler[inst];
+  rval = vtp->v7.trigOut.Prescaler[inst] & 0xFFFF;
   VUNLOCK;
 
   return rval;

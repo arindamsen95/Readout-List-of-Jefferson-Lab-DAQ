@@ -289,13 +289,19 @@ typedef struct {
 
   struct
   {
-    int fadc_threshold;
+    int enable_scaler_readout;
+    int vetroc_width;
+    int fadc_threshold[5];
+    int eplane_mult_min[5];
+    int eplane_mask[5];
+	int fadc_mask[5];
     
     struct
     {
       int latency;
       int width;
       int prescale[32];
+	  int delay[32];
     } trig;
     
   } compton;

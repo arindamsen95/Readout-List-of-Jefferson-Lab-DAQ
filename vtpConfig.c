@@ -10,8 +10,8 @@
 #include "vtpLib.h"
 //#include "xxxConfig.h"
 
-#undef DEBUG
-//#define DEBUG
+//#undef DEBUG
+#define DEBUG
 
 #define ADD_TO_STRING				\
   len1 = strlen(str);				\
@@ -353,13 +353,22 @@ vtpInitGlobals()
     vtpConf.hps.trig.prescale[i] = 1;
 
   // Compton Configuration
-  vtpConf.compton.fadc_threshold = 0;
   vtpConf.compton.trig.latency = 1000;
   vtpConf.compton.trig.width = 100;
+  vtpConf.compton.vetroc_width = 2;
+  vtpConf.compton.enable_scaler_readout = 0;
+  for(i=0; i<5; i++)
+  {
+    vtpConf.compton.fadc_threshold[i] = 0;
+    vtpConf.compton.fadc_mask[i] = 0;
+    vtpConf.compton.eplane_mult_min[i] = 0;
+    vtpConf.compton.eplane_mask[i] = 0;
+  }
   for(i=0;i<32;i++)
-    {
-      vtpConf.compton.trig.prescale[i] = 0;
-    }
+  {
+    vtpConf.compton.trig.prescale[i] = 0;
+    vtpConf.compton.trig.delay[i] = 0;
+  }
 }
 
 
@@ -1456,22 +1465,90 @@ vtpReadConfigFile(char *filename_in)
 
 		  vtpConf.hps.trig.prescale[argi[0]] = argi[1];
 		}
-	      else if(!strcmp(keyword,"VTP_COMPTON_FADC_THRESHOLD"))
+
+
+
+        else if(!strcmp(keyword,"VTP_COMPTON_VETROC_WIDTH"))
 		{
 		  sscanf (str_tmp, "%*s %d", &argi[0]);
-		  vtpConf.compton.fadc_threshold = argi[0];
+		  vtpConf.compton.vetroc_width = argi[0];
 		}
-	      else if(!strcmp(keyword,"VTP_COMPTON_LATENCY"))
+        else if(!strcmp(keyword,"VTP_COMPTON_LATENCY"))
 		{
 		  sscanf (str_tmp, "%*s %d", &argi[0]);
 		  vtpConf.compton.trig.latency = argi[0];
 		}
-	      else if(!strcmp(keyword,"VTP_COMPTON_WIDTH"))
+        else if(!strcmp(keyword,"VTP_COMPTON_WIDTH"))
 		{
 		  sscanf (str_tmp, "%*s %d", &argi[0]);
 		  vtpConf.compton.trig.width = argi[0];
 		}
-	      else if(!strcmp(keyword,"VTP_COMPTON_PRESCALE"))
+
+        else if(!strcmp(keyword,"VTP_COMPTON_FADC_THRESHOLD"))
+		{
+		  sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+		  if(argi[0]<0 || argi[0]>=5)
+		  {
+		      printf("\nReadConfigFile: Wrong compton instannce %d\n\n",argi[0]);
+		      return(-4);
+		  }
+printf("Set FADC_THRESHOLD: %d %d\n", argi[0], argi[1]);
+		  vtpConf.compton.fadc_threshold[argi[0]] = argi[1];
+		}
+        else if(!strcmp(keyword,"VTP_COMPTON_FADC_EN_MASK"))
+		{
+		  args = sscanf (str_tmp, "%*s %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			  &argi[0],
+		      &msk[ 0], &msk[ 1], &msk[ 2], &msk[ 3],
+		      &msk[ 4], &msk[ 5], &msk[ 6], &msk[ 7],
+		      &msk[ 8], &msk[ 9], &msk[10], &msk[11],
+		      &msk[12], &msk[13], &msk[14], &msk[15]);
+		  if(argi[0]<0 || argi[0]>=5)
+		  {
+		      printf("\nReadConfigFile: Wrong compton instannce %d\n\n",argi[0]);
+		      return(-4);
+		  }
+
+  		  ui1 = 0;
+          for(jj=0; jj<16; jj++)
+    	  {
+            if((msk[jj] < 0) || (msk[jj] > 1))				
+	        {					
+  	          printf("\nReadConfigFile: Wrong mask bit value, %d\n\n",msk[jj]);
+			  return(-6);
+	        }
+      		ui1 |= (msk[jj]<<jj);
+    	  }
+		  vtpConf.compton.fadc_mask[argi[0]] = ui1;
+printf("Set FADC_MASK: %d %04X\n", argi[0], vtpConf.compton.fadc_mask[argi[0]]);
+		}
+        else if(!strcmp(keyword,"VTP_COMPTON_EPLANE_MULT_MIN"))
+		{
+		  sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+		  if(argi[0]<0 || argi[0]>=5)
+		  {
+		      printf("\nReadConfigFile: Wrong compton instannce %d\n\n",argi[0]);
+		      return(-4);
+		  }
+printf("Set EPLANE_MULT_MIN: %d %d\n", argi[0], argi[1]);
+          vtpConf.compton.eplane_mult_min[argi[0]] = argi[1];
+		}
+        else if(!strcmp(keyword,"VTP_COMPTON_EPLANE_MASK"))
+		{
+		  sscanf (str_tmp, "%*s %d %d %d %d %d", &argi[0], &argi[1], &argi[2], &argi[3], &argi[4]);
+		  if(argi[0]<0 || argi[0]>=5)
+		  {
+		      printf("\nReadConfigFile: Wrong compton instannce %d\n\n",argi[0]);
+		      return(-4);
+		  }
+          vtpConf.compton.eplane_mask[argi[0]] = 0;
+		  if(argi[1]==1) vtpConf.compton.eplane_mask[argi[0]] |= 0x1;
+		  if(argi[2]==1) vtpConf.compton.eplane_mask[argi[0]] |= 0x2;
+		  if(argi[3]==1) vtpConf.compton.eplane_mask[argi[0]] |= 0x4;
+		  if(argi[4]==1) vtpConf.compton.eplane_mask[argi[0]] |= 0x8;
+printf("Set EPLANE_MASK: %d %d\n", argi[0], vtpConf.compton.eplane_mask[argi[0]]);
+		}
+        else if(!strcmp(keyword,"VTP_COMPTON_PRESCALE"))
 		{
 		  sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0]<0 || argi[0]>=32)
@@ -1479,10 +1556,29 @@ vtpReadConfigFile(char *filename_in)
 		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",argi[0]);
 		      return(-4);
 		    }
-
+printf("Set PRESCALE: %d %d\n", argi[0], argi[1]);
 		  vtpConf.compton.trig.prescale[argi[0]] = argi[1];
 		}
-	      else
+        else if(!strcmp(keyword,"VTP_COMPTON_SCALER_READOUT_EN"))
+		{
+		  sscanf (str_tmp, "%*s %d", &argi[0]);
+		  if(argi[0] > 0)
+	                  vtpConf.compton.enable_scaler_readout = 1;
+		  else
+	                  vtpConf.compton.enable_scaler_readout = 0;
+		}
+        else if(!strcmp(keyword,"VTP_COMPTON_DELAY"))
+		{
+		  sscanf (str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+		  if(argi[0]<0 || argi[0]>=32)
+		    {
+		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",argi[0]);
+		      return(-4);
+		    }
+printf("Set DELAY: %d %d\n", argi[0], argi[1]);
+		  vtpConf.compton.trig.delay[argi[0]] = argi[1];
+		}
+        else
 		{
 		  printf("Error: VTP unknown line: fgets returns %s so keyword=%s\n\n",str_tmp,keyword);
 		}
@@ -1812,14 +1908,21 @@ vtpDownloadAll()
     }
 
   if(vtpConf.fw_type == VTP_FW_TYPE_COMPTON)
+  {
+    for(ii=0;ii<5;ii++)
     {
-      vtpSetCompton_Trigger(vtpConf.compton.fadc_threshold);
-      vtpSetGt_latency(vtpConf.compton.trig.latency);
-      vtpSetGt_width(vtpConf.compton.trig.width);
-
-      for(ii=0;ii<32;ii++)
-	vtpSetTriggerBitPrescaler(ii, vtpConf.compton.trig.prescale[ii]);
+      vtpSetTriggerBitPrescaler(ii, vtpConf.compton.trig.prescale[ii]);
+      vtpSetTriggerBitDelay(ii, vtpConf.compton.trig.delay[ii]);
+      vtpSetCompton_Trigger(ii, vtpConf.compton.fadc_threshold[ii], vtpConf.compton.eplane_mult_min[ii], vtpConf.compton.eplane_mask[ii], vtpConf.compton.fadc_mask[ii]);
     }
+
+    vtpSetCompton_EnableScalerReadout(vtpConf.compton.enable_scaler_readout);
+    vtpSetCompton_VetrocWidth(vtpConf.compton.vetroc_width);
+    vtpSetGt_latency(vtpConf.compton.trig.latency);
+    vtpSetGt_width(vtpConf.compton.trig.width);
+  }
+
+  vtpUploadAllPrint();
 
   return(0);
 }
@@ -2105,14 +2208,19 @@ vtpUploadAll(char *string, int length)
     }
 
   if(vtpConf.fw_type == VTP_FW_TYPE_COMPTON)
+  {
+    for(i=0;i<5;i++)
     {
-      vtpGetCompton_Trigger(&vtpConf.compton.fadc_threshold);
-      vtpConf.compton.trig.latency = vtpGetGt_latency();
-      vtpConf.compton.trig.width = vtpGetGt_width();
-
-      for(i=0;i<32;i++)
-	vtpConf.compton.trig.prescale[i] = vtpGetTriggerBitPrescaler(i);
+      vtpConf.compton.trig.prescale[i] = vtpGetTriggerBitPrescaler(i);
+      vtpGetTriggerBitDelay(i, &vtpConf.compton.trig.delay[i]);
+      vtpGetCompton_Trigger(i, &vtpConf.compton.fadc_threshold[i], &vtpConf.compton.eplane_mult_min[i], &vtpConf.compton.eplane_mask[i], &vtpConf.compton.fadc_mask[i]);
     }
+    vtpGetCompton_EnableScalerReadout(&vtpConf.compton.enable_scaler_readout);
+    vtpGetCompton_VetrocWidth(&vtpConf.compton.vetroc_width);
+    vtpGetGt_latency(&vtpConf.compton.trig.latency);
+    vtpGetGt_width(&vtpConf.compton.trig.width);
+
+  }
 
   if(length)
     {
@@ -2383,25 +2491,62 @@ vtpUploadAll(char *string, int length)
 	    }
 	}
 
-      if(vtpConf.fw_type == VTP_FW_TYPE_COMPTON)
-	{
-	  sprintf(sss, "VTP_COMTPON_FADC_THRESHOLD %d\n",
-		  vtpConf.compton.fadc_threshold); ADD_TO_STRING;
+    if(vtpConf.fw_type == VTP_FW_TYPE_COMPTON)
+    {
+      sprintf(sss, "VTP_COMTPON_VETROC_WIDTH %d\n",
+		  vtpConf.compton.vetroc_width); ADD_TO_STRING;
 
-	  sprintf(sss, "VTP_COMPTON_LATENCY %d\n",
+      sprintf(sss, "VTP_COMPTON_LATENCY %d\n",
 		  vtpConf.compton.trig.latency); ADD_TO_STRING;
 
-	  sprintf(sss, "VTP_COMPTON_WIDTH %d\n",
+      sprintf(sss, "VTP_COMPTON_WIDTH %d\n",
 		  vtpConf.compton.trig.width); ADD_TO_STRING;
 
-	  for(i=0;i<32;i++)
-	    {
-	      sprintf(sss, "VTP_COMPTON_PRESCALE %d %d\n",
-		      i, vtpConf.compton.trig.prescale[i]); ADD_TO_STRING;
-	    }
-	}
-      CLOSE_STRING;
+      sprintf(sss, "VTP_COMPTON_SCALER_READOUT_EN %d\n",
+		  vtpConf.compton.enable_scaler_readout); ADD_TO_STRING;
+
+      for(i=0;i<5;i++)
+      {
+        sprintf(sss, "VTP_COMTPON_FADC_THRESHOLD %d %d\n",
+		  i, vtpConf.compton.fadc_threshold[i]); ADD_TO_STRING;
+
+        sprintf(sss, "VTP_COMPTON_EPLANE_MULT_MIN %d %d\n",
+		  i, vtpConf.compton.eplane_mult_min[i]); ADD_TO_STRING;
+
+        sprintf(sss, "VTP_COMPTON_PRESCALE %d %d\n",
+	      i, vtpConf.compton.trig.prescale[i]); ADD_TO_STRING;
+        
+        sprintf(sss, "VTP_COMPTON_DELAY %d %d\n",
+	      i, vtpConf.compton.trig.delay[i]); ADD_TO_STRING;
+        
+		sprintf(sss, "VTP_COMPTON_EPLANE_MASK %d %d %d %d %d\n",
+	      i, (vtpConf.compton.eplane_mask[i]>>0)&0x1,
+             (vtpConf.compton.eplane_mask[i]>>1)&0x1,
+             (vtpConf.compton.eplane_mask[i]>>2)&0x1,
+             (vtpConf.compton.eplane_mask[i]>>3)&0x1); ADD_TO_STRING;
+
+		sprintf(sss, "VTP_COMPTON_FADC_EN_MASK %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+	      i, (vtpConf.compton.fadc_mask[i]>>0)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>1)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>2)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>3)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>4)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>5)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>6)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>7)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>8)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>9)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>10)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>11)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>12)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>13)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>14)&0x1,
+             (vtpConf.compton.fadc_mask[i]>>15)&0x1
+		); ADD_TO_STRING;
+      }
     }
+    CLOSE_STRING;
+  }
   return(0);
 }
 
