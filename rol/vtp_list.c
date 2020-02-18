@@ -28,15 +28,16 @@ unsigned long gDmaBufPhys_VTP;
 unsigned int gFixedBuf[MAXBUFSIZE];
 #endif
 
-int blklevel = 1;
+int blklevel = 5;
 int maxdummywords = 200;
+int vtpComptonEnableScalerReadout = 0;
 
 /* trigBankType:
    Type 0xff10 is RAW trigger No timestamps
    Type 0xff11 is RAW trigger with timestamps (64 bits)
 */
 int trigBankType = 0xff10;
-
+int firstEvent;
 /**
                         DOWNLOAD
 **/
@@ -55,7 +56,7 @@ rocDownload()
       return;
     }
 #endif
-
+	firstEvent = 1;
 }
 
 /**
@@ -88,6 +89,9 @@ rocPrestart()
 #endif
 
   vtpTiLinkStatus();
+
+  vtpGetCompton_EnableScalerReadout(&vtpComptonEnableScalerReadout);
+  vtpSetCompton_EnableScalerReadout(0);
 }
 
 /**
@@ -124,7 +128,7 @@ rocGo()
 
   blklevel = vtpTiLinkGetBlockLevel(0);
   printf("Block level from TI: %d\n", blklevel);
-  blklevel = 1;
+//  blklevel = 1;
   printf("Setting VTP block level to: %d\n", blklevel);
   vtpSetBlockLevel(blklevel);
 
@@ -132,10 +136,23 @@ rocGo()
   vtpV7SetResetSoft(0);
   vtpEbResetFifo();
 
-
 /* Do DMA readout before Go enabled to clear out any buffered data
    - hack fix until problem with extra TI block header from past run is found */
+#ifdef READOUT_TI
+  #ifdef USE_DMA
+    vtpDmaStart(VTP_DMA_TI, vtpDmaMemGetPhysAddress(0), MAXBUFSIZE*4);
+    vtpDmaWaitDone(VTP_DMA_TI);
+  #else
+    vtpEbTiReadEvent(gpDmaBuf, MAXBUFSIZE);
+  #endif
+#endif
+
+
+
+
   vtpSDPrintScalers();
+
+  vtpSetCompton_EnableScalerReadout(vtpComptonEnableScalerReadout);
 
   VTPflag = 1;
   CDOENABLE(VTP, 1, 0);
@@ -267,6 +284,33 @@ rocTrigger(int EVTYPE)
       *rol->dabufp++ = ii;
     }
   CBCLOSE;
+
+  
+	if(firstEvent)
+	{
+		char str[10000];
+		int len = vtpUploadAll(str, sizeof(str)-4);
+	    str[len] = 0;	
+	    str[len+1] = 0;	
+	    str[len+2] = 0;	
+	    str[len+3] = 0;	
+		firstEvent = 0;
+//  		CBOPEN(0x12, BT_UB1, blklevel);
+  		CBOPEN(0x12, BT_UI4, blklevel);
+		for(ii = 0; ii < (len+3)/4; ii++)
+		{
+		  unsigned int val;
+		  val = ((str[ii*4+0])<<0) |
+				((str[ii*4+1])<<8) |
+				((str[ii*4+2])<<16) |
+				((str[ii*4+3])<<24);
+		 *rol->dabufp++ = val;
+		}
+		CBCLOSE;
+	}
+	
+
+
 
   /* Close event */
   CECLOSE;
