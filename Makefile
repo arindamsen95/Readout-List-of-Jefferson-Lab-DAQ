@@ -63,7 +63,7 @@ else
 endif
 
 
-all: echoarch $(LIBS) vtpserver
+all: echoarch $(SOLIBS) vtpserver
 
 %.o: %.c
 	@echo " CC     $@"

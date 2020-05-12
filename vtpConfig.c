@@ -1512,8 +1512,8 @@ printf("Set FADC_THRESHOLD: %d %d\n", argi[0], argi[1]);
   		  ui1 = 0;
           for(jj=0; jj<16; jj++)
     	  {
-            if((msk[jj] < 0) || (msk[jj] > 1))				
-	        {					
+            if((msk[jj] < 0) || (msk[jj] > 1))
+	        {
   	          printf("\nReadConfigFile: Wrong mask bit value, %d\n\n",msk[jj]);
 			  return(-6);
 	        }
@@ -1591,6 +1591,14 @@ printf("Set DELAY: %d %d\n", argi[0], argi[1]);
   args = args; // dump the unused variable warnings, if we're not checking this return value.
 }
 
+int
+vtpUploadAllPrint()
+{
+  char str[16001];
+  vtpUploadAll(str, 16000);
+  printf("%s",str);
+  return 0;
+}
 
 /* download setting into VTP */
 int
@@ -2515,10 +2523,10 @@ vtpUploadAll(char *string, int length)
 
         sprintf(sss, "VTP_COMPTON_PRESCALE %d %d\n",
 	      i, vtpConf.compton.trig.prescale[i]); ADD_TO_STRING;
-        
+
         sprintf(sss, "VTP_COMPTON_DELAY %d %d\n",
 	      i, vtpConf.compton.trig.delay[i]); ADD_TO_STRING;
-        
+
 		sprintf(sss, "VTP_COMPTON_EPLANE_MASK %d %d %d %d %d\n",
 	      i, (vtpConf.compton.eplane_mask[i]>>0)&0x1,
              (vtpConf.compton.eplane_mask[i]>>1)&0x1,
@@ -2548,15 +2556,6 @@ vtpUploadAll(char *string, int length)
     CLOSE_STRING;
   }
   return(0);
-}
-
-int
-vtpUploadAllPrint()
-{
-  char str[16001];
-  vtpUploadAll(str, 16000);
-  printf("%s",str);
-  return 0;
 }
 
 void

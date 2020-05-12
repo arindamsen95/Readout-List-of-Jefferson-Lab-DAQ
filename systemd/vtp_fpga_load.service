@@ -6,10 +6,10 @@ Before=DiagGui.service
 
 [Service]
 Type=oneshot
-Environment="LD_LIBRARY_PATH=/home/daq/Linux-armv7l/lib"
-Environment="COMPTON_PARAMS=/home/daq/params/"
+Environment="LD_LIBRARY_PATH=/usr/local/src/vtp"
+Environment="VTP_PARAMS=/usr/local/src/vtp/params"
 User=daq
-ExecStart=/home/daq/src/vtp/firmware/vtpFirmwareLoad
+ExecStart=/usr/local/src/vtp/firmware/vtpFirmwareLoad
 
 [Install]
 WantedBy=multi-user.target

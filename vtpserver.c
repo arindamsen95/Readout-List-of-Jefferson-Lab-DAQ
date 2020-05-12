@@ -30,7 +30,7 @@ load_firmware()
   char buf[1000], host[100], hostfile[100], z7file[100], v7file[100];
   int i;
 
-  sprintf(buf, "%s/firmwares/vtp_firmware.txt", getenv("COMPTON_PARAMS"));
+  sprintf(buf, "%s/firmwares/vtp_firmware.txt", getenv(VTP_CONFIG_GET_ENV));
 
   f = fopen(buf, "rt");
   if(!f)
@@ -59,14 +59,14 @@ load_firmware()
       {
         printf("%s: Found host %s, z7file: %s, v7file: %s\n", __func__, hostfile, z7file, v7file);
 
-        sprintf(buf, "%s/firmwares/%s", getenv("COMPTON_PARAMS"), z7file);
+        sprintf(buf, "%s/firmwares/%s", getenv(VTP_CONFIG_GET_ENV), z7file);
         if(vtpZ7CfgLoad(buf) != OK)
         {
           printf("Z7 programming failed...\n");
           return -1;
         }
 
-        sprintf(buf, "%s/firmwares/%s", getenv("COMPTON_PARAMS"), v7file);
+        sprintf(buf, "%s/firmwares/%s", getenv(VTP_CONFIG_GET_ENV), v7file);
         if(vtpV7CfgLoad(buf) != OK)
         {
           printf("V7 programming failed...\n");

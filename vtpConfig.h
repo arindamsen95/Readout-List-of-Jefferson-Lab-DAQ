@@ -3,8 +3,6 @@
 
 #include "vtpLib.h"
 
-#define VTP_CONFIG_GET_ENV "COMPTON_PARAMS"
-
 /****************************************************************************
  *
  *  vtpConfig.h  -  configuration library header file for VTP board
@@ -295,7 +293,7 @@ typedef struct {
     int eplane_mult_min[5];
     int eplane_mask[5];
 	int fadc_mask[5];
-    
+
     struct
     {
       int latency;
@@ -303,7 +301,7 @@ typedef struct {
       int prescale[32];
 	  int delay[32];
     } trig;
-    
+
   } compton;
 
 } VTP_CONF;

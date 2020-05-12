@@ -5,10 +5,10 @@ After=remote-fs.target
 After=vtp_fpga_load.service
 
 [Service]
-Environment="LD_LIBRARY_PATH=/home/daq/Linux-armv7l/lib"
-Environment="COMPTON_PARAMS=/home/daq/params/"
+Environment="LD_LIBRARY_PATH=/usr/local/src/vtp"
+Environment="VTP_PARAMS=/usr/local/src/vtp/params/"
 User=daq
-ExecStart=/home/daq/src/vtp/DiagGui/DiagGuiServer
+ExecStart=/usr/local/src/vtp/DiagGui/DiagGuiServer
 
 [Install]
 WantedBy=multi-user.target

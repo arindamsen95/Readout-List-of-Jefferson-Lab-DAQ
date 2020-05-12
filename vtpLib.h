@@ -25,6 +25,11 @@
 #include "vtp-ltm.h"
 #include "si5341_cfg.h"
 
+/* Environment variable specifying where to find parameter/configuration files */
+#ifndef VTP_CONFIG_GET_ENV
+#define VTP_CONFIG_GET_ENV "VTP_PARAMS"
+#endif
+
 #ifndef ERROR
 #define ERROR -1
 #endif
@@ -1054,4 +1059,3 @@ unsigned long vtpDmaMemGetPhysAddress(int buffer_id);
 unsigned long vtpDmaMemGetLocalAddress(int buffer_id);
 
 #endif /* VTPLIB_H */
-
