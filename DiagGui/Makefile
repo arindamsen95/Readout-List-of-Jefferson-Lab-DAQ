@@ -22,7 +22,7 @@ AR                      = ar
 RANLIB                  = ranlib
 CFLAGS			= -DLinux_$(ARCH) -L. -L${HOME}/Linux-$(ARCH)/lib \
 				-lvtp -lpthread -lrt -lm -li2c
-INCS			= -I. -I/usr/local/include -I${HOME}/Linux-$(ARCH)/include
+INCS			= -I. -I../ -I/usr/local/include -I${HOME}/Linux-$(ARCH)/include
 
 ifdef DEBUG
 	CFLAGS		+= -Wall -g

@@ -1,4 +1,4 @@
 # VTPHOST         Z7FPGA_FIRMWARE        V7FPGA_FIRMWARE
 
-hallavtp1	  fe_vtp_hallb_z7.bin	 fe_vtp_halla_v7_compton.bin
+dafarm18	  fe_vtp_hallb_z7.bin	 fe_vtp_halla_v7_compton.bin
 

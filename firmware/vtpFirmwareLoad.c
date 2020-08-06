@@ -43,7 +43,7 @@ main(int argc, char *argv[])
     }
   else
     {
-      sprintf(fwConfigFilename, "%s/firmwares/vtp_firmware.txt", getenv("COMPTON_PARAMS"));
+      sprintf(fwConfigFilename, "%s/firmwares/vtp_firmware.txt", getenv(VTP_CONFIG_GET_ENV));
     }
 
   f = fopen(fwConfigFilename, "r");
@@ -99,14 +99,14 @@ main(int argc, char *argv[])
     }
 
   /* Load firmware here */
-  sprintf(buf, "%s/firmwares/%s", getenv("COMPTON_PARAMS"), z7file);
+  sprintf(buf, "%s/firmwares/%s", getenv(VTP_CONFIG_GET_ENV), z7file);
   if(vtpZ7CfgLoad(buf) != OK)
     {
       printf("Z7 programming failed...\n");
       return -1;
     }
 
-  sprintf(buf, "%s/firmwares/%s", getenv("COMPTON_PARAMS"), v7file);
+  sprintf(buf, "%s/firmwares/%s", getenv(VTP_CONFIG_GET_ENV), v7file);
   if(vtpV7CfgLoad(buf) != OK)
     {
       printf("V7 programming failed...\n");
