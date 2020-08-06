@@ -399,9 +399,16 @@ vtpReadConfigFile(char *filename_in)
     }
 
 #ifdef VTP_CONFIG_GET_ENV
+  printf("%s: INFO: checking for config path environment variable: %s\n",
+	 __func__,VTP_CONFIG_GET_ENV);
   envDir = getenv(VTP_CONFIG_GET_ENV);
   if(envDir == NULL)
-    strcpy(envDir,"./");
+    {
+      strcpy((char *)str_tmp,"./");
+      envDir = (char *)str_tmp;
+      printf("%s: INFO: %s not found. Using %s\n",
+	     __func__,VTP_CONFIG_GET_ENV,envDir);
+    }
   else
     {
       printf("%s: VTP Config Environment Variable:\n"
@@ -410,20 +417,22 @@ vtpReadConfigFile(char *filename_in)
 	     VTP_CONFIG_GET_ENV, envDir);
     }
 #else
-  strcpy(envDir,"./");
+  strcpy((char *)str_tmp,"./");
+  envDir = (char *)str_tmp;
 #endif
 
-  printf("\n%s: using config file >%s<\n\n",
-	 __func__, filename_in);
+
+  /* printf("\n%s: using config file >%s<\n\n", */
+  /* 	 __func__, filename_in); */
 
   if(expid==NULL)
     {
       expid = getenv("EXPID");
-      printf("\nNOTE: use EXPID=>%s< from environment\n",expid);
+      printf("%s: INFO: using EXPID=>%s< from environment\n",__func__,expid);
     }
   else
     {
-      printf("\nNOTE: use EXPID=>%s< from CODA\n",expid);
+      printf("%s: INFO: using EXPID=>%s< from CODA\n",__func__,expid);
     }
 
   strcpy(filename,filename_in); /* copy filename from parameter list to local string */
@@ -451,12 +460,16 @@ vtpReadConfigFile(char *filename_in)
       else if(do_parsing<2) /* filename does not specified */
 	{
 	  sprintf(fname, "%s/vtp/%s.cnf", envDir, host);
+	  printf("%s: Trying %s\n",
+		 __func__,fname);
 	  if((fd=fopen(fname,"r")) == NULL)
 	    {
 	      sprintf(fname, "%s/vtp/%s.cnf",  envDir, expid);
+	      printf("%s: Trying %s\n",
+		     __func__,fname);
 	      if((fd=fopen(fname,"r")) == NULL)
 		{
-		  printf("\nReadConfigFile: Can't open config file >%s<\n",fname);
+		  printf("%s: Can't find config file\n",__func__);
 		  return(-2);
 		}
 	    }
