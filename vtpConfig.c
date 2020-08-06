@@ -399,9 +399,16 @@ vtpReadConfigFile(char *filename_in)
     }
 
 #ifdef VTP_CONFIG_GET_ENV
+  printf("%s: INFO: checking for config path environment variable: %s\n",
+	 __func__,VTP_CONFIG_GET_ENV);
   envDir = getenv(VTP_CONFIG_GET_ENV);
   if(envDir == NULL)
-    strcpy(envDir,"./");
+    {
+      strcpy((char *)str_tmp,"./");
+      envDir = (char *)str_tmp;
+      printf("%s: INFO: %s not found. Using %s\n",
+	     __func__,VTP_CONFIG_GET_ENV,envDir);
+    }
   else
     {
       printf("%s: VTP Config Environment Variable:\n"
@@ -410,20 +417,22 @@ vtpReadConfigFile(char *filename_in)
 	     VTP_CONFIG_GET_ENV, envDir);
     }
 #else
-  strcpy(envDir,"./");
+  strcpy((char *)str_tmp,"./");
+  envDir = (char *)str_tmp;
 #endif
 
-  printf("\n%s: using config file >%s<\n\n",
-	 __func__, filename_in);
+
+  /* printf("\n%s: using config file >%s<\n\n", */
+  /* 	 __func__, filename_in); */
 
   if(expid==NULL)
     {
       expid = getenv("EXPID");
-      printf("\nNOTE: use EXPID=>%s< from environment\n",expid);
+      printf("%s: INFO: using EXPID=>%s< from environment\n",__func__,expid);
     }
   else
     {
-      printf("\nNOTE: use EXPID=>%s< from CODA\n",expid);
+      printf("%s: INFO: using EXPID=>%s< from CODA\n",__func__,expid);
     }
 
   strcpy(filename,filename_in); /* copy filename from parameter list to local string */
@@ -451,12 +460,16 @@ vtpReadConfigFile(char *filename_in)
       else if(do_parsing<2) /* filename does not specified */
 	{
 	  sprintf(fname, "%s/vtp/%s.cnf", envDir, host);
+	  printf("%s: Trying %s\n",
+		 __func__,fname);
 	  if((fd=fopen(fname,"r")) == NULL)
 	    {
 	      sprintf(fname, "%s/vtp/%s.cnf",  envDir, expid);
+	      printf("%s: Trying %s\n",
+		     __func__,fname);
 	      if((fd=fopen(fname,"r")) == NULL)
 		{
-		  printf("\nReadConfigFile: Can't open config file >%s<\n",fname);
+		  printf("%s: Can't find config file\n",__func__);
 		  return(-2);
 		}
 	    }
@@ -1512,8 +1525,8 @@ printf("Set FADC_THRESHOLD: %d %d\n", argi[0], argi[1]);
   		  ui1 = 0;
           for(jj=0; jj<16; jj++)
     	  {
-            if((msk[jj] < 0) || (msk[jj] > 1))				
-	        {					
+            if((msk[jj] < 0) || (msk[jj] > 1))
+	        {
   	          printf("\nReadConfigFile: Wrong mask bit value, %d\n\n",msk[jj]);
 			  return(-6);
 	        }
@@ -2515,10 +2528,10 @@ vtpUploadAll(char *string, int length)
 
         sprintf(sss, "VTP_COMPTON_PRESCALE %d %d\n",
 	      i, vtpConf.compton.trig.prescale[i]); ADD_TO_STRING;
-        
+
         sprintf(sss, "VTP_COMPTON_DELAY %d %d\n",
 	      i, vtpConf.compton.trig.delay[i]); ADD_TO_STRING;
-        
+
 		sprintf(sss, "VTP_COMPTON_EPLANE_MASK %d %d %d %d %d\n",
 	      i, (vtpConf.compton.eplane_mask[i]>>0)&0x1,
              (vtpConf.compton.eplane_mask[i]>>1)&0x1,
