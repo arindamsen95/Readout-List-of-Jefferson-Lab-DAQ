@@ -93,8 +93,8 @@ vtpConfig(char *fname)
   /* reading and parsing config file */
   if( (res = vtpReadConfigFile(fname)) < 0 )
     {
-      printf("ERROR in vtpConfig: vtpReadConfigFile() returns %d\n",res);
-      return(res);
+      printf("%s: WARNING: vtpReadConfigFile() returned %d\n\t\tUsing defaults.",
+	     __func__, res);
     }
 
   /* download to all boards */
