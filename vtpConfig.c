@@ -77,6 +77,10 @@ char *getenv();
 
 static char *expid = NULL;
 
+/* Routine prototype */
+int vtpUploadAllPrint();
+
+
 void
 vtpSetExpid(char *string)
 {
