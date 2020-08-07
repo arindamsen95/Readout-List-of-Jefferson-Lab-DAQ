@@ -6499,11 +6499,14 @@ vtpFPGAClose()
       return ERROR;
     }
 
-  if(munmap((void *)vtp, sizeof(ZYNC_REGS)) < 0)
-      printf("%s: ERROR from munmap: %s (%d)\n",
-	     __func__, strerror(errno), errno);
+  if(vtp)
+    {
+      if(munmap((void *)vtp, sizeof(ZYNC_REGS)) < 0)
+	printf("%s: ERROR from munmap: %s (%d)\n",
+	       __func__, strerror(errno), errno);
 
-  vtp = NULL;
+      vtp = NULL;
+    }
 
   close(vtpFPGAFD);
   return OK;
@@ -6567,32 +6570,26 @@ vtpClose(int dev_mask)
 {
   if(dev_mask & VTP_SPI_OPEN)
     {
-
       if(vtpSPIClose() == OK)
 	{
 	  vtpDevOpenMASK &= ~VTP_SPI_OPEN;
 	}
-
     }
 
   if(dev_mask & VTP_I2C_OPEN)
     {
-
       if(vtpI2CClose() == OK)
 	{
 	  vtpDevOpenMASK &= ~VTP_I2C_OPEN;
 	}
-
     }
 
   if(dev_mask & VTP_FPGA_OPEN)
     {
-
       if(vtpFPGAClose() == OK)
 	{
 	  vtpDevOpenMASK &= ~VTP_FPGA_OPEN;
 	}
-
     }
 
   vtpKillLockShm(0);
@@ -6731,22 +6728,27 @@ vtpCreateLockShm()
 int
 vtpKillLockShm(int kflag)
 {
-
-  if(munmap(addr_shm, sizeof(struct shared_memory_struct))<0)
-    perror("munmap");
-  if(kflag==1)
+  if(addr_shm)
     {
-      if(pthread_mutexattr_destroy(&p_sync->m_attr)<0)
-	perror("pthread_mutexattr_destroy");
+      if(munmap(addr_shm, sizeof(struct shared_memory_struct))<0)
+	perror("munmap");
 
-      if(pthread_mutex_destroy(&p_sync->mutex)<0)
-	perror("pthread_mutex_destroy");
+      if(kflag==1)
+	{
+	  if(pthread_mutexattr_destroy(&p_sync->m_attr)<0)
+	    perror("pthread_mutexattr_destroy");
 
-      if(shm_unlink(shm_name_vtp)<0)
-	perror("shm_unlink");
+	  if(pthread_mutex_destroy(&p_sync->mutex)<0)
+	    perror("pthread_mutex_destroy");
 
-      printf("%s: VTP shared memory mutex destroyed\n",__FUNCTION__);
+	  if(shm_unlink(shm_name_vtp)<0)
+	    perror("shm_unlink");
+
+	  printf("%s: VTP shared memory mutex destroyed\n",__FUNCTION__);
+	}
+      addr_shm = NULL;
     }
+
   return OK;
 }
 
