@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 #include "vtpConfig.h"
 #include "vtpLib.h"
@@ -74,6 +77,22 @@ char *getenv();
     ui1 |= (msk[jj]<<jj); \
   }  
   
+#define SCAN_MSK8 \
+  args = sscanf (str_tmp, "%*s %d %d %d %d %d %d %d %d", \
+           &msk[ 0], &msk[ 1], &msk[ 2], &msk[ 3], \
+           &msk[ 4], &msk[ 5], &msk[ 6], &msk[ 7])
+           
+#define GET_READ_MSK8 \
+  SCAN_MSK8; \
+  ui1 = 0; \
+  for(jj=0; jj<8; jj++) \
+  { \
+    if((msk[jj] < 0) || (msk[jj] > 1)) \
+    { \
+      printf("\nReadConfigFile: Wrong mask bit value, %d\n\n",msk[jj]); return(-6); \
+    } \
+    ui1 |= (msk[jj]<<jj); \
+  }  
 
 static char *expid = NULL;
 
@@ -110,7 +129,8 @@ vtpInitGlobals()
 
   printf("vtpInitGlobals reached\n");
 
-  memset(vtpConf.fw_filename, 0, sizeof(vtpConf.fw_filename));
+  memset(vtpConf.fw_filename_v7, 0, sizeof(vtpConf.fw_filename_v7));
+  memset(vtpConf.fw_filename_z7, 0, sizeof(vtpConf.fw_filename_z7));
   
   vtpConf.fw_rev = -1;
   vtpConf.fw_type = -1;
@@ -351,6 +371,62 @@ vtpInitGlobals()
   vtpConf.hps.trig.latency = 0;
   for(i=0;i<32;i++)
     vtpConf.hps.trig.prescale[i] = 1;
+
+  // FADC Streaming configuration
+  vtpConf.fadc_streaming.roc_id = 0;
+  vtpConf.fadc_streaming.frame_len = 65536;
+  vtpConf.fadc_streaming.eb[0].mask_en = 0;
+  vtpConf.fadc_streaming.eb[0].source_id = 0;
+  vtpConf.fadc_streaming.eb[0].connect = 0;
+  vtpConf.fadc_streaming.eb[0].ipaddr[0] = 0;
+  vtpConf.fadc_streaming.eb[0].ipaddr[1] = 0;
+  vtpConf.fadc_streaming.eb[0].ipaddr[2] = 0;
+  vtpConf.fadc_streaming.eb[0].ipaddr[3] = 0;
+  vtpConf.fadc_streaming.eb[0].subnet[0] = 0;
+  vtpConf.fadc_streaming.eb[0].subnet[1] = 0;
+  vtpConf.fadc_streaming.eb[0].subnet[2] = 0;
+  vtpConf.fadc_streaming.eb[0].subnet[3] = 0;
+  vtpConf.fadc_streaming.eb[0].gateway[0] = 0;
+  vtpConf.fadc_streaming.eb[0].gateway[1] = 0;
+  vtpConf.fadc_streaming.eb[0].gateway[2] = 0;
+  vtpConf.fadc_streaming.eb[0].gateway[3] = 0;
+  vtpConf.fadc_streaming.eb[0].mac[0] = 0;
+  vtpConf.fadc_streaming.eb[0].mac[1] = 0;
+  vtpConf.fadc_streaming.eb[0].mac[2] = 0;
+  vtpConf.fadc_streaming.eb[0].mac[3] = 0;
+  vtpConf.fadc_streaming.eb[0].mac[4] = 0;
+  vtpConf.fadc_streaming.eb[0].mac[5] = 0;
+  vtpConf.fadc_streaming.eb[0].destip[0] = 0;
+  vtpConf.fadc_streaming.eb[0].destip[1] = 0;
+  vtpConf.fadc_streaming.eb[0].destip[2] = 0;
+  vtpConf.fadc_streaming.eb[0].destip[3] = 0;
+  vtpConf.fadc_streaming.eb[0].destipport = 0;
+  vtpConf.fadc_streaming.eb[1].mask_en = 0;
+  vtpConf.fadc_streaming.eb[1].source_id = 0;
+  vtpConf.fadc_streaming.eb[1].connect = 0;
+  vtpConf.fadc_streaming.eb[1].ipaddr[0] = 0;
+  vtpConf.fadc_streaming.eb[1].ipaddr[1] = 0;
+  vtpConf.fadc_streaming.eb[1].ipaddr[2] = 0;
+  vtpConf.fadc_streaming.eb[1].ipaddr[3] = 0;
+  vtpConf.fadc_streaming.eb[1].subnet[0] = 0;
+  vtpConf.fadc_streaming.eb[1].subnet[1] = 0;
+  vtpConf.fadc_streaming.eb[1].subnet[2] = 0;
+  vtpConf.fadc_streaming.eb[1].subnet[3] = 0;
+  vtpConf.fadc_streaming.eb[1].gateway[0] = 0;
+  vtpConf.fadc_streaming.eb[1].gateway[1] = 0;
+  vtpConf.fadc_streaming.eb[1].gateway[2] = 0;
+  vtpConf.fadc_streaming.eb[1].gateway[3] = 0;
+  vtpConf.fadc_streaming.eb[1].mac[0] = 0;
+  vtpConf.fadc_streaming.eb[1].mac[1] = 0;
+  vtpConf.fadc_streaming.eb[1].mac[2] = 0;
+  vtpConf.fadc_streaming.eb[1].mac[3] = 0;
+  vtpConf.fadc_streaming.eb[1].mac[4] = 0;
+  vtpConf.fadc_streaming.eb[1].mac[5] = 0;
+  vtpConf.fadc_streaming.eb[1].destip[0] = 0;
+  vtpConf.fadc_streaming.eb[1].destip[1] = 0;
+  vtpConf.fadc_streaming.eb[1].destip[2] = 0;
+  vtpConf.fadc_streaming.eb[1].destip[3] = 0;
+  vtpConf.fadc_streaming.eb[1].destipport = 0;
 }
 
 
@@ -364,7 +440,7 @@ vtpReadConfigFile(char *filename_in)
   int    jj, ch;
   char   str_tmp[STRLEN], keyword[ROCLEN];
   char   host[ROCLEN], ROC_name[ROCLEN];
-  int    argc,args,argi[11],msk[16],trg_bit;
+  int    argc,args,argi[11],msk[16],trg_bit, streaming_eb=0;
   float  argf[4];
   unsigned int  ui1;
   char *clonparms;
@@ -490,10 +566,15 @@ vtpReadConfigFile(char *filename_in)
           sscanf (str_tmp, "%*s %d", &argi[0]);
           vtpConf.window_offset = argi[0];
         }
-        else if(!strcmp(keyword,"VTP_FIRMWARE"))
+        else if(!strcmp(keyword,"VTP_FIRMWARE_V7"))
         {
-          sscanf(str_tmp, "%*s %250s", vtpConf.fw_filename);
-          printf("VTP_FIRMWARE = %s\n", vtpConf.fw_filename);
+          sscanf(str_tmp, "%*s %250s", vtpConf.fw_filename_v7);
+          printf("VTP_FIRMWARE = %s\n", vtpConf.fw_filename_v7);
+        }
+        else if(!strcmp(keyword,"VTP_FIRMWARE_Z7"))
+        {
+          sscanf(str_tmp, "%*s %250s", vtpConf.fw_filename_z7);
+          printf("VTP_FIRMWARE = %s\n", vtpConf.fw_filename_z7);
         }
         else if(!strcmp(keyword,"VTP_REFCLK"))
         {
@@ -1434,6 +1515,91 @@ vtpReadConfigFile(char *filename_in)
         
           vtpConf.hps.trig.prescale[argi[0]] = argi[1];
         }
+        else if(!strcmp(keyword,"VTP_STREAMING_ROCID"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.fadc_streaming.roc_id = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING_FRAMELEN"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.fadc_streaming.frame_len = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          if(argi[0]<0 || argi[0]>1)
+          {
+            printf("\nReadConfigFile: Wrong Streaming EB index %d\n\n",argi[0]);
+            return(-4);
+          }
+          streaming_eb = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING_SLOT_EN"))
+        {
+          GET_READ_MSK8;
+          vtpConf.fadc_streaming.eb[streaming_eb].mask_en = ui1;
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING_SOURCE_ID"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.fadc_streaming.eb[streaming_eb].source_id = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING_CONNECT"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          if(argi[0] > 0)
+            vtpConf.fadc_streaming.eb[streaming_eb].connect = 0;
+          else
+            vtpConf.fadc_streaming.eb[streaming_eb].connect = 1;
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING_IPADDR"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1], &argi[2], &argi[3]);
+          vtpConf.fadc_streaming.eb[streaming_eb].ipaddr[0] = argi[0];
+          vtpConf.fadc_streaming.eb[streaming_eb].ipaddr[1] = argi[1];
+          vtpConf.fadc_streaming.eb[streaming_eb].ipaddr[2] = argi[2];
+          vtpConf.fadc_streaming.eb[streaming_eb].ipaddr[3] = argi[3];
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING_SUBNET"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1], &argi[2], &argi[3]);
+          vtpConf.fadc_streaming.eb[streaming_eb].subnet[0] = argi[0];
+          vtpConf.fadc_streaming.eb[streaming_eb].subnet[1] = argi[1];
+          vtpConf.fadc_streaming.eb[streaming_eb].subnet[2] = argi[2];
+          vtpConf.fadc_streaming.eb[streaming_eb].subnet[3] = argi[3];
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING_GATEWAY"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1], &argi[2], &argi[3]);
+          vtpConf.fadc_streaming.eb[streaming_eb].gateway[0] = argi[0];
+          vtpConf.fadc_streaming.eb[streaming_eb].gateway[1] = argi[1];
+          vtpConf.fadc_streaming.eb[streaming_eb].gateway[2] = argi[2];
+          vtpConf.fadc_streaming.eb[streaming_eb].gateway[3] = argi[3];
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING_MAC"))
+        {
+          sscanf (str_tmp, "%*s 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X", &argi[0], &argi[1], &argi[2], &argi[3], &argi[4], &argi[5]);
+          vtpConf.fadc_streaming.eb[streaming_eb].mac[0] = argi[0];
+          vtpConf.fadc_streaming.eb[streaming_eb].mac[1] = argi[1];
+          vtpConf.fadc_streaming.eb[streaming_eb].mac[2] = argi[2];
+          vtpConf.fadc_streaming.eb[streaming_eb].mac[3] = argi[3];
+          vtpConf.fadc_streaming.eb[streaming_eb].mac[4] = argi[4];
+          vtpConf.fadc_streaming.eb[streaming_eb].mac[5] = argi[5];
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING_DESTIP"))
+        {
+          sscanf (str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1], &argi[2], &argi[3]);
+          vtpConf.fadc_streaming.eb[streaming_eb].destip[0] = argi[0];
+          vtpConf.fadc_streaming.eb[streaming_eb].destip[1] = argi[1];
+          vtpConf.fadc_streaming.eb[streaming_eb].destip[2] = argi[2];
+          vtpConf.fadc_streaming.eb[streaming_eb].destip[3] = argi[3];
+        }
+        else if(!strcmp(keyword,"VTP_STREAMING_DESTIPPORT"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.fadc_streaming.eb[streaming_eb].destipport = argi[0];
+        }
         else
         {
           printf("Error: VTP unknown line: fgets returns %s so keyword=%s\n\n",str_tmp,keyword);
@@ -1452,30 +1618,41 @@ int
 vtpDownloadAll()
 {
   int enable_flags;
-  int ii;  
-//  char fname[FNLEN];
-//  char *clonparms;
+  int ii, inst;  
+  char fname[FNLEN];
+  char *clonparms;
+
   
-//  clonparms = getenv("CLON_PARMS");
+  clonparms = getenv("CLON_PARMS");
   
   // Open VTP hardware interfaces
   vtpOpen(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
 
   // Load VTP Zynq FPGA image
-//  snprintf(fname, FNLEN, "%s/firmwares/%s", clonparms, "fe_vtp_hallb_z7.bin");
-//  if(vtpZ7CfgLoad(fname) != OK)
-//    exit(1);
+  if(strlen(vtpConf.fw_filename_z7) <= 0)
+  {
+    printf("No Z7 firmware file specified. Firmware is expected to loaded already.\n");
+return(0);
+  }
+  else
+  {
+    snprintf(fname, FNLEN, "%s/firmwares/%s", clonparms, vtpConf.fw_filename_z7);
+    if(vtpZ7CfgLoad(fname) != OK)
+      exit(1);
+  }
 
-//  if(strlen(vtpConf.fw_filename) <= 0)
-//  {
-//    printf("No firmware file specified, skipping register download (strlen=%d)\n",strlen(vtpConf.fw_filename));
-//    return(0);
-//  }
- 
-//  snprintf(fname, FNLEN, "%s/firmwares/%s", clonparms, vtpConf.fw_filename);
-//  if(vtpV7CfgLoad(fname) != OK)
-//    exit(1);
- 
+  // Load VTP V7 FPGA image
+  if(strlen(vtpConf.fw_filename_v7) <= 0)
+  {
+    printf("No V7 firmware file specified. Firmware is expected to loaded already.\n");
+return(0);
+  }
+  else
+  {
+    snprintf(fname, FNLEN, "%s/firmwares/%s", clonparms, vtpConf.fw_filename_v7);
+    if(vtpV7CfgLoad(fname) != OK)
+      exit(1);
+  }
  
   if(vtpConf.refclk == 125)
     vtpInit(VTP_INIT_CLK_VXS_125);
@@ -1761,13 +1938,44 @@ vtpDownloadAll()
       vtpSetHPS_TriggerPrescale(ii, vtpConf.hps.trig.prescale[ii]);
   }
 
+  if(vtpConf.fw_type == VTP_FW_TYPE_FADCSTREAM)
+  {
+    for(inst=0;inst<2;inst++)
+    {
+      vtpStreamingSetEbCfg(
+          inst,
+          vtpConf.fadc_streaming.eb[inst].mask_en,
+          vtpConf.fadc_streaming.eb[inst].source_id,
+          vtpConf.fadc_streaming.frame_len,
+          vtpConf.fadc_streaming.roc_id
+        );
+
+      vtpStreamingSetTcpCfg(
+          inst,
+          vtpConf.fadc_streaming.eb[inst].ipaddr,
+          vtpConf.fadc_streaming.eb[inst].subnet,
+          vtpConf.fadc_streaming.eb[inst].gateway,
+          vtpConf.fadc_streaming.eb[inst].mac,
+          vtpConf.fadc_streaming.eb[inst].destip,
+          vtpConf.fadc_streaming.eb[inst].destipport
+        );
+
+	  /* do it from readout list
+      vtpStreamingTcpConnect(
+          inst,
+          vtpConf.fadc_streaming.eb[inst].connect
+        );
+	  */
+    }
+  }
+
   return(0);
 }
 
 int
 vtpUploadAll(char *string, int length)
 {
-  int i, len1, len2, enable_flags;
+  int i, len1, len2, enable_flags, inst;
   char *str, sss[4096];
 
   vtpConf.fw_rev = vtpV7GetFW_Version();
@@ -2044,6 +2252,30 @@ vtpUploadAll(char *string, int length)
       vtpGetHPS_TriggerPrescale(i, &vtpConf.hps.trig.prescale[i]);
   }
 
+  if(vtpConf.fw_type == VTP_FW_TYPE_FADCSTREAM)
+  {
+    for(inst=0;inst<2;inst++)
+    {
+      vtpStreamingGetEbCfg(
+          inst,
+          &vtpConf.fadc_streaming.eb[inst].mask_en,
+          &vtpConf.fadc_streaming.eb[inst].source_id,
+          &vtpConf.fadc_streaming.frame_len,
+          &vtpConf.fadc_streaming.roc_id
+        );
+
+      vtpStreamingGetTcpCfg(
+          inst,
+          vtpConf.fadc_streaming.eb[inst].ipaddr,
+          vtpConf.fadc_streaming.eb[inst].subnet,
+          vtpConf.fadc_streaming.eb[inst].gateway,
+          vtpConf.fadc_streaming.eb[inst].mac,
+          vtpConf.fadc_streaming.eb[inst].destip,
+          &vtpConf.fadc_streaming.eb[inst].destipport
+        );
+    }
+  }
+
   if(length)
   {
     str = string;
@@ -2310,6 +2542,63 @@ vtpUploadAll(char *string, int length)
       for(i=0;i<32;i++)
       {
         sprintf(sss, "VTP_HPS_PRESCALE %d %d\n", i, vtpConf.hps.trig.prescale[i]); ADD_TO_STRING;
+      }
+    }
+
+    if(vtpConf.fw_type == VTP_FW_TYPE_FADCSTREAM)
+    {
+      sprintf(sss, "VTP_STREAMING_ROCID %d\n", vtpConf.fadc_streaming.roc_id); ADD_TO_STRING;
+      sprintf(sss, "VTP_STREAMING_FRAMELEN %d\n", vtpConf.fadc_streaming.frame_len); ADD_TO_STRING;
+      for(inst=0;inst<2;inst++)
+      {
+        sprintf(sss, "VTP_STREAMING %d\n", inst); ADD_TO_STRING;
+        sprintf(sss, "VTP_STREAMING_SLOT_EN %d %d %d %d %d %d %d %d\n",
+            (vtpConf.fadc_streaming.eb[inst].mask_en>>0) & 0x1,
+            (vtpConf.fadc_streaming.eb[inst].mask_en>>1) & 0x1,
+            (vtpConf.fadc_streaming.eb[inst].mask_en>>2) & 0x1,
+            (vtpConf.fadc_streaming.eb[inst].mask_en>>3) & 0x1,
+            (vtpConf.fadc_streaming.eb[inst].mask_en>>4) & 0x1,
+            (vtpConf.fadc_streaming.eb[inst].mask_en>>5) & 0x1,
+            (vtpConf.fadc_streaming.eb[inst].mask_en>>6) & 0x1,
+            (vtpConf.fadc_streaming.eb[inst].mask_en>>7) & 0x1
+          ); ADD_TO_STRING;
+        sprintf(sss, "VTP_STREAMING_SOURCE_ID %d\n", vtpConf.fadc_streaming.eb[inst].source_id); ADD_TO_STRING;
+        sprintf(sss, "VTP_STREAMING_CONNECT %d\n", vtpConf.fadc_streaming.eb[inst].connect); ADD_TO_STRING;
+        sprintf(sss, "VTP_STREAMING_IPADDR %d %d %d %d\n", 
+            vtpConf.fadc_streaming.eb[inst].ipaddr[0],
+            vtpConf.fadc_streaming.eb[inst].ipaddr[1],
+            vtpConf.fadc_streaming.eb[inst].ipaddr[2],
+            vtpConf.fadc_streaming.eb[inst].ipaddr[3]
+          ); ADD_TO_STRING;
+        sprintf(sss, "VTP_STREAMING_SUBNET %d %d %d %d\n",
+            vtpConf.fadc_streaming.eb[inst].subnet[0],
+            vtpConf.fadc_streaming.eb[inst].subnet[1],
+            vtpConf.fadc_streaming.eb[inst].subnet[2],
+            vtpConf.fadc_streaming.eb[inst].subnet[3]
+          ); ADD_TO_STRING;
+        sprintf(sss, "VTP_STREAMING_GATEWAY %d %d %d %d\n",
+            vtpConf.fadc_streaming.eb[inst].gateway[0],
+            vtpConf.fadc_streaming.eb[inst].gateway[1],
+            vtpConf.fadc_streaming.eb[inst].gateway[2],
+            vtpConf.fadc_streaming.eb[inst].gateway[3]
+          ); ADD_TO_STRING;
+        sprintf(sss, "VTP_STREAMING_MAC %d %d %d %d %d %d\n",
+            vtpConf.fadc_streaming.eb[inst].mac[0],
+            vtpConf.fadc_streaming.eb[inst].mac[1],
+            vtpConf.fadc_streaming.eb[inst].mac[2],
+            vtpConf.fadc_streaming.eb[inst].mac[3],
+            vtpConf.fadc_streaming.eb[inst].mac[4],
+            vtpConf.fadc_streaming.eb[inst].mac[5]
+          ); ADD_TO_STRING;
+        sprintf(sss, "VTP_STREAMING_DESTIP %d %d %d %d\n",
+            vtpConf.fadc_streaming.eb[inst].destip[0],
+            vtpConf.fadc_streaming.eb[inst].destip[1],
+            vtpConf.fadc_streaming.eb[inst].destip[2],
+            vtpConf.fadc_streaming.eb[inst].destip[3]
+          ); ADD_TO_STRING;
+        sprintf(sss, "VTP_STREAMING_DESTIPPORT %d\n",
+            vtpConf.fadc_streaming.eb[inst].destipport
+          );
       }
     }
 
