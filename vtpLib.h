@@ -757,7 +757,7 @@ typedef struct v7_bridge_struct
 
   /** 0x43C18900 */ EBIOTX_REGS ebioTx[2];
 
-  /** 0x43C18A00 */ BLANK[(9000 - 0x8A00)/4];
+  /** 0x43C18A00 */ BLANK[(0x9000 - 0x8A00)/4];
 
   /** 0x43C19000 */ COMPTONTRIGGER_REGS comptonTrigger;
 
