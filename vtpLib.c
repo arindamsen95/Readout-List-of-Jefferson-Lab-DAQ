@@ -270,33 +270,308 @@ vtpInit(int iFlag)
     case VTP_FW_TYPE_FTCAL:
     case VTP_FW_TYPE_FTHODO:
     case VTP_FW_TYPE_HPS:
-    case VTP_FW_TYPE_COMPTON:
     case VTP_FW_TYPE_DC:
+    case VTP_FW_TYPE_COMPTON:
+      vtpSetTrig1Source(trig1Src);
+      vtpSetSyncSource(syncSrc);
+      vtpTiLinkInit();
+      vtpEbResetFifo();
+
+      VLOCK;
+      vtp->v7.sd.FPAOSel = 0xFFFFFFFF;  /* Route trigger output to FPAO */
+      vtp->v7.sd.FPBOSel = 0xFFFFFFFF;  /* Route trigger output to FPBO */
+      sdStatus = vtp->v7.sd.Status;
+      VUNLOCK;
+
+      printf("VTP SD Daughtercard ID = 0x%08X\n", sdStatus);
+
       break;
+
+    case VTP_FW_TYPE_FADCSTREAM:
+      vtpSetTrig1Source(trig1Src);
+      vtpSetSyncSource(syncSrc);
+
+      // Zynq FPGA clock reset
+      VLOCK;
+      vtp->clk.Ctrl = 0x7;
+      vtp->clk.Ctrl = 0x6;
+      vtp->clk.Ctrl = 0x0;
+      usleep(10000);
+      printf("VTP: z7 clock status = 0x%08X\n", vtp->clk.Status);
+      VUNLOCK;
+
+      break;
+
     default:
       printf("%s: ERROR - unknown firmware type %d. Unable to setup VTP PLL.\n", __func__, VTP_FW_Type);
       return ERROR;
   }
 
-  vtpSetTrig1Source(trig1Src);
-  vtpSetSyncSource(syncSrc);
-
-  vtpTiLinkInit();
-
-  vtpEbResetFifo();
-
-  VLOCK;
-  vtp->v7.sd.FPAOSel = 0xFFFFFFFF;  /* Route trigger output to FPAO */
-  vtp->v7.sd.FPBOSel = 0xFFFFFFFF;  /* Route trigger output to FPBO */
-  sdStatus = vtp->v7.sd.Status;
-  VUNLOCK;
-
-  printf("VTP SD Daughtercard ID = 0x%08X\n", sdStatus);
-
   vtpEbTiEventReadErrors = 0;
   vtpEbEventReadErrors = 0;
 
   return rval;
+}
+
+int
+vtpStatus()
+{
+  int status, fw_version, fw_type, timestamp, temp, mig[2], i, inst;
+  int ebiorx_status[2], clocksweep[2], debug[2][7], eye[2][17], mdelay[2][17], ebiotx_status[2];
+  int ebiorx_ctrl[2], ebiotx_ctrl[2];
+  int initial_delay[2], bitslip[2], m_delay_val_out[2][17], s_delay_val_out[2][17], cdataout[2], c_sweep_delay[2];
+  unsigned long long nwords[2][9];
+  float t;
+  int ebctrl[2], fadcstr[2];
+  int ebHeaderStatus[2], ebDdr3ReaderStatus[2], ebWriterStatus[2], ebDecimaterStatus[2];
+  int mig_cnts[2][4];
+
+  CHECKINIT;
+
+  if(VTP_FW_Type == VTP_FW_TYPE_FADCSTREAM)
+  {
+    VLOCK;
+    status     = vtp->v7.clk.Status;
+    fw_version = vtp->v7.clk.FW_Version;
+    fw_type    = vtp->v7.clk.FW_Type;
+    timestamp  = vtp->v7.clk.Timestamp;
+    temp       = vtp->v7.clk.Temp;
+
+    for(inst=0; inst<2; inst++)
+    {
+      mig[inst]           = vtp->v7.mig[inst].Status;
+      mig_cnts[inst][0]   = vtp->v7.mig[inst].WriteCnt;
+      mig_cnts[inst][1]   = vtp->v7.mig[inst].ReadCnt;
+      mig_cnts[inst][2]   = vtp->v7.mig[inst].WriteDataCnt;
+      mig_cnts[inst][3]   = vtp->v7.mig[inst].ReadDataCnt;
+      ebctrl[inst]        = vtp->v7.streamingEb[inst].Ctrl;
+      if(inst==0)
+        fadcstr[inst]       = ((vtp->v7.fadcStreaming[0].Ctrl & 0x1)<<0) |
+                              ((vtp->v7.fadcStreaming[1].Ctrl & 0x1)<<1) |
+                              ((vtp->v7.fadcStreaming[2].Ctrl & 0x1)<<2) |
+                              ((vtp->v7.fadcStreaming[3].Ctrl & 0x1)<<3) |
+                              ((vtp->v7.fadcStreaming[4].Ctrl & 0x1)<<4) |
+                              ((vtp->v7.fadcStreaming[5].Ctrl & 0x1)<<5) |
+                              ((vtp->v7.fadcStreaming[6].Ctrl & 0x1)<<6) |
+                              ((vtp->v7.fadcStreaming[7].Ctrl & 0x1)<<7);
+      else
+        fadcstr[inst]       = ((vtp->v7.fadcStreaming[8].Ctrl & 0x1)<<0) |
+                              ((vtp->v7.fadcStreaming[9].Ctrl & 0x1)<<1) |
+                              ((vtp->v7.fadcStreaming[10].Ctrl & 0x1)<<2) |
+                              ((vtp->v7.fadcStreaming[11].Ctrl & 0x1)<<3) |
+                              ((vtp->v7.fadcStreaming[12].Ctrl & 0x1)<<4) |
+                              ((vtp->v7.fadcStreaming[13].Ctrl & 0x1)<<5) |
+                              ((vtp->v7.fadcStreaming[14].Ctrl & 0x1)<<6) |
+                              ((vtp->v7.fadcStreaming[15].Ctrl & 0x1)<<7);
+
+      ebiorx_status[inst] = vtp->ebiorx[inst].Status;
+      clocksweep[inst]    = vtp->ebiorx[inst].ClockSweep;
+      for(i=0; i<7; i++)
+        debug[inst][i] = vtp->ebiorx[inst].Debug[i];
+
+      for(i=0; i<17; i++)
+      {
+        eye[inst][i] = vtp->ebiorx[inst].Eye[i];
+        mdelay[inst][i] = vtp->ebiorx[inst].MDelay1Hot[i];
+      }
+
+      for(i=0; i<9; i++)
+      {
+        nwords[inst][i] = vtp->v7.streamingEb[inst].NWords[2*i+0];
+        nwords[inst][i]+= (unsigned long long)vtp->v7.streamingEb[inst].NWords[2*i+1];
+      }
+      ebHeaderStatus[inst] = vtp->v7.streamingEb[inst].HeaderStatus;
+      ebDdr3ReaderStatus[inst] = vtp->v7.streamingEb[inst].Ddr3ReaderStatus;
+      ebWriterStatus[inst] = vtp->v7.streamingEb[inst].EbWriterStatus;
+      ebDecimaterStatus[inst] = vtp->v7.streamingEb[inst].EbDecimaterStatus;
+      ebiotx_status[inst] = vtp->v7.ebioTx[inst].Status;
+      ebiorx_ctrl[inst] = vtp->ebiorx[inst].Ctrl;
+      ebiotx_ctrl[inst] = vtp->v7.ebioTx[inst].Ctrl;
+    }
+
+    VUNLOCK;
+
+    t = (float)temp * 503.975 / 4096.0 - 273.15;
+
+    for(inst=0; inst<2; inst++)
+    {
+      initial_delay[inst]       = ((debug[inst][0]>> 0) & 0x1f);
+      bitslip[inst]             = ((debug[inst][0]>> 5) & 0x1);
+      m_delay_val_out[inst][0]  = ((debug[inst][0]>> 6) & 0x1f);
+      m_delay_val_out[inst][1]  = ((debug[inst][0]>>11) & 0x1f);
+      m_delay_val_out[inst][2]  = ((debug[inst][0]>>16) & 0x1f);
+      m_delay_val_out[inst][3]  = ((debug[inst][0]>>21) & 0x1f);
+      m_delay_val_out[inst][4]  = ((debug[inst][0]>>26) & 0x1f) | (((debug[inst][1]>>0) & 0x1)<<5);
+      m_delay_val_out[inst][5]  = ((debug[inst][1]>> 1) & 0x1f);
+      m_delay_val_out[inst][6]  = ((debug[inst][1]>> 6) & 0x1f);
+      m_delay_val_out[inst][7]  = ((debug[inst][1]>>11) & 0x1f);
+      m_delay_val_out[inst][8]  = ((debug[inst][1]>>16) & 0x1f);
+      m_delay_val_out[inst][9]  = ((debug[inst][1]>>21) & 0x1f);
+      m_delay_val_out[inst][10] = ((debug[inst][1]>>26) & 0x1f) | (((debug[inst][2]>>0) & 0x1)<<5);
+      m_delay_val_out[inst][11] = ((debug[inst][2]>> 1) & 0x1f);
+      m_delay_val_out[inst][12] = ((debug[inst][2]>> 6) & 0x1f);
+      m_delay_val_out[inst][13] = ((debug[inst][2]>>11) & 0x1f);
+      m_delay_val_out[inst][14] = ((debug[inst][2]>>16) & 0x1f);
+      m_delay_val_out[inst][15] = ((debug[inst][2]>>21) & 0x1f);
+      m_delay_val_out[inst][16] = ((debug[inst][2]>>26) & 0x1f) | (((debug[inst][3]>>0) & 0x1)<<5);
+
+      s_delay_val_out[inst][0]  = ((debug[inst][3]>> 1) & 0x1f);
+      s_delay_val_out[inst][1]  = ((debug[inst][3]>> 6) & 0x1f);
+      s_delay_val_out[inst][2]  = ((debug[inst][3]>>11) & 0x1f);
+      s_delay_val_out[inst][3]  = ((debug[inst][3]>>16) & 0x1f);
+      s_delay_val_out[inst][4]  = ((debug[inst][3]>>21) & 0x1f);
+      s_delay_val_out[inst][5]  = ((debug[inst][3]>>26) & 0x1f) | (((debug[inst][4]>>0) & 0x1)<<5);
+      s_delay_val_out[inst][6]  = ((debug[inst][4]>> 1) & 0x1f);
+      s_delay_val_out[inst][7]  = ((debug[inst][4]>> 6) & 0x1f);
+      s_delay_val_out[inst][8]  = ((debug[inst][4]>>11) & 0x1f);
+      s_delay_val_out[inst][9]  = ((debug[inst][4]>>16) & 0x1f);
+      s_delay_val_out[inst][10] = ((debug[inst][4]>>21) & 0x1f);
+      s_delay_val_out[inst][11] = ((debug[inst][4]>>26) & 0x1f) | (((debug[inst][5]>>0) & 0x1)<<5);
+      s_delay_val_out[inst][12] = ((debug[inst][5]>> 1) & 0x1f);
+      s_delay_val_out[inst][13] = ((debug[inst][5]>> 6) & 0x1f);
+      s_delay_val_out[inst][14] = ((debug[inst][5]>>11) & 0x1f);
+      s_delay_val_out[inst][15] = ((debug[inst][5]>>16) & 0x1f) | (((debug[inst][6]>>0) & 0x1)<<5);
+      s_delay_val_out[inst][16] = ((debug[inst][6]>> 1) & 0x1f);
+
+      cdataout[inst]            = ((debug[inst][6]>> 6) & 0xf);
+      c_sweep_delay[inst]       = ((debug[inst][6]>>14) & 0x1f);
+    }
+
+    printf("---------------------------------------\n");
+    printf("--VTP Status                         --\n");
+    printf("---------------------------------------\n");
+    printf("Clock:\n");
+    printf("  Global PLL locked: %d\n", (status>>0) & 0x1);
+    printf("\n");
+    printf("Firmware:\n");
+    printf("  Type: %2d\n", fw_type);
+    printf("  Version: %d.%d\n", (fw_version>>16) & 0xFFFF, (fw_version>>0) & 0xFFFF);
+    printf("  Timestamp: 0x%08X\n", timestamp);
+    printf("    %d/%d/%d %d:%d:%d\n",
+        ((timestamp>>17)&0x3f)+2000, ((timestamp>>23)&0xf), ((timestamp>>27)&0x1f),
+        ((timestamp>>12)&0x1f), ((timestamp>>6)&0x3f), ((timestamp>>0)&0x3f)
+      );
+    printf("\n");
+    printf("Misc:\n");
+    printf("  Temperature: %dC\n", (int)t);
+    printf("  EB Controller 0:\n");
+    printf("    MIG calibration complete: %d\n", mig[0]);
+    printf("    EB Ctrl: 0x%08x\n", ebctrl[0]);
+    printf("    FADC Stream ctrl: 0x%08x\n", fadcstr[0]);
+    for(i=0;i<9;i++)
+    printf("    NWords[%d]: %llu\n", i, nwords[0][i]);
+    printf("    EBHeader Status: 0x%08X\n",         ebHeaderStatus[0]);
+    printf("      State=%d\n",                     (ebHeaderStatus[0]>>0)&0xF);
+    printf("      fadc_frame[0].empty()=%d\n",     (ebHeaderStatus[0]>>4)&0x1);
+    printf("      fadc_frame[1].empty()=%d\n",     (ebHeaderStatus[0]>>5)&0x1);
+    printf("      fadc_frame[2].empty()=%d\n",     (ebHeaderStatus[0]>>6)&0x1);
+    printf("      fadc_frame[3].empty()=%d\n",     (ebHeaderStatus[0]>>7)&0x1);
+    printf("      fadc_frame[4].empty()=%d\n",     (ebHeaderStatus[0]>>8)&0x1);
+    printf("      fadc_frame[5].empty()=%d\n",     (ebHeaderStatus[0]>>9)&0x1);
+    printf("      fadc_frame[6].empty()=%d\n",     (ebHeaderStatus[0]>>10)&0x1);
+    printf("      fadc_frame[7].empty()=%d\n",     (ebHeaderStatus[0]>>11)&0x1);
+    printf("      s_ddr3_reader_din.full()=%d\n",  (ebHeaderStatus[0]>>12)&0x1);
+    printf("      s_eb_writer_len.full()=%d\n",    (ebHeaderStatus[0]>>13)&0x1);
+    printf("      header.empty()=%d\n",            (ebHeaderStatus[0]>>14)&0x1);
+    printf("      cnt=%d\n",                       (ebHeaderStatus[0]>>15)&0x7);
+    printf("    EBDDRReader Status: 0x%08X\n",      ebDdr3ReaderStatus[0]);
+    printf("      State=%d\n",                     (ebDdr3ReaderStatus[0]>>0)&0xF);
+    printf("      s_ddr3_reader_din.empty()=%d\n", (ebDdr3ReaderStatus[0]>>4)&0x1);
+    printf("      ddr3_rd_addr.full()=%d\n",       (ebDdr3ReaderStatus[0]>>5)&0x1);
+    printf("      nwords_total(15,0)=%d\n",        (ebDdr3ReaderStatus[0]>>6)&0xFFFF);
+    printf("      nwords(9,0)=%d\n",               (ebDdr3ReaderStatus[0]>>22)&0x3FF);
+    printf("    EBWriter Status: 0x%08X\n",         ebWriterStatus[0]);
+    printf("      State=%d\n",                     (ebWriterStatus[0]>>0)&0xF);
+    printf("      s_eb_data.full()=%d\n",          (ebWriterStatus[0]>>4)&0x1);
+    printf("      s_eb_writer_header.empty()=%d\n",(ebWriterStatus[0]>>5)&0x1);
+    printf("      s_eb_writer_len.empty()=%d\n",   (ebWriterStatus[0]>>6)&0x1);
+    printf("      ddr3_rd_data.empty()=%d\n",      (ebWriterStatus[0]>>7)&0x1);
+    printf("      cnt=%d\n",                       (ebWriterStatus[0]>>8)&0x7);
+    printf("      nwords_total(15,0)=%d\n",        (ebWriterStatus[0]>>11)&0xFFFF);
+    printf("      len(4,0)=%d\n",                  (ebWriterStatus[0]>>27)&0x1F);
+    printf("    EBDecimator Status: 0x%08X\n",      ebDecimaterStatus[0]);
+    printf("      State=%d\n",                     (ebDecimaterStatus[0]>>0)&0xF);
+    printf("      s_eb_data512.empty()=%d\n",      (ebDecimaterStatus[0]>>4)&0x1);
+    printf("      eb_data.full()=%d\n",            (ebDecimaterStatus[0]>>5)&0x1);
+    printf("    MIG WriteCnt: %u\n", mig_cnts[0][0]);
+    printf("    MIG ReadCnt: %u\n", mig_cnts[0][1]);
+    printf("    MIG WriteDataCnt: %u\n", mig_cnts[0][2]);
+    printf("    MIG ReadDataCnt: %u\n", mig_cnts[0][3]);
+    printf("  EB Controller 1:\n");
+    printf("    MIG Calibration Complete: %d\n", mig[1]);
+    printf("    EB Ctrl: 0x%08X\n", ebctrl[1]);
+    printf("    FADC Stream Ctrl: 0x%08X\n", fadcstr[1]);
+    for(i=0;i<9;i++)
+    printf("    NWords[%d]: %llu\n", i, nwords[1][i]);
+    printf("    EBHeader Status: 0x%08X\n",         ebHeaderStatus[1]);
+    printf("      State=%d\n",                     (ebHeaderStatus[1]>>0)&0xF);
+    printf("      fadc_frame[0].empty()=%d\n",     (ebHeaderStatus[1]>>4)&0x1);
+    printf("      fadc_frame[1].empty()=%d\n",     (ebHeaderStatus[1]>>5)&0x1);
+    printf("      fadc_frame[2].empty()=%d\n",     (ebHeaderStatus[1]>>6)&0x1);
+    printf("      fadc_frame[3].empty()=%d\n",     (ebHeaderStatus[1]>>7)&0x1);
+    printf("      fadc_frame[4].empty()=%d\n",     (ebHeaderStatus[1]>>8)&0x1);
+    printf("      fadc_frame[5].empty()=%d\n",     (ebHeaderStatus[1]>>9)&0x1);
+    printf("      fadc_frame[6].empty()=%d\n",     (ebHeaderStatus[1]>>10)&0x1);
+    printf("      fadc_frame[7].empty()=%d\n",     (ebHeaderStatus[1]>>11)&0x1);
+    printf("      s_ddr3_reader_din.full()=%d\n",  (ebHeaderStatus[1]>>12)&0x1);
+    printf("      s_eb_writer_len.full()=%d\n",    (ebHeaderStatus[1]>>13)&0x1);
+    printf("      header.empty()=%d\n",            (ebHeaderStatus[1]>>14)&0x1);
+    printf("      cnt=%d\n",                       (ebHeaderStatus[1]>>15)&0x7);
+    printf("    EBDDRReader Status: 0x%08X\n",      ebDdr3ReaderStatus[1]);
+    printf("      State=%d\n",                     (ebDdr3ReaderStatus[1]>>0)&0xF);
+    printf("      s_ddr3_reader_din.empty()=%d\n", (ebDdr3ReaderStatus[1]>>4)&0x1);
+    printf("      ddr3_rd_addr.full()=%d\n",       (ebDdr3ReaderStatus[1]>>5)&0x1);
+    printf("      nwords_total(15,0)=%d\n",        (ebDdr3ReaderStatus[1]>>6)&0xFFFF);
+    printf("      nwords(9,0)=%d\n",               (ebDdr3ReaderStatus[1]>>22)&0x3FF);
+    printf("    EBWriter Status: 0x%08X\n",         ebWriterStatus[1]);
+    printf("      State=%d\n",                     (ebWriterStatus[1]>>0)&0xF);
+    printf("      s_eb_data.full()=%d\n",          (ebWriterStatus[1]>>4)&0x1);
+    printf("      s_eb_writer_header.empty()=%d\n",(ebWriterStatus[1]>>5)&0x1);
+    printf("      s_eb_writer_len.empty()=%d\n",   (ebWriterStatus[1]>>6)&0x1);
+    printf("      ddr3_rd_data.empty()=%d\n",      (ebWriterStatus[1]>>7)&0x1);
+    printf("      cnt=%d\n",                       (ebWriterStatus[1]>>8)&0x7);
+    printf("      nwords_total(15,0)=%d\n",        (ebWriterStatus[1]>>11)&0xFFFF);
+    printf("      len(4,0)=%d\n",                  (ebWriterStatus[1]>>27)&0x1F);
+    printf("    EBDecimator Status: 0x%08X\n",      ebDecimaterStatus[1]);
+    printf("      State=%d\n",                     (ebDecimaterStatus[1]>>0)&0xF);
+    printf("      s_eb_data512.empty()=%d\n",      (ebDecimaterStatus[1]>>4)&0x1);
+    printf("      eb_data.full()=%d\n",            (ebDecimaterStatus[1]>>5)&0x1);
+    printf("    MIG WriteCnt: %u\n", mig_cnts[1][0]);
+    printf("    MIG ReadCnt: %u\n", mig_cnts[1][1]);
+    printf("    MIG WriteDataCnt: %u\n", mig_cnts[1][2]);
+    printf("    MIG ReadDataCnt: %u\n", mig_cnts[1][3]);
+    printf("\n");
+
+    for(inst=0; inst<2; inst++)
+    {
+      printf("EBIO TX%d:\n", inst);
+      printf("  Status: 0x%08X\n", ebiotx_status[inst]);
+      printf("  Ctrl:   0x%08X\n", ebiotx_ctrl[inst]);
+      printf("EBIO RX%d:\n", inst);
+      printf("  Status: 0x%08X\n", ebiorx_status[inst]);
+      printf("  Ctrl:   0x%08X\n", ebiorx_ctrl[inst]);
+      printf("  Clocksweep: 0x%08X\n", clocksweep[inst]);
+      printf("  Debug:\n");
+      printf("    initial_delay       = %d\n", initial_delay[inst]);
+      printf("    bitslip             = %d\n", bitslip[inst]);
+
+      for(i=0; i<17; i++)
+        printf("    m_delay_val_out[%2d]  = %d\n", i, m_delay_val_out[inst][i]);
+
+      for(i=0; i<17; i++)
+        printf("    s_delay_val_out[%2d]  = %d\n", i, s_delay_val_out[inst][i]);
+
+      printf("    cdataout             = %d\n", cdataout[inst]);
+      printf("    c_sweep_delay        = %d\n", c_sweep_delay[inst]);
+
+      for(i=0; i<17; i++)
+        printf("  eye%2d                = 0x%08X\n", i, eye[inst][i]);
+
+      for(i=0; i<17; i++)
+        printf("  delay%2d              = 0x%08X\n", i, mdelay[inst][i]);
+    }
+  }
+  return(OK);
 }
 
 int
@@ -1630,6 +1905,620 @@ vtpSetSyncSource(int src)
   VLOCK;
     vtp->v7.sd.SyncSel = src;
   VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpStreamingReset(int mask)
+{
+  CHECKINIT;
+//  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  vtp->tcpClient[0].Ctrl = mask;
+  return OK;
+}
+
+int
+vtpStreamingInit(int mask, int ip0, int ip1, int ip2, int ip3, int dst_port)
+{
+  int i, frame_len = 16383;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  VLOCK;
+  vtp->clk.Ctrl = 0x7;
+  vtp->clk.Ctrl = 0x6;
+  vtp->clk.Ctrl = 0x0;
+  usleep(10000);
+
+  vtp->v7.streamingEb[0].Ctrl = 0x80000000 | mask | (frame_len<<16);
+
+  vtp->tcpClient[0].Ctrl = 0x03C5;
+  vtp->tcpClient[0].IP4_StateRequest = 0;
+  vtp->tcpClient[0].IP4_Addr = (129<<24) | (57<<16) | (109<<8) | (28<<0);
+  vtp->tcpClient[0].IP4_SubnetMask = 0xFFFFFF00;
+  vtp->tcpClient[0].IP4_GatewayAddr = (129<<24) | (57<<16) | (109<<8) | (1<<0);
+  vtp->tcpClient[0].MAC_ADDR[1] = 0x0000CEBA;
+  vtp->tcpClient[0].MAC_ADDR[0] = 0xF00300DA;
+  vtp->tcpClient[0].TCP_DEST_ADDR[1] = (ip0<<24) | (ip1<<16) | (ip2<<8) | (ip3<<0);
+  vtp->tcpClient[0].TCP_PORT[1] = (10001<<16) | (dst_port<<0);
+  vtp->tcpClient[0].Ctrl = 0x03C5;
+  vtp->tcpClient[0].Ctrl = 0x03C0;
+  usleep(10000);
+  vtp->tcpClient[0].Ctrl = 0x13C0;
+
+  vtp->v7.ebioTx[0].Ctrl = 0x7; // Assert: RESET, TRAINING, FIFO_RESET
+  vtp->v7.ebioTx[0].Ctrl = 0x6; // Release: RESET, Assert: TRAINING, FIFO_RESET
+
+  vtp->ebiorx[0].Ctrl = 0xBB;
+  vtp->ebiorx[0].Ctrl = 0xBA;
+  usleep(10000);
+  vtp->ebiorx[0].Ctrl = 0xB8;
+  usleep(10000);
+
+  for(i=0;i<10;i++)
+  {
+    printf("%d",i);
+    vtp->ebiorx[0].Ctrl = 0xBA;
+    vtp->ebiorx[0].Ctrl = 0xB8;
+    usleep(1000);
+    if(!(vtp->ebiorx[0].Status & 0xFFFF0000))
+      break;
+    vtp->ebiorx[0].Ctrl = 0xBE;
+  }
+  printf("\n");
+  vtp->ebiorx[0].Ctrl = 0x38;
+  usleep(1000);
+  vtp->ebiorx[0].SoftWriteData = 0xC0DA2019;
+  vtp->ebiorx[0].SoftWriteData = 0xC0DA0001;
+  usleep(1000);
+  vtp->ebiorx[0].Ctrl = 0x78;
+
+  if(i != 10) printf("EBIORX     sync'd\n");
+  else        printf("EBIORX NOT sync'd\n");
+
+  vtp->v7.ebioTx[0].Ctrl = 0x0;
+
+  vtp->v7.mig[0].Ctrl = 0x2;  // Release SYS_RST, Assert FIFO_RST
+  usleep(10000);
+
+  vtp->v7.streamingEb[0].Ctrl = mask | (frame_len<<16);
+
+
+  vtp->v7.mig[0].Ctrl = 0x0;  // Reset FIFO_RST
+  usleep(10000);
+
+  sleep(1);
+  vtp->tcpClient[0].IP4_StateRequest = 2;
+
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpStreamingEnd()
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  VLOCK;
+  vtp->v7.streamingEb[0].Ctrl = 0x80000000;
+  vtp->tcpClient[0].IP4_StateRequest = 0;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_id)
+{
+  int slot_start;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  frame_len = (frame_len+31) / 32;
+  frame_len*= 32;
+  frame_len--;
+
+  CHECKRANGE_INT(inst, 0, 1);
+  CHECKRANGE_INT(frame_len, 1024, 65535);
+  CHECKRANGE_INT(roc_id, 0, 127);
+
+  slot_start = inst ? 13 : 3;
+  mask = mask & 0xFF;
+  frame_len >>= 2;
+
+  VLOCK;
+  vtp->v7.streamingEb[inst].Ctrl  = 0x80000000 | mask | (frame_len<<16);
+  vtp->v7.streamingEb[inst].SourceID  = source_id;
+  vtp->v7.streamingEb[inst].Ctrl2 = (slot_start<<8) | roc_id;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpStreamingGetEbCfg(int inst, int *mask, int *source_id, int *frame_len, int *roc_id)
+{
+  uint32_t val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  if(inst<0 || inst>1)
+  {
+    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
+    return ERROR;
+  }
+
+  VLOCK;
+  val = vtp->v7.streamingEb[inst].Ctrl;
+  *mask = (val>>0) & 0xFF;
+  *frame_len = ((val>>16) & 0x3FFF)*4+4;
+
+  *source_id = vtp->v7.streamingEb[inst].SourceID;
+
+  val = vtp->v7.streamingEb[inst].Ctrl2;
+  *roc_id    = (val & 0x7F);
+
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpStreamingSetTcpCfg(
+    int inst,
+    unsigned char ipaddr[4],
+    unsigned char subnet[4],
+    unsigned char gateway[4],
+    unsigned char mac[6],
+    unsigned char destipaddr[4],
+    unsigned short destipport
+  )
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  if(inst<0 || inst>1)
+  {
+    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
+    return ERROR;
+  }
+
+  VLOCK;
+  vtp->tcpClient[inst].IP4_StateRequest = 0;
+  vtp->tcpClient[inst].IP4_Addr         = (    ipaddr[0]<<24) | (    ipaddr[1]<<16) | (    ipaddr[2]<<8) | (    ipaddr[3]<<0);
+  vtp->tcpClient[inst].IP4_SubnetMask   = (    subnet[0]<<24) | (    subnet[1]<<16) | (    subnet[2]<<8) | (    subnet[3]<<0);
+  vtp->tcpClient[inst].IP4_GatewayAddr  = (   gateway[0]<<24) | (   gateway[1]<<16) | (   gateway[2]<<8) | (   gateway[3]<<0);
+  vtp->tcpClient[inst].MAC_ADDR[1]      =                                             (       mac[0]<<8) | (       mac[1]<<0);
+  vtp->tcpClient[inst].MAC_ADDR[0]      = (       mac[2]<<24) | (       mac[3]<<16) | (       mac[4]<<8) | (       mac[5]<<0);
+  vtp->tcpClient[inst].TCP_DEST_ADDR[1] = (destipaddr[0]<<24) | (destipaddr[1]<<16) | (destipaddr[2]<<8) | (destipaddr[3]<<0);
+  printf("%s: TCP_DEST_ADDR = 0x%08X\n", __func__, vtp->tcpClient[inst].TCP_DEST_ADDR[1]);
+  vtp->tcpClient[inst].TCP_PORT[1]      = (        10001<<16) | (destipport<<0);
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpStreamingGetTcpCfg(
+    int inst,
+    unsigned char ipaddr[4],
+    unsigned char subnet[4],
+    unsigned char gateway[4],
+    unsigned char mac[6],
+    unsigned char destipaddr[4],
+    unsigned short *destipport
+  )
+{
+  unsigned int val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  if(inst<0 || inst>1)
+  {
+    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
+    return ERROR;
+  }
+
+  VLOCK;
+  val = vtp->tcpClient[inst].IP4_Addr;
+  ipaddr[0] = ((val>>24)&0xFF); ipaddr[1] = ((val>>16)&0xFF); ipaddr[2] = ((val>>8)&0xFF); ipaddr[3] = ((val>>0)&0xFF);
+
+  val = vtp->tcpClient[inst].IP4_SubnetMask;
+  subnet[0] = ((val>>24)&0xFF); subnet[1] = ((val>>16)&0xFF); subnet[2] = ((val>>8)&0xFF); subnet[3] = ((val>>0)&0xFF);
+
+  val = vtp->tcpClient[inst].IP4_GatewayAddr;
+  gateway[0] = ((val>>24)&0xFF); gateway[1] = ((val>>16)&0xFF); gateway[2] = ((val>>8)&0xFF); gateway[3] = ((val>>0)&0xFF);
+
+  val = vtp->tcpClient[inst].MAC_ADDR[1];
+  mac[0] = ((val>>8)&0xFF); mac[1] = ((val>>0)&0xFF);
+
+  val = vtp->tcpClient[inst].MAC_ADDR[0];
+  mac[2] = ((val>>24)&0xFF); mac[3] = ((val>>16)&0xFF); mac[4] = ((val>>8)&0xFF); mac[5] = ((val>>0)&0xFF);
+
+  val = vtp->tcpClient[inst].TCP_DEST_ADDR[1];
+  destipaddr[0] = ((val>>24)&0xFF); destipaddr[1] = ((val>>16)&0xFF); destipaddr[2] = ((val>>8)&0xFF); destipaddr[3] = ((val>>0)&0xFF);
+
+  printf("%s: TCP_DEST_ADDR = 0x%08X\n", __func__, vtp->tcpClient[inst].TCP_DEST_ADDR[1]);
+
+  val = vtp->tcpClient[inst].TCP_PORT[1];
+  *destipport = ((val>>0)&0xFFFF);
+  VUNLOCK;
+
+  return OK;
+}
+
+/*
+int
+vtpStreamingTcpConnect(int inst, int connect)
+{
+  int j;
+
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  if(inst<0 || inst>1)
+  {
+    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
+    return ERROR;
+  }
+
+  printf("%s(%d,%d)\n", __func__, inst, connect);
+
+  VLOCK;
+  if(connect)
+  {
+    // Assert resets
+    for(j=0;j<8;j++)
+      vtp->v7.fadcStreaming[j+8*inst].Ctrl = 0;
+
+    vtp->tcpClient[inst].IP4_StateRequest = 0;    // tcp: disconnect socket
+    vtp->v7.streamingEb[inst].Ctrl |= 0x80000000; // streaming_eb: RESET=1
+    vtp->v7.ebioTx[inst].Ctrl = 0x7;              // ebioTx: RESET,TRAINING,FIFO_RESET
+    vtp->ebiorx[inst].Ctrl = 0xBB;                // Z7 ebioRx reset
+    vtp->v7.mig[inst].Ctrl = 0x3;                 // Assert SYS_RST,FIFO_RST
+    vtp->tcpClient[inst].Ctrl = 0x03C5;           // tcp: reset: phy, qsfp, tcp
+    usleep(1000);
+
+    // V7 Mig
+    vtp->v7.mig[inst].Ctrl = 0x2;                 // Assert FIFO_RST
+    usleep(10000);
+    vtp->v7.mig[inst].Ctrl = 0x0;
+
+    // V7 ebioTx->ebioRx interface initialization
+    vtp->v7.ebioTx[inst].Ctrl = 0x6;              // ebioTx: TRAINING,FIFO_RESET
+
+    vtp->ebiorx[inst].Ctrl = 0xBA;
+    usleep(10000);
+    vtp->ebiorx[inst].Ctrl = 0xB8;
+    usleep(10000);
+
+    for(j=0;j<10;j++)
+    {
+      vtp->ebiorx[inst].Ctrl = 0xBA;
+      vtp->ebiorx[inst].Ctrl = 0xB8;
+      usleep(1000);
+      if(!(vtp->ebiorx[inst].Status & 0xFFFF0000))
+        break;
+      vtp->ebiorx[inst].Ctrl = 0xBE;
+    }
+    vtp->ebiorx[inst].Ctrl = 0xB8;
+    usleep(1000);
+    vtp->ebiorx[inst].Ctrl = 0x38;
+
+#if 1
+vtp->ebiorx[inst].Ctrl = 0x38;
+usleep(1000);
+vtp->ebiorx[inst].SoftWriteData = 0x00000001;
+vtp->ebiorx[inst].SoftWriteData = 0x00000002;
+vtp->ebiorx[inst].SoftWriteData = 0x00000003;
+vtp->ebiorx[inst].SoftWriteData = 0x00000004;
+vtp->ebiorx[inst].SoftWriteData = 0x00000005;
+vtp->ebiorx[inst].SoftWriteData = 0x00000006;
+vtp->ebiorx[inst].SoftWriteData = 0x00000007;
+vtp->ebiorx[inst].SoftWriteData = 0x00000008;
+vtp->ebiorx[inst].SoftWriteData = 0x00000009;
+vtp->ebiorx[inst].SoftWriteData = 0x0000000A;
+usleep(1000);
+vtp->ebiorx[inst].Ctrl = 0x38;
+#endif
+
+
+    if(j != 10) printf("EBIORX(%d)     sync'd\n", inst);
+    else        printf("EBIORX(%d) NOT sync'd\n", inst);
+
+    // V7 evioTx reset release
+    vtp->v7.ebioTx[inst].Ctrl = 0x4;
+
+    // Z7 socket connect
+    vtp->tcpClient[inst].Ctrl = 0x03C0;           // tcp: reset: qsfp
+    usleep(10000);
+    vtp->tcpClient[inst].Ctrl = 0x13C0;           // tcp: reset: none
+    usleep(250000);
+    vtp->tcpClient[inst].IP4_StateRequest = 2;    // tcp: connect socket
+
+
+    // Release resets downstream->upstream
+#if 0
+    vtp->ebiorx[inst].Ctrl = 0x78;
+#endif
+    vtp->v7.ebioTx[inst].Ctrl = 0x0;
+    vtp->v7.streamingEb[inst].Ctrl &= 0x7FFFFFFF;
+  }
+  else
+  {
+    vtp->tcpClient[inst].IP4_StateRequest = 0;
+  }
+  VUNLOCK;
+
+  vtpStatus();
+
+  return OK;
+}
+*/
+
+int
+vtpStreamingEbioTxSoftWrite(int inst, int val0, int val1, int val2, int val3, int val4)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  if(inst<0 || inst>1)
+  {
+    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
+    return ERROR;
+  }
+
+  VLOCK;
+  vtp->v7.ebioTx[inst].SoftWrite[0] = val0;
+  vtp->v7.ebioTx[inst].SoftWrite[1] = val1;
+  vtp->v7.ebioTx[inst].SoftWrite[2] = val2;
+  vtp->v7.ebioTx[inst].SoftWrite[3] = val3;
+  vtp->v7.ebioTx[inst].SoftWrite[4] = val4;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpStreamEbioRxReset(int inst, int rst)
+{
+  int val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  if(inst<0 || inst>1)
+  {
+    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
+    return ERROR;
+  }
+
+  VLOCK;
+  val = vtp->ebiorx[inst].Ctrl;
+  printf("Before = 0x%08X\n", val);
+
+  if(rst) val |= 0x00000080;
+  else    val &= 0xFFFFFF7F;
+  vtp->ebiorx[inst].Ctrl = val;
+
+  val = vtp->ebiorx[inst].Ctrl;
+  printf("After = 0x%08X\n", val);
+  VUNLOCK;
+
+  return 0;
+}
+
+int
+vtpStreamQsfpReset(int inst, int reset)
+{
+  int val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  if(inst<0 || inst>1)
+  {
+    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
+    return ERROR;
+  }
+
+  VLOCK;
+  val = vtp->tcpClient[inst].Ctrl;
+  if(reset) val &= 0xFFFFEFFF;
+  else      val |= 0x00001000;
+  VUNLOCK;
+
+  return 0;
+}
+
+#define TCP_SKIP_EN   0x0
+
+int
+vtpStreamingSkipTcp(int inst, int skip)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  if(inst<0 || inst>1)
+  {
+    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
+    return ERROR;
+  }
+
+  VLOCK;
+  if(skip) vtp->ebiorx[inst].Ctrl |= 0x00000200;
+  else     vtp->ebiorx[inst].Ctrl &= 0xFFFFFDFF;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpStreamingMigFifoReset(int inst)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  if(inst<0 || inst>1)
+  {
+    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
+    return ERROR;
+  }
+
+  printf("%s(%d)\n", __func__, inst);
+  // V7 Mig
+  VLOCK;
+  vtp->v7.mig[inst].Ctrl = 0x2;                 // Assert FIFO_RST
+  usleep(10000);
+  vtp->v7.mig[inst].Ctrl = 0x0;
+  usleep(10000);
+  VUNLOCK;
+  return OK;
+}
+
+int
+vtpStreamingTcpConnect(int inst, int connect)
+{
+  int j;
+
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
+  if(inst<0 || inst>1)
+  {
+    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
+    return ERROR;
+  }
+
+  printf("%s(%d,%d)\n", __func__, inst, connect);
+
+//printf("%s - status:\n", __func__);
+//  vtpStatus();
+
+  VLOCK;
+  if(connect)
+  {
+    // Assert resets
+//    for(j=0;j<8;j++) vtp->v7.fadcStreaming[j+8*inst].Ctrl = 0;
+    for(j=0;j<8;j++) vtp->v7.fadcStreaming[j+8*inst].Ctrl = 3;
+
+    vtp->tcpClient[inst].IP4_StateRequest = 0;    // tcp: disconnect socket
+//    vtp->v7.streamingEb[inst].Ctrl &= 0x7FFFFFFF; // streaming_eb: RESET=0
+    vtp->v7.streamingEb[inst].Ctrl |= 0x80000000; // streaming_eb: RESET=1
+    vtp->v7.ebioTx[inst].Ctrl = 0x7;              // ebioTx: RESET,TRAINING,FIFO_RESET
+    vtp->ebiorx[inst].Ctrl = 0xBB | TCP_SKIP_EN;                // Z7 ebioRx reset
+    vtp->v7.mig[inst].Ctrl = 0x1;                 // Assert SYS_RST
+    vtp->tcpClient[inst].Ctrl = 0x03C5;           // tcp: reset: phy, qsfp, tcp
+    usleep(10000);
+
+    // V7 Mig
+    vtp->v7.mig[inst].Ctrl = 0x2;                 // Assert FIFO_RST
+    usleep(10000);
+    vtp->v7.mig[inst].Ctrl = 0x0;
+
+    // V7 ebioTx->ebioRx interface initialization
+    vtp->v7.ebioTx[inst].Ctrl = 0x6;              // ebioTx: TRAINING,FIFO_RESET
+
+    vtp->ebiorx[inst].Ctrl = 0xBA | TCP_SKIP_EN;
+    usleep(10000);
+    vtp->ebiorx[inst].Ctrl = 0xB8 | TCP_SKIP_EN;
+    usleep(10000);
+
+    for(j=0;j<10;j++)
+    {
+      vtp->ebiorx[inst].Ctrl = 0xBA | TCP_SKIP_EN;
+      vtp->ebiorx[inst].Ctrl = 0xB8 | TCP_SKIP_EN;
+      usleep(1000);
+      if(!(vtp->ebiorx[inst].Status & 0xFFFF0000))
+        break;
+      vtp->ebiorx[inst].Ctrl = 0xBE | TCP_SKIP_EN;
+    }
+    vtp->ebiorx[inst].Ctrl = 0xB8 | TCP_SKIP_EN;
+    usleep(1000);
+    vtp->ebiorx[inst].Ctrl = 0x38 | TCP_SKIP_EN;
+
+#if 0
+vtp->ebiorx[inst].Ctrl = 0x38;
+usleep(1000);
+vtp->ebiorx[inst].SoftWriteData = 0x00000001;
+vtp->ebiorx[inst].SoftWriteData = 0x00000002;
+vtp->ebiorx[inst].SoftWriteData = 0x00000003;
+vtp->ebiorx[inst].SoftWriteData = 0x00000004;
+vtp->ebiorx[inst].SoftWriteData = 0x00000005;
+vtp->ebiorx[inst].SoftWriteData = 0x00000006;
+vtp->ebiorx[inst].SoftWriteData = 0x00000007;
+vtp->ebiorx[inst].SoftWriteData = 0x00000008;
+vtp->ebiorx[inst].SoftWriteData = 0x00000009;
+vtp->ebiorx[inst].SoftWriteData = 0x0000000A;
+usleep(1000);
+vtp->ebiorx[inst].Ctrl = 0x38;
+#endif
+
+
+    if(j != 10) printf("EBIORX(%d)     sync'd\n", inst);
+    else        printf("EBIORX(%d) NOT sync'd\n", inst);
+
+    // V7 evioTx reset release
+    vtp->v7.ebioTx[inst].Ctrl = 0x4;
+
+
+
+
+
+
+    // Z7 socket connect
+    vtp->tcpClient[inst].Ctrl = 0x03C0;           // tcp: reset: qsfp
+    usleep(10000);
+    vtp->tcpClient[inst].Ctrl = 0x13C0;           // tcp: reset: none
+    usleep(250000);
+    vtp->tcpClient[inst].IP4_StateRequest = 2;    // tcp: connect socket
+
+
+
+/*
+    for(i=0;i<2;i++)
+    {
+      for(j=0;j<8;j++)
+      {
+        if(vtp->v7.streamingEb[i].Ctrl & (1<<j))
+        {
+          vtp->v7.fadcStreaming[i*8+j].Ctrl = 1;
+          printf("VTP Stream FADC %2d - ENABLED\n", i*8+j);
+        }
+        else
+        {
+          vtp->v7.fadcStreaming[i*8+j].Ctrl = 0;
+          printf("VTP Stream FADC %2d - DISABLED\n", i*8+j);
+        }
+      }
+    }
+*/
+    // Release resets downstream->upstream
+#if 1
+    vtp->ebiorx[inst].Ctrl = 0x78 | TCP_SKIP_EN;
+#endif
+    vtp->v7.ebioTx[inst].Ctrl = 0x0;
+    vtp->v7.ebioTx[inst].Ctrl = 0x8;
+    vtp->v7.streamingEb[inst].Ctrl &= 0x7FFFFFFF;
+  }
+  else
+  {
+    vtp->tcpClient[inst].IP4_StateRequest = 0;
+  }
+  VUNLOCK;
+
+  vtpStatus();
+
+  return OK;
+}
+
+int
+vtpStreamingTcpGo()
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+
 
   return OK;
 }
@@ -5246,7 +6135,10 @@ vtpGetGtTriggerBit(int inst, int *strigger_mask0, int *sector_mask0, int *mult_m
   if(pulser & 0x80000000)
   {
     pulser &= 0x7FFFFFFF;
-    *pulser_freq = ((float)pulser) / 250000000.0f;
+    if(pulser)
+      *pulser_freq = 250000000.0f / ((float)pulser);
+    else
+      *pulser_freq = 0.0;
   }
   else
     *pulser_freq = 0.0f;

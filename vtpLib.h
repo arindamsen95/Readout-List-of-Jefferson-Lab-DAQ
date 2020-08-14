@@ -124,7 +124,9 @@ typedef struct V7Clk_Struct
   /** 0x0008 */ volatile uint32_t FW_Version;
   /** 0x000C */ BLANK[(0x10-0xC)/4];
   /** 0x0010 */ volatile uint32_t FW_Type;
-  /** 0x0014 */ BLANK[(0x100-0x14)/4];
+  /** 0x0014 */ volatile uint32_t Timestamp;
+  /** 0x0018 */ volatile uint32_t Temp;
+  /** 0x001C */ BLANK[(0x100-0x1C)/4];
 } V7CLK_REGS; /* must be 256 bytes */
 
 #define VTP_V7CLK_CTRL_GCLK_RESET    (1<<0)
@@ -271,6 +273,46 @@ typedef struct Compton_Trigger_Struct
 #define VTP_COMPTON_TRIGGER_CTRL_EPLANE_MULT_MIN_MASK 0x07000000
 #define VTP_COMPTON_TRIGGER_CTRL_EPLANE_MASK 0xF0000000
 
+typedef struct V7Mig_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t Status;
+  /** 0x0008 */ BLANK[(0x050-0x008)/4];
+  /** 0x0050 */ volatile uint32_t WriteCnt;
+  /** 0x0054 */ volatile uint32_t ReadCnt;
+  /** 0x0058 */ volatile uint32_t WriteDataCnt;
+  /** 0x005C */ volatile uint32_t ReadDataCnt;
+  /** 0x0060 */ BLANK[(0x080-0x060)/4];
+} V7MIG_REGS;
+
+typedef struct FadcStreaming_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x0080-0x004)/4];
+} FADCSTREAMING_REGS;
+
+typedef struct StreamingEb_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t SourceID;
+  /** 0x0008 */ volatile uint32_t Ctrl2;
+  /** 0x000C */ BLANK[(0x0010-0x000C)/4];
+  /** 0x0010 */ volatile uint32_t NWords[18];
+  /** 0x0058 */ volatile uint32_t HeaderStatus;
+  /** 0x005C */ volatile uint32_t Ddr3ReaderStatus;
+  /** 0x0060 */ volatile uint32_t EbWriterStatus;
+  /** 0x0064 */ volatile uint32_t EbDecimaterStatus;
+  /** 0x0068 */ BLANK[(0x0080-0x0068)/4];
+} STREAMINGEB_REGS;
+
+typedef struct EbioTx_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t Status;
+  /** 0x0008 */ BLANK[(0x0010-0x008)/4];
+  /** 0x0010 */ volatile uint32_t SoftWrite[5];
+  /** 0x0024 */ BLANK[(0x0080-0x0024)/4];
+} EBIOTX_REGS;
 
 typedef struct ECTrigger_Struct
 {
@@ -629,7 +671,9 @@ typedef struct v7_bridge_struct
 
   /** 0x43C10600 */ FTCALDECODER_REGS ftcalDec;
 
-  /** 0x43C10700 */ BLANK[(0x1000 - 0x700)/4];
+  /** 0x43C10700 */ BLANK[(0x0F00 - 0x700)/4];
+
+  /** 0x43C10F00 */ V7MIG_REGS mig[2];
 
   /** 0x43C11000 */ SERDES_REGS vxs[16];
 
@@ -705,7 +749,15 @@ typedef struct v7_bridge_struct
 
   /** 0x43C16000 */ GTBIT_REGS gtBit[16]; /* 128 bytes */
 
-  /** 0x43C16800 */ BLANK[(0x9000 - 0x6800)/4];
+  /** 0x43C16800 */ BLANK[(0x8000 - 0x6800)/4];
+
+  /** 0x43C18000 */ FADCSTREAMING_REGS fadcStreaming[16];
+
+  /** 0x43C18800 */ STREAMINGEB_REGS streamingEb[2];
+
+  /** 0x43C18900 */ EBIOTX_REGS ebioTx[2];
+
+  /** 0x43C18A00 */ BLANK[(9000 - 0x8A00)/4];
 
   /** 0x43C19000 */ COMPTONTRIGGER_REGS comptonTrigger;
 
@@ -716,6 +768,60 @@ typedef struct v7_bridge_struct
   /** 0x43C1FFFC */ volatile uint32_t Cfg;
 
 } V7_REGS;
+
+typedef struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t Status;
+  /** 0x0008 */ volatile uint32_t FW_Version;
+  /** 0x000C */ BLANK[(0x0010-0x000C)/4];
+  /** 0x0010 */ volatile uint32_t FW_Type;
+  /** 0x0014 */ volatile uint32_t FW_Timestamp;
+  /** 0x0018 */ BLANK[(0x0100-0x0018)/4];
+} Z7CLK_REGS;
+
+typedef struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x0010-0x0004)/4];
+  /** 0x0010 */ volatile uint32_t IP4_Addr;
+  /** 0x0014 */ volatile uint32_t IP4_MCastAddr;
+  /** 0x0018 */ volatile uint32_t IP4_SubnetMask;
+  /** 0x001C */ volatile uint32_t IP4_GatewayAddr;
+  /** 0x0020 */ volatile uint32_t IP4_StateRequest;
+  /** 0x0024 */ volatile uint32_t IP4_ConnectionReset;
+  /** 0x0028 */ volatile uint32_t IP4_TCPKeepAlive;
+  /** 0x002C */ volatile uint32_t IP4_TCPStateStatus;
+  /** 0x0030 */ volatile uint32_t IP4_TCPStatus;
+  /** 0x0034 */ volatile uint32_t MAC_ADDR[2];
+  /** 0x003C */ volatile uint32_t MAC_STATUS[4];
+  /** 0x004C */ BLANK[(0x0050-0x004C)/4];
+  /** 0x0050 */ volatile uint32_t PCS_STATUS;
+  /** 0x0054 */ BLANK[(0x0060-0x0054)/4];
+  /** 0x0060 */ volatile uint32_t PHY_STATUS;
+  /** 0x0064 */ BLANK[(0x0080-0x0064)/4];
+  /** 0x0080 */ volatile uint32_t TCP_DEST_ADDR[8];
+  /** 0x00A0 */ volatile uint32_t TCP_PORT[8];
+  /** 0x00C0 */ BLANK[(0x0100-0x00C0)/4];
+} TCPIPCLIENT_REGS;
+
+typedef struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x0100-0x0004)/4];
+} TCPIPTESTTX_REGS;
+
+typedef struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t Status;
+  /** 0x0008 */ volatile uint32_t ClockSweep;
+  /** 0x000C */ volatile uint32_t Debug[7];
+  /** 0x0028 */ volatile uint32_t Eye[17];
+  /** 0x006C */ volatile uint32_t MDelay1Hot[17];
+  /** 0x00B0 */ volatile uint32_t SoftWriteData;
+  /** 0x00B4 */ BLANK[(0x0100-0x00B4)/4];
+} EBIORX_REGS;
 
 #define VTP_V7BRIDGE_STATUS_INIT_B (1<<1)
 #define VTP_V7BRIDGE_STATUS_DONE   (1<<0)
@@ -730,11 +836,22 @@ typedef struct v7_bridge_struct
 
 typedef struct zync_reg_struct
 {
+  /******** ZYNQ AXI Peripherals ***********/
   /** 0x43C00000 */ EB_REGS eb;
   /** 0x43C00100 */ BLANK[(0x1000-0x100)/4];
   /** 0x43C01000 */ AXI_DMA_REGS dma_ti;
   /** 0x43C02000 */ AXI_DMA_REGS dma_vtp;
-  /** 0x43C03000 */ BLANK[(0x10000-0x3000)/4];
+  /** 0x43C03000 */ BLANK[(0x08100-0x3000)/4];
+  /******** ZYNQ PERBUS Peripherals ********/
+  /** 0x43C08100 */ Z7CLK_REGS clk;
+  /** 0x43C08200 */ BLANK[(0x9000-0x8200)/4];
+  /** 0x43C09000 */ TCPIPCLIENT_REGS tcpClient[2];
+  /** 0x43C09200 */ BLANK[(0x9800-0x9200)/4];
+  /** 0x43C09800 */ TCPIPTESTTX_REGS tcpTxTest;
+  /** 0x43C09900 */ BLANK[(0xA000-0x9900)/4];
+  /** 0x43C0A000 */ EBIORX_REGS ebiorx[2];
+  /** 0x43C0A200 */ BLANK[(0x10000-0x0A200)/4];
+  /******** V7 PERBUS Peripherals **********/
   /** 0x43C10000 */ V7_REGS v7;
 } ZYNC_REGS;
 
@@ -765,8 +882,8 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_FTOF              11
 #define VTP_FW_TYPE_CND               12
 #define VTP_FW_TYPE_HPS               13
+#define VTP_FW_TYPE_FADCSTREAM        14
 #define VTP_FW_TYPE_COMPTON           15
-
 
 /* Routine prototypes */
 int  vtpSetDebugMask(uint32_t mask);
@@ -1036,6 +1153,15 @@ int  vtpEbReset();
 int  vtpSetBlockLevel(int level);
 int  vtpTiLinkGetBlockLevel(int print);
 int  vtpTiAck(int clearsync);
+int  vtpStatus();
+
+// VTP Streaming functions
+int vtpStreamingTcpConnect(int inst, int connect);
+int vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_id);
+int vtpStreamingGetEbCfg(int inst, int *mask, int *source_id, int *frame_len, int *roc_id);
+int vtpStreamingGetTcpCfg(int inst, unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short *destipport);
+int vtpStreamingSetTcpCfg(int inst, unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short destipport);
+
 
 #define VTP_DMA_TI  0
 #define VTP_DMA_VTP 1

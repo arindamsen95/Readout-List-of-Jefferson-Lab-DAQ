@@ -84,9 +84,24 @@ typedef struct
   int en;
 } hps_mult_trig;
 
+typedef struct
+{
+  int mask_en;
+  int source_id;
+  int connect;
+  unsigned char ipaddr[4];
+  unsigned char subnet[4];
+  unsigned char gateway[4];
+  unsigned char mac[6];
+  unsigned char destip[4];
+  unsigned short destipport;
+} streaming_eb_cfg;
+
+
 /** VTP configuration parameters **/
 typedef struct {
-  char fw_filename[FNLEN];
+  char fw_filename_v7[FNLEN];
+  char fw_filename_z7[FNLEN];
 
   int fw_rev;
   int fw_type;
@@ -97,6 +112,13 @@ typedef struct {
 
   int payload_en;
   int fiber_en;
+
+  struct
+  {
+    int roc_id;
+    int frame_len;
+    streaming_eb_cfg eb[2];
+  } fadc_streaming;
 
   struct
   {
