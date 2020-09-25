@@ -81,7 +81,7 @@ void ltm4676_write_byte(unsigned char slaveAddr, int page, unsigned char cmd, un
     ltm4676_set_page(page);
 
   if((rval = vtpI2CWrite8(I2C_BUS, cmd, data)) < 0)
-    exit_error(__func__, 1);  
+    exit_error(__func__, 1);
 
   return;
 }
@@ -96,7 +96,7 @@ unsigned char ltm4676_read_byte(unsigned char slaveAddr, int page, unsigned char
     ltm4676_set_page(page);
 
   if((rval = vtpI2CRead16(I2C_BUS, cmd)) < 0)
-    exit_error(__func__, 1);  
+    exit_error(__func__, 1);
 
   return (rval & 0xFF);
 }
@@ -106,12 +106,12 @@ unsigned short ltm4676_read_word(unsigned char slaveAddr, int page, unsigned cha
   int32_t rval;
 
   vtpI2CSelectSlave(I2C_BUS, slaveAddr);
-  
+
   if(page >= 0)
     ltm4676_set_page(page);
 
   if((rval = vtpI2CRead16(I2C_BUS, cmd)) < 0)
-    exit_error(__func__, 1);  
+    exit_error(__func__, 1);
 
   return (rval & 0xFFFF);
 }
@@ -126,7 +126,7 @@ void ltm4676_read_block(unsigned char slaveAddr, int page, unsigned char cmd, un
     ltm4676_set_page(page);
 
   if((rval = vtpI2CReadBlock(I2C_BUS, cmd, buf)) < 0)
-    exit_error(__func__, 1);  
+    exit_error(__func__, 1);
 }
 
 float get_L11(unsigned short v)
@@ -267,18 +267,18 @@ void ltm4676_print_status()
       printf("LTM4676A %d, SLAVE_ADDR %02X\n", i, LTM4676_ADDR[i]);
       printf("   Mfg Id = %s, Part Id = %s\n", get_mfg_id(i), get_part_id(i));
       printf("   VIN = %5.3fV, IIN = %5.3fA, CTRL TEMP = %5.3fC\n", get_vin(i), get_iin(i), get_temp(i));
-    
+
       for(ch = 0; ch < 2; ch++)
       {
         unsigned short status_word = get_status_word(i, ch);
         unsigned char status_vout = get_status_vout(i, ch);
         unsigned char status_iout = get_status_iout(i, ch);
-        
+
       printf("      %s: VOUT = %5.3fV, IOUT = %5.3fA, TEMP = %5.3fC, IIN = %5.3fA, POWER = %5.3fW\n", rail[2*i+0],
        get_vout_ch(i,0), get_iout_ch(i,0), get_temp_ch(i,0), get_iin_ch(i,0), get_power_ch(i,0));
       printf("      %s: VOUT = %5.3fV, IOUT = %5.3fA, TEMP = %5.3fC, IIN = %5.3fA, POWER = %5.3fW\n",rail[2*i+1],
        get_vout_ch(i,1), get_iout_ch(i,1), get_temp_ch(i,1), get_iin_ch(i,1), get_power_ch(i,1));
-            
+
         printf("          STATUS WORD (fault source): 0x%04X\n", status_word);
         if(status_word & 0x8000) printf("          VOUT\n");
         if(status_word & 0x4000) printf("          IOUT\n");
@@ -296,7 +296,7 @@ void ltm4676_print_status()
         if(status_word & 0x0004) printf("          TEMPERATURE\n");
         if(status_word & 0x0002) printf("          CML\n");
         if(status_word & 0x0001) printf("          OTHER\n");
-        
+
         printf("          STATUS VOUT (fault source): 0x%02X\n", status_vout);
         if(status_vout & 0x0080) printf("          VOUT_OV FAULT\n");
         if(status_vout & 0x0040) printf("          VOUT_OV WARNING\n");
@@ -306,7 +306,7 @@ void ltm4676_print_status()
         if(status_vout & 0x0004) printf("          TON_MAX FAULT\n");
         if(status_vout & 0x0002) printf("          TOFF_MAX WARNING\n");
         if(status_vout & 0x0001) printf("          NOT SUPPORTED\n");
-        
+
         printf("          STATUS IOUT (fault source): 0x%02X\n", status_iout);
         if(status_iout & 0x0080) printf("          IOUT_IC FAULT\n");
         if(status_iout & 0x0040) printf("          NOT SUPPORTED\n");
@@ -316,11 +316,11 @@ void ltm4676_print_status()
         if(status_iout & 0x0004) printf("          NOT SUPPORTED\n");
         if(status_iout & 0x0002) printf("          NOT SUPPORTED\n");
         if(status_iout & 0x0001) printf("          NOT SUPPORTED\n");
-        
-        printf("         VOUT_OV_FAULT_RESPONSE = 0x%02X\n", 
+
+        printf("         VOUT_OV_FAULT_RESPONSE = 0x%02X\n",
                ltm4676_read_byte(LTM4676_ADDR[i], ch, 0x41));
-               
-        printf("         VOUT_UV_FAULT_RESPONSE = 0x%02X\n", 
+
+        printf("         VOUT_UV_FAULT_RESPONSE = 0x%02X\n",
                ltm4676_read_byte(LTM4676_ADDR[i], ch, 0x45));
       }
     }
@@ -347,7 +347,7 @@ void ltm4676_setup()
       ltm4676_write_byte(LTM4676_ADDR[i], ch, 0x45, 0); // VOUT UV ignore fault
     }
   }
-  
+
   printf("After:\n");
   for(i = 0; i < 4; i++)
   {
@@ -357,31 +357,11 @@ void ltm4676_setup()
       printf("         VOUT_UV_FAULT_RESPONSE = 0x%02X\n", ltm4676_read_byte(LTM4676_ADDR[i], ch, 0x45));
     }
   }
-  
+
   printf("Storing to eeprom:\n");
   for(i = 0; i < 4; i++)
   {
     vtpI2CSelectSlave(I2C_BUS, LTM4676_ADDR[i]);
     vtpI2CWriteCmd(I2C_BUS, 0x15);
     }
-}
-
-int main()
-{
-  if(vtpCheckAddresses() == ERROR)
-    exit(-1);
-
-  if(vtpOpen(VTP_I2C_OPEN) == ERROR)
-    {
-      printf("vtpOpen not OK\n");
-      goto CLOSE;
-    }
-
-  ltm4676_print_status();
-
- CLOSE:
-  vtpClose(VTP_I2C_OPEN);
-
-
-  exit(0);
 }
