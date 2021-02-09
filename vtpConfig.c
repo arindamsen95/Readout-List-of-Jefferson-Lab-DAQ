@@ -394,6 +394,7 @@ vtpInitGlobals()
 
   // FADC Streaming configuration
   vtpConf.fadc_streaming.roc_id = 0;
+  vtpConf.fadc_streaming.nframe_buf = 1000;
   vtpConf.fadc_streaming.frame_len = 65536;
   vtpConf.fadc_streaming.eb[0].mask_en = 0;
   vtpConf.fadc_streaming.eb[0].source_id = 0;
@@ -1583,6 +1584,11 @@ vtpReadConfigFile(char *filename_in)
         {
           sscanf (str_tmp, "%*s %d", &argi[0]);
           vtpConf.fadc_streaming.roc_id = argi[0];
+	}
+        else if(!strcmp(keyword,"VTP_STREAMING_NFRAME_BUF"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.fadc_streaming.nframe_buf = argi[0];
         }
         else if(!strcmp(keyword,"VTP_STREAMING_FRAMELEN"))
         {
@@ -2157,7 +2163,8 @@ return(0);
           vtpConf.fadc_streaming.eb[inst].mask_en,
           vtpConf.fadc_streaming.eb[inst].source_id,
           vtpConf.fadc_streaming.frame_len,
-          vtpConf.fadc_streaming.roc_id
+          vtpConf.fadc_streaming.roc_id,
+	  vtpConf.fadc_streaming.nframe_buf
         );
 
       vtpStreamingSetTcpCfg(
@@ -2473,7 +2480,8 @@ vtpUploadAll(char *string, int length)
           &vtpConf.fadc_streaming.eb[inst].mask_en,
           &vtpConf.fadc_streaming.eb[inst].source_id,
           &vtpConf.fadc_streaming.frame_len,
-          &vtpConf.fadc_streaming.roc_id
+          &vtpConf.fadc_streaming.roc_id,
+	  &vtpConf.fadc_streaming.nframe_buf
         );
 
       vtpStreamingGetTcpCfg(
@@ -2855,6 +2863,7 @@ vtpUploadAll(char *string, int length)
     if(vtpConf.fw_type == VTP_FW_TYPE_FADCSTREAM)
     {
       sprintf(sss, "VTP_STREAMING_ROCID %d\n", vtpConf.fadc_streaming.roc_id); ADD_TO_STRING;
+      sprintf(sss, "VTP_STREAMING_NFRAME_BUF %d\n", vtpConf.fadc_streaming.nframe_buf); ADD_TO_STRING;
       sprintf(sss, "VTP_STREAMING_FRAMELEN %d\n", vtpConf.fadc_streaming.frame_len); ADD_TO_STRING;
       for(inst=0;inst<2;inst++)
       {

@@ -2011,7 +2011,7 @@ vtpStreamingEnd()
 }
 
 int
-vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_id)
+vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_id, int nframe_buf)
 {
   int slot_start;
   CHECKINIT;
@@ -2024,6 +2024,7 @@ vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_i
   CHECKRANGE_INT(inst, 0, 1);
   CHECKRANGE_INT(frame_len, 1024, 65535);
   CHECKRANGE_INT(roc_id, 0, 127);
+  CHECKRANGE_INT(nframe_buf,16,1023);
 
   slot_start = inst ? 13 : 3;
   mask = mask & 0xFF;
@@ -2032,14 +2033,14 @@ vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_i
   VLOCK;
   vtp->v7.streamingEb[inst].Ctrl  = 0x80000000 | mask | (frame_len<<16);
   vtp->v7.streamingEb[inst].SourceID  = source_id;
-  vtp->v7.streamingEb[inst].Ctrl2 = (slot_start<<8) | roc_id;
+  vtp->v7.streamingEb[inst].Ctrl2 = (nframe_buf<<16) | (slot_start<<8) | roc_id;
   VUNLOCK;
 
   return OK;
 }
 
 int
-vtpStreamingGetEbCfg(int inst, int *mask, int *source_id, int *frame_len, int *roc_id)
+vtpStreamingGetEbCfg(int inst, int *mask, int *source_id, int *frame_len, int *roc_id, int *nframe_buf)
 {
   uint32_t val;
   CHECKINIT;
@@ -2060,6 +2061,7 @@ vtpStreamingGetEbCfg(int inst, int *mask, int *source_id, int *frame_len, int *r
 
   val = vtp->v7.streamingEb[inst].Ctrl2;
   *roc_id    = (val & 0x7F);
+  *nframe_buf = (val & 0x03FF0000)>>16;
 
   VUNLOCK;
 
@@ -2502,8 +2504,9 @@ vtp->ebiorx[inst].Ctrl = 0x38;
     vtp->v7.ebioTx[inst].Ctrl = 0x8;
     vtp->v7.streamingEb[inst].Ctrl &= 0x7FFFFFFF;
   }
-  else
+  else  /* disconnect the socket */
   {
+    vtp->v7.streamingEb[inst].Ctrl = 0x80000000;
     vtp->tcpClient[inst].IP4_StateRequest = 0;
   }
   VUNLOCK;

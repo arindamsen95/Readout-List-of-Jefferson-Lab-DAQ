@@ -116,6 +116,7 @@ typedef struct {
   struct
   {
     int roc_id;
+    int nframe_buf;
     int frame_len;
     streaming_eb_cfg eb[2];
   } fadc_streaming;
