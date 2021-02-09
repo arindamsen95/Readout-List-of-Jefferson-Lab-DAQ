@@ -7412,47 +7412,66 @@ vtpOpen(int dev_mask)
 
   if(dev_mask & VTP_FPGA_OPEN)
     {
-
-      if(vtpFPGAOpen() == OK)
+      if(vtpDevOpenMASK & VTP_FPGA_OPEN)
 	{
-	  vtpDevOpenMASK |= VTP_FPGA_OPEN;
+	  VTP_DBGN(VTP_DEBUG_INIT, "FPGA Already Opened\n");
 	}
       else
 	{
-	  printf("%s: ERROR opening V7 map\n",
-		 __func__);
+	  if(vtpFPGAOpen() == OK)
+	    {
+	      vtpDevOpenMASK |= VTP_FPGA_OPEN;
+	    }
+	  else
+	    {
+	      printf("%s: ERROR opening V7 map\n",
+		     __func__);
+	    }
 	}
     }
 
   if(dev_mask & VTP_I2C_OPEN)
     {
-
-      if(vtpI2COpen() == OK)
+      if(vtpDevOpenMASK & VTP_I2C_OPEN)
 	{
-	  vtpDevOpenMASK |= VTP_I2C_OPEN;
+	  VTP_DBGN(VTP_DEBUG_INIT, "I2C Already Opened\n");
 	}
       else
 	{
-	  printf("%s: ERROR opening I2C device\n",
-		 __func__);
+	  if(vtpI2COpen() == OK)
+	    {
+	      vtpDevOpenMASK |= VTP_I2C_OPEN;
+	    }
+	  else
+	    {
+	      printf("%s: ERROR opening I2C device\n",
+		     __func__);
+	    }
 	}
     }
 
   if(dev_mask & VTP_SPI_OPEN)
     {
-
-      if(vtpSPIOpen() == OK)
+      if(vtpDevOpenMASK & VTP_SPI_OPEN)
 	{
-	  vtpDevOpenMASK |= VTP_SPI_OPEN;
+	  VTP_DBGN(VTP_DEBUG_INIT, "SPI Already Opened\n");
 	}
       else
 	{
-	  printf("%s: ERROR opening SPI device\n",
-		 __func__);
+	  if(vtpSPIOpen() == OK)
+	    {
+	      vtpDevOpenMASK |= VTP_SPI_OPEN;
+	    }
+	  else
+	    {
+	      printf("%s: ERROR opening SPI device\n",
+		     __func__);
+	    }
 	}
     }
 
-  vtpCreateLockShm();
+  if(addr_shm==NULL)
+    vtpCreateLockShm();
 
   return vtpDevOpenMASK;
 }
