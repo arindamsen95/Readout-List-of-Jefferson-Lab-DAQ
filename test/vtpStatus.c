@@ -16,15 +16,14 @@
 
 extern int nfadc;
 
-int 
-main(int argc, char *argv[]) 
+int
+main(int argc, char *argv[])
 {
   vtpOpen(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
-  
-  vtpInit(VTP_INIT_SKIP);
-  
+
+  vtpInit(VTP_INIT_CLK_VXS_250);
+
   vtpSerdesStatusAll();
-  
+
   exit(0);
 }
-
