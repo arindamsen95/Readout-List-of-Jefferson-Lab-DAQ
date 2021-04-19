@@ -99,10 +99,11 @@ realclean: clean
 
 install: echoarch $(LIBS) vtpserver
 	@echo " INST   ${LIBS} $(LIBS:.a=.so) ${HDRS}"
-	-$(Q)cp *.a $(HOME)/Linux-armv7l/lib/
-	-$(Q)cp *.so $(HOME)/Linux-armv7l/lib/
-	-$(Q)cp *.h $(HOME)/Linux-armv7l/include/
-	-$(Q)cp vtpserver $(HOME)/Linux-armv7l/bin/
+	-$(Q)cp *.a $(CODA)/Linux-armv7l/lib/
+	-$(Q)cp *.so $(CODA)/Linux-armv7l/lib/
+	-$(Q)cp *.h $(CODA)/Linux-armv7l/include/
+	-$(Q)cp *.h $(CODA)/linuxvme/include/
+	-$(Q)cp vtpserver $(CODA)/Linux-armv7l/bin/
 
 echoarch:
 	@echo "Make for $(ARCH)"

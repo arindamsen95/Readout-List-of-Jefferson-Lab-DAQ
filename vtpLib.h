@@ -302,7 +302,9 @@ typedef struct StreamingEb_Struct
   /** 0x005C */ volatile uint32_t Ddr3ReaderStatus;
   /** 0x0060 */ volatile uint32_t EbWriterStatus;
   /** 0x0064 */ volatile uint32_t EbDecimaterStatus;
-  /** 0x0068 */ BLANK[(0x0080-0x0068)/4];
+  /** 0x0068 */ volatile uint32_t NFramesDropped[2];
+  /** 0x0070 */ volatile uint32_t DDR3BusyCnt[2];
+  /** 0x0078 */ volatile uint32_t EBFullCnt[2];
 } STREAMINGEB_REGS;
 
 typedef struct EbioTx_Struct
@@ -1153,7 +1155,8 @@ int  vtpEbReset();
 int  vtpSetBlockLevel(int level);
 int  vtpTiLinkGetBlockLevel(int print);
 int  vtpTiAck(int clearsync);
-int  vtpStatus();
+int  vtpStatus(int pflag);
+int  vtpStats();
 
 // VTP Streaming functions
 int vtpStreamingTcpConnect(int inst, int connect);

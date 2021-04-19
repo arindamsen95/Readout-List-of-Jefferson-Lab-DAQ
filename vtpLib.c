@@ -314,13 +314,13 @@ vtpInit(int iFlag)
 }
 
 int
-vtpStatus()
+vtpStatus(int pflag)
 {
   int status, fw_version, fw_type, timestamp, temp, mig[2], i, inst;
   int ebiorx_status[2], clocksweep[2], debug[2][7], eye[2][17], mdelay[2][17], ebiotx_status[2];
   int ebiorx_ctrl[2], ebiotx_ctrl[2];
   int initial_delay[2], bitslip[2], m_delay_val_out[2][17], s_delay_val_out[2][17], cdataout[2], c_sweep_delay[2];
-  unsigned long long nwords[2][9];
+  unsigned long long nwords[2][9], drops[2];
   float t;
   int ebctrl[2], fadcstr[2];
   int ebHeaderStatus[2], ebDdr3ReaderStatus[2], ebWriterStatus[2], ebDecimaterStatus[2];
@@ -375,11 +375,15 @@ vtpStatus()
         mdelay[inst][i] = vtp->ebiorx[inst].MDelay1Hot[i];
       }
 
+      /* These are 48 bit counters in two registers so sum them to get the right values */
       for(i=0; i<9; i++)
       {
         nwords[inst][i] = vtp->v7.streamingEb[inst].NWords[2*i+0];
-        nwords[inst][i]+= (unsigned long long)vtp->v7.streamingEb[inst].NWords[2*i+1];
+        nwords[inst][i]+= (unsigned long long)(vtp->v7.streamingEb[inst].NWords[2*i+1])<<32;
       }
+      drops[inst] =  vtp->v7.streamingEb[inst].NFramesDropped[0];
+      drops[inst] += (unsigned long long)(vtp->v7.streamingEb[inst].NFramesDropped[1])<<32;
+
       ebHeaderStatus[inst] = vtp->v7.streamingEb[inst].HeaderStatus;
       ebDdr3ReaderStatus[inst] = vtp->v7.streamingEb[inst].Ddr3ReaderStatus;
       ebWriterStatus[inst] = vtp->v7.streamingEb[inst].EbWriterStatus;
@@ -458,8 +462,10 @@ vtpStatus()
     printf("    MIG calibration complete: %d\n", mig[0]);
     printf("    EB Ctrl: 0x%08x\n", ebctrl[0]);
     printf("    FADC Stream ctrl: 0x%08x\n", fadcstr[0]);
-    for(i=0;i<9;i++)
-    printf("    NWords[%d]: %llu\n", i, nwords[0][i]);
+    for(i=0;i<8;i++)
+      printf("    NWords[%d]: %llu\n", i, nwords[0][i]);
+    printf("    Sum[0-7 + Hdrs]: %llu\n", nwords[0][8]);
+    printf("    Dropped Frames : %llu\n", drops[0]);
     printf("    EBHeader Status: 0x%08X\n",         ebHeaderStatus[0]);
     printf("      State=%d\n",                     (ebHeaderStatus[0]>>0)&0xF);
     printf("      fadc_frame[0].empty()=%d\n",     (ebHeaderStatus[0]>>4)&0x1);
@@ -501,8 +507,10 @@ vtpStatus()
     printf("    MIG Calibration Complete: %d\n", mig[1]);
     printf("    EB Ctrl: 0x%08X\n", ebctrl[1]);
     printf("    FADC Stream Ctrl: 0x%08X\n", fadcstr[1]);
-    for(i=0;i<9;i++)
-    printf("    NWords[%d]: %llu\n", i, nwords[1][i]);
+    for(i=0;i<8;i++)
+      printf("    NWords[%d]: %llu\n", i, nwords[1][i]);
+    printf("    Sum[0-7 + Hdrs]: %llu\n", nwords[1][8]);
+    printf("    Dropped Frames : %llu\n", drops[1]);
     printf("    EBHeader Status: 0x%08X\n",         ebHeaderStatus[1]);
     printf("      State=%d\n",                     (ebHeaderStatus[1]>>0)&0xF);
     printf("      fadc_frame[0].empty()=%d\n",     (ebHeaderStatus[1]>>4)&0x1);
@@ -542,37 +550,165 @@ vtpStatus()
     printf("    MIG ReadDataCnt: %u\n", mig_cnts[1][3]);
     printf("\n");
 
-    for(inst=0; inst<2; inst++)
-    {
-      printf("EBIO TX%d:\n", inst);
-      printf("  Status: 0x%08X\n", ebiotx_status[inst]);
-      printf("  Ctrl:   0x%08X\n", ebiotx_ctrl[inst]);
-      printf("EBIO RX%d:\n", inst);
-      printf("  Status: 0x%08X\n", ebiorx_status[inst]);
-      printf("  Ctrl:   0x%08X\n", ebiorx_ctrl[inst]);
-      printf("  Clocksweep: 0x%08X\n", clocksweep[inst]);
-      printf("  Debug:\n");
-      printf("    initial_delay       = %d\n", initial_delay[inst]);
-      printf("    bitslip             = %d\n", bitslip[inst]);
+    if(pflag>0) {
+      for(inst=0; inst<2; inst++)
+	{
+	  printf("EBIO TX%d:\n", inst);
+	  printf("  Status: 0x%08X\n", ebiotx_status[inst]);
+	  printf("  Ctrl:   0x%08X\n", ebiotx_ctrl[inst]);
+	  printf("EBIO RX%d:\n", inst);
+	  printf("  Status: 0x%08X\n", ebiorx_status[inst]);
+	  printf("  Ctrl:   0x%08X\n", ebiorx_ctrl[inst]);
+	  printf("  Clocksweep: 0x%08X\n", clocksweep[inst]);
+	  printf("  Debug:\n");
+	  printf("    initial_delay       = %d\n", initial_delay[inst]);
+	  printf("    bitslip             = %d\n", bitslip[inst]);
 
-      for(i=0; i<17; i++)
-        printf("    m_delay_val_out[%2d]  = %d\n", i, m_delay_val_out[inst][i]);
+	  for(i=0; i<17; i++)
+	    printf("    m_delay_val_out[%2d]  = %d\n", i, m_delay_val_out[inst][i]);
 
-      for(i=0; i<17; i++)
-        printf("    s_delay_val_out[%2d]  = %d\n", i, s_delay_val_out[inst][i]);
+	  for(i=0; i<17; i++)
+	    printf("    s_delay_val_out[%2d]  = %d\n", i, s_delay_val_out[inst][i]);
 
-      printf("    cdataout             = %d\n", cdataout[inst]);
-      printf("    c_sweep_delay        = %d\n", c_sweep_delay[inst]);
+	  printf("    cdataout             = %d\n", cdataout[inst]);
+	  printf("    c_sweep_delay        = %d\n", c_sweep_delay[inst]);
 
-      for(i=0; i<17; i++)
-        printf("  eye%2d                = 0x%08X\n", i, eye[inst][i]);
-
-      for(i=0; i<17; i++)
-        printf("  delay%2d              = 0x%08X\n", i, mdelay[inst][i]);
+	  for(i=0; i<17; i++)
+	    printf("  eye%2d                = 0x%08X\n", i, eye[inst][i]);
+	  
+	  for(i=0; i<17; i++)
+	    printf("  delay%2d              = 0x%08X\n", i, mdelay[inst][i]);
+	}
     }
   }
   return(OK);
 }
+
+
+int
+vtpStats()
+{
+  int status, fw_version, fw_type, timestamp, temp, mig[2], i, inst, rtime;
+  unsigned long long nwords[2][9], drops[2], rambusy[2], ebfull[2];
+  float t;
+  int ebctrl[2], fadcstr[2];
+  int mig_cnts[2][4];
+
+  CHECKINIT;
+
+  rtime = time(NULL);
+
+  if(VTP_FW_Type == VTP_FW_TYPE_FADCSTREAM)
+  {
+    VLOCK;
+    status     = vtp->v7.clk.Status;
+    fw_version = vtp->v7.clk.FW_Version;
+    fw_type    = vtp->v7.clk.FW_Type;
+    timestamp  = vtp->v7.clk.Timestamp;
+    temp       = vtp->v7.clk.Temp;
+
+    for(inst=0; inst<2; inst++)
+    {
+      mig[inst]           = vtp->v7.mig[inst].Status;
+      mig_cnts[inst][0]   = vtp->v7.mig[inst].WriteCnt;
+      mig_cnts[inst][1]   = vtp->v7.mig[inst].ReadCnt;
+      mig_cnts[inst][2]   = vtp->v7.mig[inst].WriteDataCnt;
+      mig_cnts[inst][3]   = vtp->v7.mig[inst].ReadDataCnt;
+      ebctrl[inst]        = vtp->v7.streamingEb[inst].Ctrl;
+      if(inst==0)
+        fadcstr[inst]       = ((vtp->v7.fadcStreaming[0].Ctrl & 0x1)<<0) |
+                              ((vtp->v7.fadcStreaming[1].Ctrl & 0x1)<<1) |
+                              ((vtp->v7.fadcStreaming[2].Ctrl & 0x1)<<2) |
+                              ((vtp->v7.fadcStreaming[3].Ctrl & 0x1)<<3) |
+                              ((vtp->v7.fadcStreaming[4].Ctrl & 0x1)<<4) |
+                              ((vtp->v7.fadcStreaming[5].Ctrl & 0x1)<<5) |
+                              ((vtp->v7.fadcStreaming[6].Ctrl & 0x1)<<6) |
+                              ((vtp->v7.fadcStreaming[7].Ctrl & 0x1)<<7);
+      else
+        fadcstr[inst]       = ((vtp->v7.fadcStreaming[8].Ctrl & 0x1)<<0) |
+                              ((vtp->v7.fadcStreaming[9].Ctrl & 0x1)<<1) |
+                              ((vtp->v7.fadcStreaming[10].Ctrl & 0x1)<<2) |
+                              ((vtp->v7.fadcStreaming[11].Ctrl & 0x1)<<3) |
+                              ((vtp->v7.fadcStreaming[12].Ctrl & 0x1)<<4) |
+                              ((vtp->v7.fadcStreaming[13].Ctrl & 0x1)<<5) |
+                              ((vtp->v7.fadcStreaming[14].Ctrl & 0x1)<<6) |
+                              ((vtp->v7.fadcStreaming[15].Ctrl & 0x1)<<7);
+
+      for(i=0; i<9; i++)
+      {
+        nwords[inst][i] = vtp->v7.streamingEb[inst].NWords[2*i+0];
+        nwords[inst][i]+= (unsigned long long)(vtp->v7.streamingEb[inst].NWords[2*i+1])<<32;
+      }
+      drops[inst]  =  vtp->v7.streamingEb[inst].NFramesDropped[0];
+      drops[inst] += (unsigned long long)(vtp->v7.streamingEb[inst].NFramesDropped[1])<<32;
+      rambusy[inst]  =  vtp->v7.streamingEb[inst].DDR3BusyCnt[0];
+      rambusy[inst] += (unsigned long long)(vtp->v7.streamingEb[inst].DDR3BusyCnt[1])<<32;
+      ebfull[inst]  =  vtp->v7.streamingEb[inst].EBFullCnt[0];
+      ebfull[inst] += (unsigned long long)(vtp->v7.streamingEb[inst].EBFullCnt[1])<<32;
+      }
+
+    VUNLOCK;
+
+    t = (float)temp * 503.975 / 4096.0 - 273.15;
+
+    }
+
+    printf("---------------------------------------\n");
+    printf("--VTP Statistics                     --\n");
+    printf("---------------------------------------\n");
+    printf("Clock:\n");
+    printf("  Global PLL locked: %d\n", (status>>0) & 0x1);
+    printf("\n");
+    printf("Temperature: %dC\n", (int)t);
+    printf("\n");
+    printf("Firmware:\n");
+    printf("  Type: %2d\n", fw_type);
+    printf("  Version: %d.%d\n", (fw_version>>16) & 0xFFFF, (fw_version>>0) & 0xFFFF);
+    printf("  Timestamp: 0x%08X : %d/%d/%d %d:%d:%d \n", timestamp,
+        ((timestamp>>17)&0x3f)+2000, ((timestamp>>23)&0xf), ((timestamp>>27)&0x1f),
+        ((timestamp>>12)&0x1f), ((timestamp>>6)&0x3f), ((timestamp>>0)&0x3f) );
+    printf("\n");
+    printf("  Current time: 0x%08X\n", rtime);
+    printf("    %d/%d/%d %02d:%02d:%02d\n",
+        ((rtime>>17)&0x3f)+2000, ((rtime>>23)&0xf), ((rtime>>27)&0x1f),
+        ((rtime>>12)&0x1f), ((rtime>>6)&0x3f), ((rtime>>0)&0x3f)
+      );
+    printf("\n");
+    printf("Event Building:\n");
+    printf("  EB Controller 0:\n");
+    printf("    MIG calibration complete: %d\n", mig[0]);
+    printf("    EB Ctrl: 0x%08x\n", ebctrl[0]);
+    printf("    FADC Stream ctrl: 0x%08x\n", fadcstr[0]);
+    for(i=0;i<8;i++)
+      printf("    NWords[%d]: %llu\n", i, nwords[0][i]);
+    printf("    Sum[0-7 + Hdrs]: %llu\n", nwords[0][8]);
+    printf("    Dropped Frames : %llu\n", drops[0]);
+    printf("    DDR3 Busy Count: %llu\n", rambusy[0]);
+    printf("    EB Full Count  : %llu\n", ebfull[0]);
+    printf("    MIG WriteCnt: %u\n",     mig_cnts[0][0]);
+    printf("    MIG ReadCnt: %u\n",      mig_cnts[0][1]);
+    printf("    MIG WriteDataCnt: %u\n", mig_cnts[0][2]);
+    printf("    MIG ReadDataCnt: %u\n",  mig_cnts[0][3]);
+    printf("\n");
+    printf("  EB Controller 1:\n");
+    printf("    MIG Calibration Complete: %d\n", mig[1]);
+    printf("    EB Ctrl: 0x%08X\n", ebctrl[1]);
+    printf("    FADC Stream Ctrl: 0x%08X\n", fadcstr[1]);
+    for(i=0;i<8;i++)
+      printf("    NWords[%d]: %llu\n", i, nwords[1][i]);
+    printf("    Sum[0-7 + Hdrs]: %llu\n", nwords[1][8]);
+    printf("    Dropped Frames : %llu\n", drops[1]);
+    printf("    DDR3 Busy Count: %llu\n", rambusy[1]);
+    printf("    EB Full Count  : %llu\n", ebfull[1]);
+    printf("    MIG WriteCnt: %u\n",     mig_cnts[1][0]);
+    printf("    MIG ReadCnt: %u\n",      mig_cnts[1][1]);
+    printf("    MIG WriteDataCnt: %u\n", mig_cnts[1][2]);
+    printf("    MIG ReadDataCnt: %u\n",  mig_cnts[1][3]);
+    printf("\n");
+
+  return(OK);
+}
+
 
 int
 vtpSetBlockLevel(int level)
@@ -2152,114 +2288,6 @@ vtpStreamingGetTcpCfg(
   return OK;
 }
 
-/*
-int
-vtpStreamingTcpConnect(int inst, int connect)
-{
-  int j;
-
-  CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
-
-  if(inst<0 || inst>1)
-  {
-    printf("%s: ERROR inst=%d invalid.\n", __func__, inst);
-    return ERROR;
-  }
-
-  printf("%s(%d,%d)\n", __func__, inst, connect);
-
-  VLOCK;
-  if(connect)
-  {
-    // Assert resets
-    for(j=0;j<8;j++)
-      vtp->v7.fadcStreaming[j+8*inst].Ctrl = 0;
-
-    vtp->tcpClient[inst].IP4_StateRequest = 0;    // tcp: disconnect socket
-    vtp->v7.streamingEb[inst].Ctrl |= 0x80000000; // streaming_eb: RESET=1
-    vtp->v7.ebioTx[inst].Ctrl = 0x7;              // ebioTx: RESET,TRAINING,FIFO_RESET
-    vtp->ebiorx[inst].Ctrl = 0xBB;                // Z7 ebioRx reset
-    vtp->v7.mig[inst].Ctrl = 0x3;                 // Assert SYS_RST,FIFO_RST
-    vtp->tcpClient[inst].Ctrl = 0x03C5;           // tcp: reset: phy, qsfp, tcp
-    usleep(1000);
-
-    // V7 Mig
-    vtp->v7.mig[inst].Ctrl = 0x2;                 // Assert FIFO_RST
-    usleep(10000);
-    vtp->v7.mig[inst].Ctrl = 0x0;
-
-    // V7 ebioTx->ebioRx interface initialization
-    vtp->v7.ebioTx[inst].Ctrl = 0x6;              // ebioTx: TRAINING,FIFO_RESET
-
-    vtp->ebiorx[inst].Ctrl = 0xBA;
-    usleep(10000);
-    vtp->ebiorx[inst].Ctrl = 0xB8;
-    usleep(10000);
-
-    for(j=0;j<10;j++)
-    {
-      vtp->ebiorx[inst].Ctrl = 0xBA;
-      vtp->ebiorx[inst].Ctrl = 0xB8;
-      usleep(1000);
-      if(!(vtp->ebiorx[inst].Status & 0xFFFF0000))
-        break;
-      vtp->ebiorx[inst].Ctrl = 0xBE;
-    }
-    vtp->ebiorx[inst].Ctrl = 0xB8;
-    usleep(1000);
-    vtp->ebiorx[inst].Ctrl = 0x38;
-
-#if 1
-vtp->ebiorx[inst].Ctrl = 0x38;
-usleep(1000);
-vtp->ebiorx[inst].SoftWriteData = 0x00000001;
-vtp->ebiorx[inst].SoftWriteData = 0x00000002;
-vtp->ebiorx[inst].SoftWriteData = 0x00000003;
-vtp->ebiorx[inst].SoftWriteData = 0x00000004;
-vtp->ebiorx[inst].SoftWriteData = 0x00000005;
-vtp->ebiorx[inst].SoftWriteData = 0x00000006;
-vtp->ebiorx[inst].SoftWriteData = 0x00000007;
-vtp->ebiorx[inst].SoftWriteData = 0x00000008;
-vtp->ebiorx[inst].SoftWriteData = 0x00000009;
-vtp->ebiorx[inst].SoftWriteData = 0x0000000A;
-usleep(1000);
-vtp->ebiorx[inst].Ctrl = 0x38;
-#endif
-
-
-    if(j != 10) printf("EBIORX(%d)     sync'd\n", inst);
-    else        printf("EBIORX(%d) NOT sync'd\n", inst);
-
-    // V7 evioTx reset release
-    vtp->v7.ebioTx[inst].Ctrl = 0x4;
-
-    // Z7 socket connect
-    vtp->tcpClient[inst].Ctrl = 0x03C0;           // tcp: reset: qsfp
-    usleep(10000);
-    vtp->tcpClient[inst].Ctrl = 0x13C0;           // tcp: reset: none
-    usleep(250000);
-    vtp->tcpClient[inst].IP4_StateRequest = 2;    // tcp: connect socket
-
-
-    // Release resets downstream->upstream
-#if 0
-    vtp->ebiorx[inst].Ctrl = 0x78;
-#endif
-    vtp->v7.ebioTx[inst].Ctrl = 0x0;
-    vtp->v7.streamingEb[inst].Ctrl &= 0x7FFFFFFF;
-  }
-  else
-  {
-    vtp->tcpClient[inst].IP4_StateRequest = 0;
-  }
-  VUNLOCK;
-
-  vtpStatus();
-
-  return OK;
-}
-*/
 
 int
 vtpStreamingEbioTxSoftWrite(int inst, int val0, int val1, int val2, int val3, int val4)
@@ -2396,7 +2424,7 @@ vtpStreamingTcpConnect(int inst, int connect)
   printf("%s(%d,%d)\n", __func__, inst, connect);
 
 //printf("%s - status:\n", __func__);
-//  vtpStatus();
+//  vtpStatus(0);
 
   VLOCK;
   if(connect)
@@ -2511,7 +2539,7 @@ vtp->ebiorx[inst].Ctrl = 0x38;
   }
   VUNLOCK;
 
-  vtpStatus();
+  // vtpStatus(0);
 
   return OK;
 }
