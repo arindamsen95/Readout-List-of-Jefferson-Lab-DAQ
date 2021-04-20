@@ -657,6 +657,17 @@ typedef struct Hcal_Struct
   /** 0x000C */ BLANK[(0x100-0x0C)/4];
 } HCAL_REGS;
 
+/* MPD Interface */
+#define MPD_CTRL_GTX_RESET		0x00000001	/* Analog reset fiber - asserted all channels and release 1 time on SSP init and don't do again */
+#define MPD_CTRL_RESET			0x00000002	/* Fiber link reset the MPD */
+
+#define MPD_STATUS_CHANNELUP		0x00000001	/* Channel Up indicates remote MPD connected */
+#define MPD_STATUS_HARDERROR		0x00000002	/* Indicates whether hard error exists (requires CTRL_RESET to be asserted to fix) */
+#define MPD_STATUS_FRAMEERROR		0x00000004	/* Indicates whether framing error exists (requires CTRL_RESET to be asserted to fix) */
+#define MPD_STATUS_SOFTERRORS		0x0000FF00	/* Bit error counter on fiber link to MPD */
+
+#define MPD_EBCTRL_ENABLE		0x00000001	/* Set to 1 to allow MPD event data to fill event builder buffer */
+
 typedef struct MpdFiber_Struct
 {
   /** 0x0000 */ volatile uint32_t gtx_ctrl;
@@ -786,6 +797,9 @@ typedef struct v7_bridge_struct
 
   /** 0x43C19000 */ COMPTONTRIGGER_REGS comptonTrigger;
 
+  /** NOT SURE   */ MPDFIBER_REGS mpdFiber[32];
+  /** NOT SURE 2 */ MPD_REGS mpd;
+
   /** 0x43C19100 */ BLANK[(0xFFF4 - 0x9100)/4];
 
   /** 0x43C1FFF4 */ volatile uint32_t Status;
@@ -909,6 +923,7 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_HPS               13
 #define VTP_FW_TYPE_FADCSTREAM        14
 #define VTP_FW_TYPE_COMPTON           15
+#define VTP_FW_TYPE_MPDRO             16
 
 /* Routine prototypes */
 int  vtpSetDebugMask(uint32_t mask);
@@ -1210,5 +1225,7 @@ int  vtpDmaMemOpen(int nbuffers, int size);
 int  vtpDmaMemClose();
 unsigned long vtpDmaMemGetPhysAddress(int buffer_id);
 unsigned long vtpDmaMemGetLocalAddress(int buffer_id);
+
+#include "vtp-mpdro.h"
 
 #endif /* VTPLIB_H */

@@ -18,6 +18,7 @@
  *----------------------------------------------------------------------------*/
 
 #include <pthread.h>
+#include <stdio.h>
 #include "vtpLib.h"
 
 extern volatile ZYNC_REGS *vtp;
@@ -44,7 +45,7 @@ extern pthread_mutex_t   vtpMutex;
   }
 
 /* MPD Control/Status Routines */
-#if 0
+#if MPD_MON_NOT_SUPPORTED
 int
 vtpMpdMonEnable(int fiber)
 {
@@ -58,8 +59,8 @@ vtpMpdMonEnable(int fiber)
   }
 
   VLOCK;
-  vmeWrite32(&pSSP[id]->MPD[fiber].MonCtrl, 0x1); // reset
-  vmeWrite32(&pSSP[id]->MPD[fiber].MonCtrl, 0x2); // enable write
+  vtp->v7.mpdFiber[fiber].mon_ctrl = 0x1; // reset
+  vtp->v7.mpdFiber[fiber].mon_ctrl = 0x2; // enable write
   VUNLOCK;
   return OK;
 }
@@ -77,15 +78,15 @@ vtpMpdMonDump(int fiber)
     return ERROR;
   }
 
-  printf("%s(%d,%d)\n", __func__, id, fiber);
+  printf("%s(%d)\n", __func__, fiber);
   VLOCK;
-  vmeWrite32(&pSSP[id]->MPD[fiber].MonCtrl, 0x0); // disable write
+  vtp->v7.mpdFiber[fiber].mon_ctrl = 0; // disable write
 
   for(i=0;i<65536;i++)
   {
     int word, rx_d;
     int isk, iscomma, disperr, notintable, clkcorcnt, bufstatus, realign;
-    word = vmeRead32(&pSSP[id]->MPD[fiber].MonStatus);
+    word = vtp->v7.mpdFiber[fiber].mon_status;
 
     rx_d         = (word>>0)  & 0xFFFF;
     isk          = (word>>16) & 0x0003;
@@ -127,11 +128,11 @@ vtpMpdSetAvg(int fiber, int apv, int min, int max)
         (apv<<26);
 
   VLOCK;
-  vmeWrite32(&pSSP[id]->MPD[fiber].Avg, val | 0x80000000);
-  //vmeWrite32(&pSSP[id]->MPD[fiber].Avg, val);
+  vtp->v7.mpdFiber[fiber].apv_avg = val | 0x80000000;
   VUNLOCK;
   return OK;
 }
+#endif // 0
 
 int
 vtpMpdSetApvOffset(int fiber, int apv, int strip, int offset)
@@ -160,8 +161,7 @@ vtpMpdSetApvOffset(int fiber, int apv, int strip, int offset)
   val = (offset & 0x1fff) | (strip<<16) | (apv<<23);
 
   VLOCK;
-      vmeWrite32(&pSSP[id]->MPD[fiber].ApvOffset, val | 0x80000000);
-      //  vmeWrite32(&pSSP[id]->MPD[fiber].ApvOffset, val);
+  vtp->v7.mpdFiber[fiber].apv_offset = val | 0x80000000;
   VUNLOCK;
   return OK;
 }
@@ -189,12 +189,9 @@ vtpMpdSetApvThreshold(int fiber, int apv, int strip, int threshold)
     }
 
   val = (threshold & 0x1fff) | (strip<<16) | (apv<<23);
-  // printf("%s(id=%d,fiber=%d,apv=%d,strip=%d,threshold=%d): 0x%08X\n",
-  //     __func__, id, fiber, apv, strip, threshold, val);
 
   VLOCK;
-      vmeWrite32(&pSSP[id]->MPD[fiber].ApvThreshold, val | 0x80000000);
-      //vmeWrite32(&pSSP[id]->MPD[fiber].ApvThreshold, val);
+  vtp->v7.mpdFiber[fiber].apv_thr = val | 0x80000000;
   VUNLOCK;
   return OK;
 }
@@ -210,12 +207,12 @@ vtpMpdFiberReset(int id)
   VLOCK;
   for(impd=0; impd<32; impd++)
     {
-      vmeWrite32(&pSSP[id]->MPD[impd].Ctrl, MPD_CTRL_GTX_RESET);
+      vtp->v7.mpdFiber[impd].gtx_ctrl = MPD_CTRL_GTX_RESET;
     }
-  taskDelay(2);
+  usleep(60000);
   for(impd=0; impd<32; impd++)
     {
-      vmeWrite32(&pSSP[id]->MPD[impd].Ctrl, 0);
+      vtp->v7.mpdFiber[impd].gtx_ctrl = 0;
     }
   VUNLOCK;
   return OK;
@@ -232,13 +229,13 @@ vtpMpdFiberLinkReset(unsigned int mpdmask)
   for(impd=0; impd<32; impd++)
     {
       if(mpdmask & (1<<impd))
-	vmeWrite32(&pSSP[id]->MPD[impd].Ctrl, MPD_CTRL_RESET);
+	vtp->v7.mpdFiber[impd].gtx_ctrl = MPD_CTRL_RESET;
     }
-  taskDelay(2);
+  usleep(60000);
   for(impd=0; impd<32; impd++)
     {
       if(mpdmask & (1<<impd))
-	vmeWrite32(&pSSP[id]->MPD[impd].Ctrl, 0);
+	vtp->v7.mpdFiber[impd].gtx_ctrl = 0;
     }
   VUNLOCK;
   return OK;
@@ -254,12 +251,18 @@ vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers, int enable_cm)
   VLOCK;
   for(impd=0; impd<32; impd++)
     {
-    val = vmeRead32(&pSSP[id]->MPD[impd].EBCtrl) & 0xFFFFFFF1;
-    if(build_all_samples) val |= 0x2;
-    if(build_debug_headers) val |= 0x4;
-    if(enable_cm) val |= 0x8;
+      val = vtp->v7.mpdFiber[impd].eb_ctrl & 0xFFFFFFF1;
 
-    vmeWrite32(&pSSP[id]->MPD[impd].EBCtrl, val);
+      if(build_all_samples)
+	val |= 0x2;
+
+      if(build_debug_headers)
+	val |= 0x4;
+
+      if(enable_cm)
+	val |= 0x8;
+
+      vtp->v7.mpdFiber[impd].eb_ctrl = val;
     }
   VUNLOCK;
 
@@ -281,11 +284,15 @@ vtpMpdEnable(unsigned int mpdmask)
     {
       if(mpdmask & (1<<impd))
 	{
-	vmeWrite32(&pSSP[id]->MPD[impd].EBCtrl, MPD_EBCTRL_ENABLE);
-	vmeWrite32(&pSSP[id]->MPD[impd].EBBusyThreshold, 0x100);
-	rval = vmeRead32(&pSSP[id]->MPD[impd].EBBusyThreshold);
-	if(printFlag)
-	  printf("BusyTh set!!!0x%08X\n", rval);
+	  vtp->v7.mpdFiber[impd].eb_ctrl = MPD_EBCTRL_ENABLE;
+
+#ifdef EB_BUSY_THR_SUPPORTED
+	  vtp->v7.mpdFiber[impd].eb_busy_thr = 0x100;
+	  rval = vtp->v7.mpdFiber[impd].eb_busy_thr;
+
+	  if(printFlag)
+	    printf("BusyTh set!!!0x%08X\n", rval);
+#endif
 	}
     }
   VUNLOCK;
@@ -305,8 +312,8 @@ vtpMpdDisable(unsigned int mpdmask)
     {
       if(mpdmask & (1<<impd))
 	{
-	val = vmeRead32(&pSSP[id]->MPD[impd].EBCtrl) & ~MPD_EBCTRL_ENABLE;
-	vmeWrite32(&pSSP[id]->MPD[impd].EBCtrl, val);
+	  val = vtp->v7.mpdFiber[impd].eb_ctrl & ~MPD_EBCTRL_ENABLE;
+	  vtp->v7.mpdFiber[impd].eb_ctrl = val;
 	}
     }
   VUNLOCK;
@@ -322,22 +329,18 @@ vtpMpdReadRegs(int impd)
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO);
 
-  printf("%s(id = %d, impd = %d): \n",
-	 __func__, id, impd);
+  printf("%s(impd = %d): \n",
+	 __func__, impd);
   VLOCK;
-  vmeWrite32(&pSSP[id]->MPDSelector, impd);
+
   for(ireg = (0x0>>2); ireg < (0x200>>2); ireg++)
     {
-      if((ireg%4)==0) printf("\n%05x\t",ireg<<2);
-      res = vmeMemProbe((char *) &pSSP[id]->MPDregs[ireg],4,(char *)&rval);
-      if(res<0)
-	{
-	  printf("  -BUSERROR-  ");
-	  res=0;
-	  errval=ERROR;
-	}
-      else
-	printf("  0x%08x  ",rval);
+      vtp->v7.mpd.addr = (impd << 24) | (ireg << 2);
+
+      if((ireg%4)==0)
+	printf("\n%05x\t",ireg<<2);
+
+      printf("  0x%08x  ",rval);
     }
   printf("\n\n");
 
@@ -346,9 +349,6 @@ vtpMpdReadRegs(int impd)
   return errval;
 }
 
-static int vtpMpdFiberSelected[MAX_VME_SLOTS+1];
-static int vtpMpdFiberSelected_initd=0;
-
 unsigned int
 vtpMpdReadReg(int impd, unsigned int reg)
 {
@@ -356,19 +356,10 @@ vtpMpdReadReg(int impd, unsigned int reg)
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO);
 
-  if(vtpMpdFiberSelected_initd==0)
-    {
-      memset(&vtpMpdFiberSelected,-1,sizeof(vtpMpdFiberSelected));
-      vtpMpdFiberSelected_initd=1;
-    }
-
-  if(impd!=vtpMpdFiberSelected[id])
-    {
-      vmeWrite32(&pSSP[id]->MPDSelector, impd);
-      vtpMpdFiberSelected[id]=impd;
-    }
-
-  rval = vmeRead32(&pSSP[id]->MPDregs[reg>>2]);
+  VLOCK;
+  vtp->v7.mpd.addr = (impd << 24) | reg;
+  rval = vtp->v7.mpd.data;
+  VUNLOCK;
 
   return rval;
 }
@@ -380,19 +371,10 @@ vtpMpdWriteReg(int impd, unsigned int reg, unsigned int value)
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO);
 
-  if(vtpMpdFiberSelected_initd==0)
-    {
-      memset(&vtpMpdFiberSelected,-1,sizeof(vtpMpdFiberSelected));
-      vtpMpdFiberSelected_initd=1;
-    }
-
-  if(impd!=vtpMpdFiberSelected[id])
-    {
-      vmeWrite32(&pSSP[id]->MPDSelector, impd);
-      vtpMpdFiberSelected[id]=impd;
-    }
-
-  vmeWrite32(&pSSP[id]->MPDregs[reg>>2],value);
+  VLOCK;
+  vtp->v7.mpd.addr = (impd << 24) | reg;
+  vtp->v7.mpd.data = value;
+  VUNLOCK;
 
   return rval;
 }
@@ -405,16 +387,16 @@ vtpMpdGetSoftErrorCount(int fiber)
   CHECKTYPE(VTP_FW_TYPE_MPDRO);
 
   VLOCK;
-  result = (vmeRead32(&pSSP[id]->MPD[fiber].Status) >> 8) & 0xFF;
+  result = (vtp->v7.mpdFiber[fiber].gtx_status >> 8) & 0xFF;
   VUNLOCK;
 
   return result;
 }
 
 int
-vtpMpdPrintStatus(int id)
+vtpMpdPrintStatus()
 {
-  MPD_regs mr[32];
+  MPDFIBER_REGS mr[32];
   int impd=0;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO);
@@ -422,14 +404,13 @@ vtpMpdPrintStatus(int id)
   VLOCK;
   for(impd=0; impd<32; impd++)
     {
-      mr[impd].Ctrl   = vmeRead32(&pSSP[id]->MPD[impd].Ctrl);
-      mr[impd].Status = vmeRead32(&pSSP[id]->MPD[impd].Status);
-      mr[impd].EBCtrl = vmeRead32(&pSSP[id]->MPD[impd].EBCtrl);
+      mr[impd].gtx_ctrl   = vtp->v7.mpdFiber[impd].gtx_ctrl;
+      mr[impd].gtx_status = vtp->v7.mpdFiber[impd].gtx_status;
+      mr[impd].eb_ctrl = vtp->v7.mpdFiber[impd].eb_ctrl;
     }
   VUNLOCK;
 
   printf("\n");
-  printf("                               SSP - Slot %2d\n",id);
   printf("                           MPD Settings and Status\n\n");
   printf("     Channel   -------ERRORS------     Event\n");
   printf("MPD    Up      HARD   FRAME   SOFT    Builder\n");
@@ -438,20 +419,20 @@ vtpMpdPrintStatus(int id)
     {
       printf("%2d    ",impd);
 
-      printf("%s      ",(mr[impd].Status & MPD_STATUS_CHANNELUP)?" UP ":"DOWN");
+      printf("%s      ",(mr[impd].gtx_status & MPD_STATUS_CHANNELUP)?" UP ":"DOWN");
 
-      printf("%s    ",(mr[impd].Status & MPD_STATUS_HARDERROR)?"ERR":"---");
+      printf("%s    ",(mr[impd].gtx_status & MPD_STATUS_HARDERROR)?"ERR":"---");
 
-      printf("%s     ",(mr[impd].Status & MPD_STATUS_FRAMEERROR)?"ERR":"---");
+      printf("%s     ",(mr[impd].gtx_status & MPD_STATUS_FRAMEERROR)?"ERR":"---");
 
-      if(mr[impd].Status & MPD_STATUS_SOFTERRORS)
+      if(mr[impd].gtx_status & MPD_STATUS_SOFTERRORS)
 	{
-	  printf("%3d    ",(mr[impd].Status & MPD_STATUS_SOFTERRORS)>>8);
+	  printf("%3d    ",(mr[impd].gtx_status & MPD_STATUS_SOFTERRORS)>>8);
 	}
       else
 	printf("---    ");
 
-      printf("%s",(mr[impd].EBCtrl & MPD_EBCTRL_ENABLE)?"ENABLED ":"DISABLED");
+      printf("%s",(mr[impd].eb_ctrl & MPD_EBCTRL_ENABLE)?"ENABLED ":"DISABLED");
 
       printf("\n");
     }
@@ -474,7 +455,7 @@ vtpMpdGetChanUpMask()
   VLOCK;
   for(impd=0; impd<32; impd++)
     {
-      status = vmeRead32(&pSSP[id]->MPD[impd].Status);
+      status = vtp->v7.mpdFiber[impd].gtx_status;
       status &= MPD_STATUS_CHANNELUP;
       if(status)
 	rval |= (1 << impd);
@@ -493,11 +474,12 @@ vtpGetMpdMaxRxLen(int impd)
   CHECKTYPE(VTP_FW_TYPE_MPDRO);
 
   VLOCK;
-  result = vmeRead32(&pSSP[id]->MPD[impd].MaxRxLen);
+  result = vtp->v7.mpdFiber[impd].max_rx_len;
   VUNLOCK;
   return result;
 }
 
+#if MPD_EB_NOT_SUPPORTED
 int
 vtpGetEB_wordCount(int impd)
 {
@@ -507,7 +489,7 @@ vtpGetEB_wordCount(int impd)
   CHECKTYPE(VTP_FW_TYPE_MPDRO);
 
   VLOCK;
-  result = vmeRead32(&pSSP[id]->MPD[impd].EB_wordCount);
+  result = vtp->v7.mpdFiber[impd].eb_word_count;
   VUNLOCK;
   return result;
 }
@@ -522,9 +504,9 @@ vtpGetEbStatus(unsigned int *blockcnt, unsigned int *wordcnt, unsigned int *even
 
 
   VLOCK;
-  *blockcnt = vmeRead32(&pSSP[id]->EB.FifoBlockCnt);
-  *wordcnt = vmeRead32(&pSSP[id]->EB.FifoWordCnt);
-  *eventcnt = vmeRead32(&pSSP[id]->EB.FifoEventCnt);
+  *blockcnt = vtp->v7.mpdFiber[impd].eb_fifo_blk_count;
+  *wordcnt = vtp->v7.mpdFiber[impd].eb_fifo_word_count;
+  *eventcnt = vtp->v7.mpdFiber[impd].eb_fifo_event_count;
   VUNLOCK;
   return 0;
 }

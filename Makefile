@@ -45,7 +45,7 @@ ifeq ($(USE_IPC),1)
 endif
 
 ifdef DEBUG
-	CFLAGS		+= -Wall -g
+	CFLAGS		+= -Wall -Wno-unused -g
 else
 	CFLAGS		+= -O2
 endif
