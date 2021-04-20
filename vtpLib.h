@@ -657,6 +657,29 @@ typedef struct Hcal_Struct
   /** 0x000C */ BLANK[(0x100-0x0C)/4];
 } HCAL_REGS;
 
+typedef struct MpdFiber_Struct
+{
+  /** 0x0000 */ volatile uint32_t gtx_ctrl;
+  /** 0x0004 */ BLANK[(0x10-0x04)/4];
+  /** 0x0010 */ volatile uint32_t gtx_status;
+  /** 0x0014 */ BLANK[(0x20-0x14)/4];
+  /** 0x0020 */ volatile uint32_t eb_ctrl;
+  /** 0x0024 */ BLANK[(0x28-0x24)/4];
+  /** 0x0028 */ volatile uint32_t max_rx_len;
+  /** 0x002C */ BLANK[(0x34-0x2C)/4];
+  /** 0x0034 */ volatile uint32_t apv_offset;
+  /** 0x0038 */ volatile uint32_t apv_thr;
+  /** 0x003C */ BLANK[(0x100-0x3C)/4];
+} MPDFIBER_REGS;
+
+typedef struct MpdRegs_Struct
+{
+  /** 0x0000 */ volatile uint32_t data;
+  /** 0x0004 */ BLANK[(0x3C-0x04)/4];
+  /** 0x003C */ volatile uint32_t addr;
+  /** 0x0040 */ BLANK[(0x100-0x40)/4];
+} MPD_REGS;
+
 typedef struct v7_bridge_struct
 {
   /** 0x43C10000 */ BLANK[0x100/4];

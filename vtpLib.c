@@ -64,10 +64,10 @@ static int vtpDevOpenMASK = 0;
 static int vtpFPGAFD = -1;
 const char vtpFPGADev[256] = "/dev/uio0";
 
-static int VTP_FW_Version = 0;
-static int VTP_FW_Type = 0;
+int VTP_FW_Version = 0;
+int VTP_FW_Type = 0;
 
-static volatile ZYNC_REGS *vtp = NULL;
+volatile ZYNC_REGS *vtp = NULL;
 
 static int vtpEbTiEventReadErrors;
 static int vtpEbEventReadErrors;
@@ -575,7 +575,7 @@ vtpStatus(int pflag)
 
 	  for(i=0; i<17; i++)
 	    printf("  eye%2d                = 0x%08X\n", i, eye[inst][i]);
-	  
+
 	  for(i=0; i<17; i++)
 	    printf("  delay%2d              = 0x%08X\n", i, mdelay[inst][i]);
 	}

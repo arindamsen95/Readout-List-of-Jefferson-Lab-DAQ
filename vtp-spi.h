@@ -15,10 +15,12 @@
  *----------------------------------------------------------------------------*
  *
  * Description:
- *     Header file for VTP-SPI 
+ *     Header file for VTP-SPI
  *
  *----------------------------------------------------------------------------*/
 
+#include <unistd.h>
+#include <stdint.h>
 
 int vtpSPIOpen();
 int vtpSPIClose();
