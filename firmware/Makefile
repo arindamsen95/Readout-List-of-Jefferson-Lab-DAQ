@@ -7,6 +7,19 @@
 #
 #
 
+# Uncomment DEBUG line, to include some debugging info ( -g and -Wall)
+DEBUG   ?= 1
+QUIET	?= 1
+
+ifeq ($(QUIET),1)
+	Q = @
+	INSTALL = @install -b
+else
+	Q =
+	INSTALL = install -b --verbose
+endif
+
+
 VTPLIB_PATH		= ../
 
 CC			= gcc
@@ -25,19 +38,25 @@ DEPS			= $(SRC:%.c=%.d)
 all: $(PROGS)
 
 clean:
-	@rm -vf $(PROGS) $(DEPS) *~
+	$(Q)rm -vf $(PROGS) $(DEPS) *~
 
 %: %.c ${STATIC_LIBS}
-	@echo "Building $@ from $<"
-	$(CC) $(CFLAGS) -o $@ $(@:%=%.c) ${STATIC_LIBS} -lm -lrt -lpthread
+	@echo " CC     $@"
+	$(Q)$(CC) $(CFLAGS) -o $@ $(@:%=%.c) ${STATIC_LIBS} -lm -lrt -lpthread
 
 %.d: %.c
-	@echo ""
-	@echo "Building $@ from $<"
-	@set -e; rm -f $@; \
+	@echo " DEP    $@"
+	$(Q)set -e; rm -f $@; \
 	$(CC) -MM -shared $(INCS) $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,\1 $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
+
+install: ${PROGS}
+	@echo " INST   $<"
+	-${INSTALL} --mode=755 --directory /usr/local/vtp/
+	-${INSTALL} --mode=755 ${PROGS} /usr/local/vtp/
+	-${INSTALL} --mode=755 --directory /usr/local/vtp/systemd
+	-${INSTALL} --mode=644 ../systemd/vtp_fpga_load.service /usr/local/vtp/systemd/
 
 -include $(DEPS)
 

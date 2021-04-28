@@ -41,8 +41,10 @@ DEPS			= $(SRC:.c=.d)
 
 ifeq ($(QUIET),1)
 	Q = @
+	INSTALL = @install -b
 else
 	Q =
+	INSTALL = install -b --verbose
 endif
 
 
@@ -74,7 +76,10 @@ realclean: clean
 
 install: DiagGuiServer
 	@echo " INST   $<"
-	-$(Q)cp DiagGuiServer $(HOME)/Linux-$(ARCH)/bin/
+	-${INSTALL} --mode=755 --directory /usr/local/vtp/
+	-${INSTALL} --mode=755 DiagGuiServer /usr/local/vtp/
+	-${INSTALL} --mode=755 --directory /usr/local/vtp/systemd
+	-${INSTALL} --mode=644 ../systemd/DiagGui.service /usr/local/vtp/systemd/
 
 echoarch:
 	@echo "Make for $(ARCH)"
