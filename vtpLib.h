@@ -680,7 +680,7 @@ typedef struct MpdFiber_Struct
   /** 0x002C */ BLANK[(0x34-0x2C)/4];
   /** 0x0034 */ volatile uint32_t apv_offset;
   /** 0x0038 */ volatile uint32_t apv_thr;
-  /** 0x003C */ BLANK[(0x100-0x3C)/4];
+  /** 0x003C */ BLANK[(0x40-0x3C)/4];
 } MPDFIBER_REGS;
 
 typedef struct MpdRegs_Struct
@@ -797,10 +797,15 @@ typedef struct v7_bridge_struct
 
   /** 0x43C19000 */ COMPTONTRIGGER_REGS comptonTrigger;
 
-  /** NOT SURE   */ MPDFIBER_REGS mpdFiber[32];
-  /** NOT SURE 2 */ MPD_REGS mpd;
+  /** 0x43C19100 */ BLANK[(0x9200 - 0x9100)/4];
 
-  /** 0x43C19100 */ BLANK[(0xFFF4 - 0x9100)/4];
+  /** 0x43C19200 */ MPD_REGS mpd;
+
+  /** 0x43C19300 */ BLANK[(0xA000 - 0x9300)/4];
+
+  /** 0x43C1A000 */ MPDFIBER_REGS mpdFiber[32];
+
+  /** 0x43C1A800 */ BLANK[(0xFFF4 - 0xA800)/4];
 
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
@@ -923,7 +928,7 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_HPS               13
 #define VTP_FW_TYPE_FADCSTREAM        14
 #define VTP_FW_TYPE_COMPTON           15
-#define VTP_FW_TYPE_MPDRO             16
+#define VTP_FW_TYPE_MPDRO             18
 
 /* Routine prototypes */
 int  vtpSetDebugMask(uint32_t mask);

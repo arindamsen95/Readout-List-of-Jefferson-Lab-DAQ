@@ -257,7 +257,7 @@ vtpInit(int iFlag)
   printf("%s: VTP_FW_Version=0x%x, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
 
   switch(VTP_FW_Type)
-  {
+    {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_GT:
@@ -287,6 +287,22 @@ vtpInit(int iFlag)
 
       break;
 
+    case VTP_FW_TYPE_MPDRO:
+      vtpSetTrig1Source(trig1Src);
+      vtpSetSyncSource(syncSrc);
+      /* vtpTiLinkInit(); */
+      /* vtpEbResetFifo(); */
+
+      VLOCK;
+      vtp->v7.sd.FPAOSel = 0xFFFFFFFF;  /* Route trigger output to FPAO */
+      vtp->v7.sd.FPBOSel = 0xFFFFFFFF;  /* Route trigger output to FPBO */
+      sdStatus = vtp->v7.sd.Status;
+      VUNLOCK;
+
+      printf("VTP SD Daughtercard ID = 0x%08X\n", sdStatus);
+
+      break;
+
     case VTP_FW_TYPE_FADCSTREAM:
       vtpSetTrig1Source(trig1Src);
       vtpSetSyncSource(syncSrc);
@@ -305,7 +321,7 @@ vtpInit(int iFlag)
     default:
       printf("%s: ERROR - unknown firmware type %d. Unable to setup VTP PLL.\n", __func__, VTP_FW_Type);
       return ERROR;
-  }
+    }
 
   vtpEbTiEventReadErrors = 0;
   vtpEbEventReadErrors = 0;
@@ -989,6 +1005,24 @@ vtpCheckAddresses()
   if(offset != expected)
     {
       printf("%s: ERROR VTPp->v7.gtBit[0] not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
+  offset = ((unsigned long) &test.v7.mpd) - base;
+  expected = 0x19200;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->v7.mpd not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
+  offset = ((unsigned long) &test.v7.mpdFiber[0]) - base;
+  expected = 0x1A000;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->v7.mpdFiber[0] not at offset = 0x%lx (@ 0x%lx)\n",
 	     __func__,expected,offset);
       rval = ERROR;
     }
@@ -6740,6 +6774,7 @@ vtpTiLinkInit()
   int i, val;
   CHECKINIT;
 
+  printf("%s: init\n", __func__);
   for(i = 0; i < TI_LINK_INIT_TRIES; i++)
   {
     VLOCK;
@@ -6814,6 +6849,7 @@ vtpEbResetFifo()
 {
   CHECKINIT;
 
+  printf("%s: reset fifo\n",__func__);
   VLOCK;
   vtp->eb.LinkCtrl |= VTP_EB_LINKCTRL_FIFO_RST;
   vtp->eb.LinkCtrl &= ~VTP_EB_LINKCTRL_FIFO_RST;
