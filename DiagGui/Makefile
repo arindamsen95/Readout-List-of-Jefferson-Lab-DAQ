@@ -20,9 +20,13 @@ KERNEL_VERSION=${shell uname -r}
 CC			= gcc
 AR                      = ar
 RANLIB                  = ranlib
-CFLAGS			= -DLinux_$(ARCH) -L. -L${HOME}/Linux-$(ARCH)/lib \
-				-lvtp -lpthread -lrt -lm -li2c
-INCS			= -I. -I../ -I/usr/local/include -I${HOME}/Linux-$(ARCH)/include
+CFLAGS			= -DLinux_$(ARCH) -L. \
+				-lpthread -lrt -lm
+
+STATIC_LIBS		= ../libvtp.a
+STATIC_LIBS		+= /usr/local/lib/libi2c.a
+
+INCS			= -I. -I../
 
 ifdef DEBUG
 	CFLAGS		+= -Wall -g
@@ -55,9 +59,9 @@ all: DiagGuiServer
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 
-DiagGuiServer: $(OBJ)
+DiagGuiServer: $(OBJ) ${STATIC_LIBS}
 	@echo " CC     $@"
-	$(Q)$(CC) $(CFLAGS) $(INCS) -o $@ ${OBJ}
+	$(Q)$(CC) $(CFLAGS) $(INCS) -o $@ ${OBJ} ${STATIC_LIBS}
 
 
 -include $(DEPS)

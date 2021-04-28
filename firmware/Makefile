@@ -13,8 +13,10 @@ CC			= gcc
 AR                      = ar
 RANLIB                  = ranlib
 INCS			= -I. -I${VTPLIB_PATH}
-CFLAGS			= -Wall -g ${INCS}\
-			  -L. -L${VTPLIB_PATH}
+CFLAGS			= -Wall -g ${INCS}
+
+STATIC_LIBS		= ../libvtp.a
+STATIC_LIBS		+= /usr/local/lib/libi2c.a
 
 PROGS			= vtpFirmwareLoad
 SRC			= $(PROGS:%=%.c)
@@ -25,9 +27,9 @@ all: $(PROGS)
 clean:
 	@rm -vf $(PROGS) $(DEPS) *~
 
-%: %.c
+%: %.c ${STATIC_LIBS}
 	@echo "Building $@ from $<"
-	$(CC) $(CFLAGS) -o $@ $(@:%=%.c) -lm -lrt -lvtp -li2c
+	$(CC) $(CFLAGS) -o $@ $(@:%=%.c) ${STATIC_LIBS} -lm -lrt -lpthread
 
 %.d: %.c
 	@echo ""
