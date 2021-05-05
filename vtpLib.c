@@ -2197,7 +2197,15 @@ int
 vtpStreamingEnd()
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   VLOCK;
   vtp->v7.streamingEb[0].Ctrl = 0x80000000;
@@ -2212,7 +2220,16 @@ vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_i
 {
   int slot_start;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   frame_len = (frame_len+31) / 32;
   frame_len*= 32;
@@ -2241,7 +2258,15 @@ vtpStreamingGetEbCfg(int inst, int *mask, int *source_id, int *frame_len, int *r
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   if(inst<0 || inst>1)
   {
@@ -2277,7 +2302,15 @@ vtpStreamingSetTcpCfg(
   )
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   if(inst<0 || inst>1)
   {
@@ -2314,7 +2347,15 @@ vtpStreamingGetTcpCfg(
 {
   unsigned int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   if(inst<0 || inst>1)
   {
@@ -2355,7 +2396,15 @@ int
 vtpStreamingEbioTxSoftWrite(int inst, int val0, int val1, int val2, int val3, int val4)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   if(inst<0 || inst>1)
   {
@@ -2379,7 +2428,15 @@ vtpStreamEbioRxReset(int inst, int rst)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   if(inst<0 || inst>1)
   {
@@ -2407,7 +2464,15 @@ vtpStreamQsfpReset(int inst, int reset)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   if(inst<0 || inst>1)
   {
@@ -2430,7 +2495,15 @@ int
 vtpStreamingSkipTcp(int inst, int skip)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   if(inst<0 || inst>1)
   {
@@ -2450,7 +2523,15 @@ int
 vtpStreamingMigFifoReset(int inst)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   if(inst<0 || inst>1)
   {
@@ -2475,7 +2556,15 @@ vtpStreamingTcpConnect(int inst, int connect)
   int j;
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
   if(inst<0 || inst>1)
   {
@@ -2610,7 +2699,15 @@ int
 vtpStreamingTcpGo()
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+  switch(VTP_FW_Type[0])
+    {
+    case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_MPDRO:
+      break;
+    default:
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
+      return ERROR;
+    }
 
 
   return OK;
