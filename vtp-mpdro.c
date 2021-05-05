@@ -23,7 +23,7 @@
 
 extern volatile ZYNC_REGS *vtp;
 extern int VTP_FW_Version;
-extern int VTP_FW_Type;
+extern int VTP_FW_Type[2];
 
 /* Mutex to guard VTP read/writes */
 extern pthread_mutex_t   vtpMutex;
@@ -37,11 +37,15 @@ extern pthread_mutex_t   vtpMutex;
     }								\
   }
 
-#define CHECKTYPE(v) {        \
-    if( (v != VTP_FW_TYPE_COMMON) && (v != VTP_FW_Type) ) { \
-      printf("%s: ERROR: VTP wrong firmware type (%d)\n",__func__,v);	\
-      return ERROR;           \
-    }               \
+#define CHECKTYPE(v,c) {					    \
+    if ((c!=0)&&(c!=1)) {					    \
+       printf("%s: ERROR: VTP wrong Chip ID (%d)\n",__func__,c);    \
+       return ERROR;                                                \
+       }                                                            \
+    if( (v != VTP_FW_TYPE_COMMON) && (v != VTP_FW_Type[c]) ) {         \
+      printf("%s: ERROR: VTP wrong firmware type (%d)\n",__func__,v);  \
+      return ERROR;						       \
+    }								       \
   }
 
 /* MPD Control/Status Routines */
@@ -50,7 +54,7 @@ int
 vtpMpdMonEnable(int fiber)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   if((fiber<0) || (fiber>31))
   {
@@ -70,7 +74,7 @@ vtpMpdMonDump(int fiber)
 {
   int i;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   if((fiber<0) || (fiber>31))
   {
@@ -110,7 +114,7 @@ vtpMpdSetAvg(int fiber, int apv, int min, int max)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   if((fiber<0) || (fiber>31))
     {
@@ -139,7 +143,7 @@ vtpMpdSetApvOffset(int fiber, int apv, int strip, int offset)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   if((fiber<0) || (fiber>31))
     {
@@ -171,7 +175,7 @@ vtpMpdSetApvThreshold(int fiber, int apv, int strip, int threshold)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
   if((fiber<0) || (fiber>31))
     {
       printf("%s: ERROR: invalid fiber %d\n",__func__,fiber);
@@ -202,7 +206,7 @@ vtpMpdFiberReset()
 {
   int impd=0;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   for(impd=0; impd<32; impd++)
@@ -223,7 +227,7 @@ vtpMpdFiberLinkReset(unsigned int mpdmask)
 {
   int impd=0;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   for(impd=0; impd<32; impd++)
@@ -246,7 +250,7 @@ vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers, int enable_cm)
 {
   int impd=0, val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   for(impd=0; impd<32; impd++)
@@ -277,7 +281,7 @@ vtpMpdEnable(unsigned int mpdmask)
   int printFlag = 0;
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   for(impd=0; impd<32; impd++)
@@ -305,7 +309,7 @@ vtpMpdDisable(unsigned int mpdmask)
 {
   int impd=0, val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   for(impd=0; impd<32; impd++)
@@ -327,7 +331,7 @@ vtpMpdReadRegs(int impd)
   int ireg=0, res=0, errval=OK;;
   unsigned int rval=0;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   printf("%s(impd = %d): \n",
 	 __func__, impd);
@@ -354,7 +358,7 @@ vtpMpdReadReg(int impd, unsigned int reg)
 {
   unsigned int rval=0;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   vtp->v7.mpd.addr = (impd << 24) | reg;
@@ -369,7 +373,7 @@ vtpMpdWriteReg(int impd, unsigned int reg, unsigned int value)
 {
   unsigned int rval=OK;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   vtp->v7.mpd.addr = (impd << 24) | reg;
@@ -384,7 +388,7 @@ vtpMpdGetSoftErrorCount(int fiber)
 {
   int result;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   result = (vtp->v7.mpdFiber[fiber].gtx_status >> 8) & 0xFF;
@@ -399,7 +403,7 @@ vtpMpdPrintStatus()
   MPDFIBER_REGS mr[32];
   int impd=0;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   for(impd=0; impd<32; impd++)
@@ -452,7 +456,7 @@ vtpMpdGetChanUpMask()
   unsigned int status = 0, rval = 0;
   int impd=0;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   for(impd=0; impd<32; impd++)
@@ -473,7 +477,7 @@ vtpGetMpdMaxRxLen(int impd)
   int result;
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   result = vtp->v7.mpdFiber[impd].max_rx_len;
@@ -488,7 +492,7 @@ vtpGetEB_wordCount(int impd)
   int result;
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
   result = vtp->v7.mpdFiber[impd].eb_word_count;
@@ -502,7 +506,7 @@ vtpGetEbStatus(unsigned int *blockcnt, unsigned int *wordcnt, unsigned int *even
 {
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_MPDRO);
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
 
   VLOCK;
