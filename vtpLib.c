@@ -65,7 +65,7 @@ static int vtpFPGAFD = -1;
 const char vtpFPGADev[256] = "/dev/uio0";
 
 static int VTP_FW_Version[2];
-static int VTP_FW_Type[2];
+int VTP_FW_Type[2];
 
 volatile ZYNC_REGS *vtp = NULL;
 
