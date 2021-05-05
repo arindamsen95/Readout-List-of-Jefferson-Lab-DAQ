@@ -28,7 +28,7 @@ int  vtpMpdSetAvg(int fiber, int apv, int min, int max);
 
 int  vtpMpdSetApvOffset(int fiber, int apv, int strip, int offset);
 int  vtpMpdSetApvThreshold(int fiber, int apv, int strip, int threshold);
-int  vtpMpdFiberReset(int id);
+int  vtpMpdFiberReset();
 int  vtpMpdFiberLinkReset(unsigned int mpdmask);
 
 int  vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers, int enable_cm);

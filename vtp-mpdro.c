@@ -45,7 +45,7 @@ extern pthread_mutex_t   vtpMutex;
   }
 
 /* MPD Control/Status Routines */
-#if MPD_MON_NOT_SUPPORTED
+#ifdef MPD_MON_NOT_SUPPORTED
 int
 vtpMpdMonEnable(int fiber)
 {
@@ -132,7 +132,7 @@ vtpMpdSetAvg(int fiber, int apv, int min, int max)
   VUNLOCK;
   return OK;
 }
-#endif // 0
+#endif // MPD_MON_NOT_SUPPORTED
 
 int
 vtpMpdSetApvOffset(int fiber, int apv, int strip, int offset)
@@ -198,7 +198,7 @@ vtpMpdSetApvThreshold(int fiber, int apv, int strip, int threshold)
 
 
 int
-vtpMpdFiberReset(int id)
+vtpMpdFiberReset()
 {
   int impd=0;
   CHECKINIT;
@@ -412,12 +412,14 @@ vtpMpdPrintStatus()
 
   printf("\n");
   printf("                           MPD Settings and Status\n\n");
-  printf("     Channel   -------ERRORS------     Event\n");
-  printf("MPD    Up      HARD   FRAME   SOFT    Builder\n");
+  printf("           Channel   -------ERRORS------     Event\n");
+  printf("MPD  Ctrl    Up      HARD   FRAME   SOFT    Builder\n");
   printf("--------------------------------------------------------------------------------\n");
   for(impd=0; impd<32; impd++)
     {
-      printf("%2d    ",impd);
+      printf("%2d     ",impd);
+
+      printf("%01x    ",mr[impd].gtx_ctrl);
 
       printf("%s      ",(mr[impd].gtx_status & MPD_STATUS_CHANNELUP)?" UP ":"DOWN");
 
