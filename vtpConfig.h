@@ -103,8 +103,8 @@ typedef struct {
   char fw_filename_v7[FNLEN];
   char fw_filename_z7[FNLEN];
 
-  int fw_rev;
-  int fw_type;
+  int fw_rev[2];
+  int fw_type[2];
   int refclk;
 
   int window_width;
