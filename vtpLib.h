@@ -657,6 +657,77 @@ typedef struct Hcal_Struct
   /** 0x000C */ BLANK[(0x100-0x0C)/4];
 } HCAL_REGS;
 
+
+/* VTP Hardware CODA ROC and related Structures - DJA*/
+
+typedef struct TILink_Struct
+{
+  /** 0x0000 */ volatile uint32_t LinkReset;
+  /** 0x0004 */ volatile uint32_t Ctrl;
+  /** 0x0008 */ volatile uint32_t LinkStatus;
+  /** 0x000C */ volatile uint32_t Status;
+  /** 0x0010 */ BLANK[(0x14-0x10)/4];
+  /** 0x0014 */ volatile uint32_t EBStatus;
+  /** 0x0018 */ volatile uint32_t EB_TiFifo;
+  /** 0x001C */ BLANK[(0x24-0x1c)/4];
+  /** 0x0024 */ volatile uint32_t EB_TiLen;
+  /** 0x0028 */ BLANK[(0x100-0x028)/4];
+} TILINK_REGS;
+
+#define VTP_TI_LINKRESET_FIFO     (1<<3)
+#define VTP_TI_LINKRESET_RX_FIFO  (1<<2)
+#define VTP_TI_LINKRESET_PLL      (1<<1)
+#define VTP_TI_LINKRESET_RX       (1<<0)
+
+#define VTP_TI_CTRL_ACK         (1<<1)
+#define VTP_TI_CTRL_BL_REQ      (1<<0)
+
+#define VTP_TI_LINKSTATUS_RX_LOCKED         (1<<17)
+#define VTP_TI_LINKSTATUS_RX_READY          (1<<16)
+#define VTP_TI_LINKSTATUS_RX_ERROR_CNT_MASK 0xFFFF
+
+#define VTP_TI_STATUS_NEXT_BL_MASK   0xFF00
+#define VTP_TI_STATUS_CUR_BL_MASK    0x00FF
+
+#define VTP_TI_EBSTATUS_FIFO_EMPTY      (1<<0)
+#define VTP_TI_EBSTATUS_FIFO_LEN_EMPTY  (1<<3)
+
+
+typedef struct ROC_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t rocID;
+  /** 0x0008 */ volatile uint32_t State;
+  /** 0x000C */ BLANK[(0x10-0xC)/4];
+  /** 0x0010 */ volatile uint32_t CpuSyncEventData;
+  /** 0x0014 */ volatile uint32_t CpuSyncEventStatus;
+  /** 0x0018 */ volatile uint32_t CpuSyncEventLen;
+  /** 0x001c */ volatile uint32_t CpuSyncEventLenStatus;
+  /** 0x0020 */ volatile uint32_t CpuAsyncEventData;
+  /** 0x0024 */ volatile uint32_t CpuAsyncEventStatus;
+  /** 0x0028 */ volatile uint32_t CpuAsyncEventLen;
+  /** 0x002c */ volatile uint32_t CpuAsyncEventLenStatus;
+  /** 0x0030 */ BLANK[(0x040-0x030)/4];
+  /** 0x0040 */ volatile uint32_t TiTriggerCnt;
+  /** 0x0044 */ BLANK[(0x100-0x044)/4];
+} ROC_REGS;
+
+#define VTP_ROC_STATE_TCPFULL   (1<<16);
+
+
+typedef struct ROC_EB_Struct
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ volatile uint32_t Status;
+  /** 0x0008 */ BLANK[(0x10-0x08)/4];
+  /** 0x0010 */ volatile uint32_t evio_cfg[3];
+  /** 0x001c */ BLANK[(0x20-0x1C)/4];
+  /** 0x0020 */ volatile uint32_t pp_cfg[16];
+  /** 0x0060 */ volatile uint32_t pp_state[16];
+  /** 0x00A0 */ BLANK[(0x100-0xA0)/4];
+ } ROC_EB_REGS;
+
+
 /* MPD Interface */
 #define MPD_CTRL_GTX_RESET		0x00000001	/* Analog reset fiber - asserted all channels and release 1 time on SSP init and don't do again */
 #define MPD_CTRL_RESET			0x00000002	/* Fiber link reset the MPD */
@@ -707,7 +778,11 @@ typedef struct v7_bridge_struct
 
   /** 0x43C10600 */ FTCALDECODER_REGS ftcalDec;
 
-  /** 0x43C10700 */ BLANK[(0x0F00 - 0x700)/4];
+  /** 0x43C10700 */ BLANK[(0x0A00 - 0x700)/4];
+
+  /** 0x43C10A00 */ ROC_EB_REGS rocEB;
+
+  /** 0x43C10B00 */ BLANK[(0x0F00 - 0xB00)/4];
 
   /** 0x43C10F00 */ V7MIG_REGS mig[2];
 
@@ -885,10 +960,12 @@ typedef struct zync_reg_struct
   /** 0x43C00100 */ BLANK[(0x1000-0x100)/4];
   /** 0x43C01000 */ AXI_DMA_REGS dma_ti;
   /** 0x43C02000 */ AXI_DMA_REGS dma_vtp;
-  /** 0x43C03000 */ BLANK[(0x08100-0x3000)/4];
+  /** 0x43C03000 */ BLANK[(0x08000-0x3000)/4];
   /******** ZYNQ PERBUS Peripherals ********/
+  /** 0x43C08000 */ TILINK_REGS tiLink;
   /** 0x43C08100 */ Z7CLK_REGS clk;
-  /** 0x43C08200 */ BLANK[(0x9000-0x8200)/4];
+  /** 0x43C08200 */ ROC_REGS roc;
+  /** 0x43C08300 */ BLANK[(0x9000-0x8300)/4];
   /** 0x43C09000 */ TCPIPCLIENT_REGS tcpClient[2];
   /** 0x43C09200 */ BLANK[(0x9800-0x9200)/4];
   /** 0x43C09800 */ TCPIPTESTTX_REGS tcpTxTest;
@@ -928,15 +1005,22 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_HPS               13
 #define VTP_FW_TYPE_FADCSTREAM        14
 #define VTP_FW_TYPE_COMPTON           15
+#define VTP_FW_TYPE_FADCCOIN          16
+#define VTP_FW_TYPE_VCODAROC          17
 #define VTP_FW_TYPE_MPDRO             18
+
+/* These are created in the Zync VHDL files */
+#define ZYNC_FW_TYPE_COMMON           0
+#define ZYNC_FW_TYPE_ZSTREAM          1
+#define ZYNC_FW_TYPE_ZCODAROC         2
 
 /* Routine prototypes */
 int  vtpSetDebugMask(uint32_t mask);
 
 int  vtpInit(int iFlag);
 int  vtpBReady();
-int  vtpV7GetFW_Version();
-int  vtpV7GetFW_Type();
+int  vtpGetFW_Version(int chip);
+int  vtpGetFW_Type(int chip);
 #ifdef IPC
 int  vtpSendScalers();
 int  vtpSendSerdes();
@@ -1185,19 +1269,21 @@ int  vtpGetWindowLookback();
 int  vtpGetTriggerPayloadMask();
 int  vtpGetTriggerFiberMask();
 int  vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize);
-int  vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize);
+int  vtpTiLinkReadEvent(uint32_t *pBuf, uint32_t maxsize);
 int  vtpTIData2TriggerBank(volatile uint32_t *data, int ndata);
 int  vtpEbDecodeEvent(uint32_t *pBuf, uint32_t size);
 int  vtpEbReadAndDecodeEvent();
 int  vtpSetWindow(int, int);
+
 int  vtpTiLinkInit();
 int  vtpTiLinkStatus();
-int  vtpEbResetFifo();
+int  vtpTiLinkResetFifo(int rx);
 int  vtpEbBuildTestEvent(int len);
 int  vtpEbReset();
 int  vtpSetBlockLevel(int level);
 int  vtpTiLinkGetBlockLevel(int print);
-int  vtpTiAck(int clearsync);
+int  vtpTiAck();
+int  vtpTiLinkSetMode(int mode);
 int  vtpStatus(int pflag);
 int  vtpStats();
 
@@ -1209,6 +1295,23 @@ int vtpStreamingGetTcpCfg(int inst, unsigned char ipaddr[4], unsigned char subne
 int vtpStreamingSetTcpCfg(int inst, unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short destipport);
 int vtpStreamingTcpGo();
 
+// VTP ROC functions
+int vtpRocStatus(int flag);
+int vtpRocReset(int enflag);
+int vtpRocSetID(int roc_id);
+int vtpRocEnable(int en_mask);
+int vtpRocGetCfg(int *roc_id, int *en_mask);
+int vtpRocGetTcpCfg(unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short *destipport);
+int vtpRocSetTcpCfg(unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short destipport);
+int vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen);
+int vtpRocTcpConnected();
+int vtpRocEvioWriteControl(unsigned int type, unsigned int val0, unsigned int val1);
+int vtpRocEbReset();
+int vtpRocEbStart();
+int vtpRocEbStop();
+int vtpRocEbConfig(unsigned int bank0, unsigned int bank1, unsigned int bank2, int slot_mask);
+int vtpRocEbioReset();
+int vtpRocMigReset();
 
 #define VTP_DMA_TI  0
 #define VTP_DMA_VTP 1

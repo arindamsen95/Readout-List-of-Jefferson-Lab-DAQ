@@ -64,12 +64,12 @@ static int vtpDevOpenMASK = 0;
 static int vtpFPGAFD = -1;
 const char vtpFPGADev[256] = "/dev/uio0";
 
-int VTP_FW_Version = 0;
-int VTP_FW_Type = 0;
+static int VTP_FW_Version[2];
+static int VTP_FW_Type[2];
 
 volatile ZYNC_REGS *vtp = NULL;
 
-static int vtpEbTiEventReadErrors;
+static int vtpTiLinkEventReadErrors;
 static int vtpEbEventReadErrors;
 
 uint32_t vtpDebugMask = 0;
@@ -86,11 +86,15 @@ pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
     }								\
   }
 
-#define CHECKTYPE(v) {        \
-    if( (v != VTP_FW_TYPE_COMMON) && (v != VTP_FW_Type) ) { \
-      printf("%s: ERROR: VTP wrong firmware type (%d)\n",__func__,v);	\
-      return ERROR;           \
-    }               \
+#define CHECKTYPE(v,c) {					    \
+    if ((c!=0)&&(c!=1)) {					    \
+       printf("%s: ERROR: VTP wrong Chip ID (%d)\n",__func__,c);    \
+       return ERROR;                                                \
+       }                                                            \
+    if( (v != VTP_FW_TYPE_COMMON) && (v != VTP_FW_Type[c]) ) {         \
+      printf("%s: ERROR: VTP wrong firmware type (%d)\n",__func__,v);  \
+      return ERROR;						       \
+    }								       \
   }
 
 #define CHECKRANGE_INT(var, min, max) { \
@@ -177,6 +181,7 @@ vtpSetDebugMask(uint32_t mask)
 int
 vtpInit(int iFlag)
 {
+  int i;
   int rval = OK;
   int syncSrc, trig1Src, clkSrc, sdStatus;
 
@@ -211,9 +216,12 @@ vtpInit(int iFlag)
 
   if(iFlag & VTP_INIT_SKIP)
   {
-    VTP_FW_Version = vtpV7GetFW_Version();
-    VTP_FW_Type = vtpV7GetFW_Type();
-    printf("%s: VTP_FW_Version=0x%x, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
+    for(i=0;i<2;i++) {
+      VTP_FW_Version[i] = vtpGetFW_Version(i);
+      VTP_FW_Type[i] = vtpGetFW_Type(i);
+    }
+    printf("%s: V7 Chip FW_Version=0x%x, V7 Chip FW_Type=%d\n", __func__, VTP_FW_Version[0], VTP_FW_Type[0]);
+    printf("%s: Z7 Chip FW_Version=0x%x, Z7 Chip FW_Type=%d\n", __func__, VTP_FW_Version[1], VTP_FW_Type[1]);
     return rval;
   }
 
@@ -250,14 +258,17 @@ vtpInit(int iFlag)
   vtpV7SetResetSoft(1);
   vtpV7SetResetSoft(0);
 
-  VTP_FW_Type = vtpV7GetFW_Type();
-  VTP_FW_Version = vtpV7GetFW_Version();
+  for(i=0;i<2;i++) {
+    VTP_FW_Type[i] = vtpGetFW_Type(i);
+    VTP_FW_Version[i] = vtpGetFW_Version(i);
+  }
   vtpUnlock();
 
-  printf("%s: VTP_FW_Version=0x%x, VTP_FW_Type=%d\n", __func__, VTP_FW_Version, VTP_FW_Type);
+  printf("%s: V7 Chip FW_Version=0x%x, V7 Chip FW_Type=%d\n", __func__, VTP_FW_Version[0], VTP_FW_Type[0]);
+  printf("%s: Z7 Chip FW_Version=0x%x, Z7 Chip FW_Type=%d\n", __func__, VTP_FW_Version[1], VTP_FW_Type[1]);
 
-  switch(VTP_FW_Type)
-    {
+  switch(VTP_FW_Type[0])
+  {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_GT:
@@ -275,7 +286,6 @@ vtpInit(int iFlag)
       vtpSetTrig1Source(trig1Src);
       vtpSetSyncSource(syncSrc);
       vtpTiLinkInit();
-      vtpEbResetFifo();
 
       VLOCK;
       vtp->v7.sd.FPAOSel = 0xFFFFFFFF;  /* Route trigger output to FPAO */
@@ -288,22 +298,8 @@ vtpInit(int iFlag)
       break;
 
     case VTP_FW_TYPE_MPDRO:
-      vtpSetTrig1Source(trig1Src);
-      vtpSetSyncSource(syncSrc);
-      /* vtpTiLinkInit(); */
-      /* vtpEbResetFifo(); */
-
-      VLOCK;
-      vtp->v7.sd.FPAOSel = 0xFFFFFFFF;  /* Route trigger output to FPAO */
-      vtp->v7.sd.FPBOSel = 0xFFFFFFFF;  /* Route trigger output to FPBO */
-      sdStatus = vtp->v7.sd.Status;
-      VUNLOCK;
-
-      printf("VTP SD Daughtercard ID = 0x%08X\n", sdStatus);
-
-      break;
-
     case VTP_FW_TYPE_FADCSTREAM:
+    case VTP_FW_TYPE_VCODAROC:
       vtpSetTrig1Source(trig1Src);
       vtpSetSyncSource(syncSrc);
 
@@ -319,11 +315,11 @@ vtpInit(int iFlag)
       break;
 
     default:
-      printf("%s: ERROR - unknown firmware type %d. Unable to setup VTP PLL.\n", __func__, VTP_FW_Type);
+      printf("%s: ERROR - unknown firmware type %d. Unable to setup VTP PLL.\n", __func__, VTP_FW_Type[0]);
       return ERROR;
-    }
+  }
 
-  vtpEbTiEventReadErrors = 0;
+  vtpTiLinkEventReadErrors = 0;
   vtpEbEventReadErrors = 0;
 
   return rval;
@@ -344,7 +340,8 @@ vtpStatus(int pflag)
 
   CHECKINIT;
 
-  if(VTP_FW_Type == VTP_FW_TYPE_FADCSTREAM)
+  // FIXME: Check this for MPDRO
+  if(VTP_FW_Type[0] == VTP_FW_TYPE_FADCSTREAM)
   {
     VLOCK;
     status     = vtp->v7.clk.Status;
@@ -604,7 +601,7 @@ vtpStatus(int pflag)
 int
 vtpStats()
 {
-  int status, fw_version, fw_type, timestamp, temp, mig[2], i, inst, rtime;
+  int status, fw_version, fw_type, timestamp, temp, mig[2][2], i, inst, rtime;
   unsigned long long nwords[2][9], drops[2], rambusy[2], ebfull[2];
   float t;
   int ebctrl[2], fadcstr[2];
@@ -614,25 +611,28 @@ vtpStats()
 
   rtime = time(NULL);
 
-  if(VTP_FW_Type == VTP_FW_TYPE_FADCSTREAM)
-  {
-    VLOCK;
-    status     = vtp->v7.clk.Status;
-    fw_version = vtp->v7.clk.FW_Version;
-    fw_type    = vtp->v7.clk.FW_Type;
-    timestamp  = vtp->v7.clk.Timestamp;
-    temp       = vtp->v7.clk.Temp;
+  VLOCK;
+  status     = vtp->v7.clk.Status;
+  fw_version = vtp->v7.clk.FW_Version;
+  fw_type    = vtp->v7.clk.FW_Type;
+  timestamp  = vtp->v7.clk.Timestamp;
+  temp       = vtp->v7.clk.Temp;
 
-    for(inst=0; inst<2; inst++)
+  for(inst=0; inst<2; inst++)
     {
-      mig[inst]           = vtp->v7.mig[inst].Status;
+      mig[inst][0]        = vtp->v7.mig[inst].Ctrl;
+      mig[inst][1]        = vtp->v7.mig[inst].Status;
       mig_cnts[inst][0]   = vtp->v7.mig[inst].WriteCnt;
       mig_cnts[inst][1]   = vtp->v7.mig[inst].ReadCnt;
       mig_cnts[inst][2]   = vtp->v7.mig[inst].WriteDataCnt;
       mig_cnts[inst][3]   = vtp->v7.mig[inst].ReadDataCnt;
-      ebctrl[inst]        = vtp->v7.streamingEb[inst].Ctrl;
-      if(inst==0)
-        fadcstr[inst]       = ((vtp->v7.fadcStreaming[0].Ctrl & 0x1)<<0) |
+
+    // FIXME: Check this for MPDRO
+      if(VTP_FW_Type[0] == VTP_FW_TYPE_FADCSTREAM)
+	{
+	  ebctrl[inst]        = vtp->v7.streamingEb[inst].Ctrl;
+	  if(inst==0)
+	    fadcstr[inst]       = ((vtp->v7.fadcStreaming[0].Ctrl & 0x1)<<0) |
                               ((vtp->v7.fadcStreaming[1].Ctrl & 0x1)<<1) |
                               ((vtp->v7.fadcStreaming[2].Ctrl & 0x1)<<2) |
                               ((vtp->v7.fadcStreaming[3].Ctrl & 0x1)<<3) |
@@ -640,8 +640,8 @@ vtpStats()
                               ((vtp->v7.fadcStreaming[5].Ctrl & 0x1)<<5) |
                               ((vtp->v7.fadcStreaming[6].Ctrl & 0x1)<<6) |
                               ((vtp->v7.fadcStreaming[7].Ctrl & 0x1)<<7);
-      else
-        fadcstr[inst]       = ((vtp->v7.fadcStreaming[8].Ctrl & 0x1)<<0) |
+	  else
+	    fadcstr[inst]       = ((vtp->v7.fadcStreaming[8].Ctrl & 0x1)<<0) |
                               ((vtp->v7.fadcStreaming[9].Ctrl & 0x1)<<1) |
                               ((vtp->v7.fadcStreaming[10].Ctrl & 0x1)<<2) |
                               ((vtp->v7.fadcStreaming[11].Ctrl & 0x1)<<3) |
@@ -650,24 +650,22 @@ vtpStats()
                               ((vtp->v7.fadcStreaming[14].Ctrl & 0x1)<<6) |
                               ((vtp->v7.fadcStreaming[15].Ctrl & 0x1)<<7);
 
-      for(i=0; i<9; i++)
-      {
-        nwords[inst][i] = vtp->v7.streamingEb[inst].NWords[2*i+0];
-        nwords[inst][i]+= (unsigned long long)(vtp->v7.streamingEb[inst].NWords[2*i+1])<<32;
-      }
-      drops[inst]  =  vtp->v7.streamingEb[inst].NFramesDropped[0];
-      drops[inst] += (unsigned long long)(vtp->v7.streamingEb[inst].NFramesDropped[1])<<32;
-      rambusy[inst]  =  vtp->v7.streamingEb[inst].DDR3BusyCnt[0];
-      rambusy[inst] += (unsigned long long)(vtp->v7.streamingEb[inst].DDR3BusyCnt[1])<<32;
-      ebfull[inst]  =  vtp->v7.streamingEb[inst].EBFullCnt[0];
-      ebfull[inst] += (unsigned long long)(vtp->v7.streamingEb[inst].EBFullCnt[1])<<32;
-      }
-
+	  for(i=0; i<9; i++)
+	    {
+	      nwords[inst][i] = vtp->v7.streamingEb[inst].NWords[2*i+0];
+	      nwords[inst][i]+= (unsigned long long)(vtp->v7.streamingEb[inst].NWords[2*i+1])<<32;
+	    }
+	  drops[inst]  =  vtp->v7.streamingEb[inst].NFramesDropped[0];
+	  drops[inst] += (unsigned long long)(vtp->v7.streamingEb[inst].NFramesDropped[1])<<32;
+	  rambusy[inst]  =  vtp->v7.streamingEb[inst].DDR3BusyCnt[0];
+	  rambusy[inst] += (unsigned long long)(vtp->v7.streamingEb[inst].DDR3BusyCnt[1])<<32;
+	  ebfull[inst]  =  vtp->v7.streamingEb[inst].EBFullCnt[0];
+	  ebfull[inst] += (unsigned long long)(vtp->v7.streamingEb[inst].EBFullCnt[1])<<32;
+	}
+    }
     VUNLOCK;
 
     t = (float)temp * 503.975 / 4096.0 - 273.15;
-
-    }
 
     printf("---------------------------------------\n");
     printf("--VTP Statistics                     --\n");
@@ -692,30 +690,42 @@ vtpStats()
     printf("\n");
     printf("Event Building:\n");
     printf("  EB Controller 0:\n");
-    printf("    MIG calibration complete: %d\n", mig[0]);
-    printf("    EB Ctrl: 0x%08x\n", ebctrl[0]);
-    printf("    FADC Stream ctrl: 0x%08x\n", fadcstr[0]);
-    for(i=0;i<8;i++)
-      printf("    NWords[%d]: %llu\n", i, nwords[0][i]);
-    printf("    Sum[0-7 + Hdrs]: %llu\n", nwords[0][8]);
-    printf("    Dropped Frames : %llu\n", drops[0]);
-    printf("    DDR3 Busy Count: %llu\n", rambusy[0]);
-    printf("    EB Full Count  : %llu\n", ebfull[0]);
+    printf("    MIG  Control            : %08x\n", mig[0][0]);
+    printf("    MIG calibration complete: %d\n", mig[0][1]);
+
+    // FIXME: Check this for MPDRO
+    if(VTP_FW_Type[0] == VTP_FW_TYPE_FADCSTREAM) {
+      printf("    EB Ctrl: 0x%08x\n", ebctrl[0]);
+      printf("    FADC Stream ctrl: 0x%08x\n", fadcstr[0]);
+      for(i=0;i<8;i++)
+	printf("    NWords[%d]: %llu\n", i, nwords[0][i]);
+      printf("    Sum[0-7 + Hdrs]: %llu\n", nwords[0][8]);
+      printf("    Dropped Frames : %llu\n", drops[0]);
+      printf("    DDR3 Busy Count: %llu\n", rambusy[0]);
+      printf("    EB Full Count  : %llu\n", ebfull[0]);
+    }
+
     printf("    MIG WriteCnt: %u\n",     mig_cnts[0][0]);
     printf("    MIG ReadCnt: %u\n",      mig_cnts[0][1]);
     printf("    MIG WriteDataCnt: %u\n", mig_cnts[0][2]);
     printf("    MIG ReadDataCnt: %u\n",  mig_cnts[0][3]);
     printf("\n");
     printf("  EB Controller 1:\n");
-    printf("    MIG Calibration Complete: %d\n", mig[1]);
-    printf("    EB Ctrl: 0x%08X\n", ebctrl[1]);
-    printf("    FADC Stream Ctrl: 0x%08X\n", fadcstr[1]);
-    for(i=0;i<8;i++)
-      printf("    NWords[%d]: %llu\n", i, nwords[1][i]);
-    printf("    Sum[0-7 + Hdrs]: %llu\n", nwords[1][8]);
-    printf("    Dropped Frames : %llu\n", drops[1]);
-    printf("    DDR3 Busy Count: %llu\n", rambusy[1]);
-    printf("    EB Full Count  : %llu\n", ebfull[1]);
+    printf("    MIG  Control            : %08x\n", mig[1][0]);
+    printf("    MIG Calibration Complete: %d\n", mig[1][1]);
+
+    // FIXME: Check this for MPDRO
+    if(VTP_FW_Type[0] == VTP_FW_TYPE_FADCSTREAM) {
+      printf("    EB Ctrl: 0x%08X\n", ebctrl[1]);
+      printf("    FADC Stream Ctrl: 0x%08X\n", fadcstr[1]);
+      for(i=0;i<8;i++)
+	printf("    NWords[%d]: %llu\n", i, nwords[1][i]);
+      printf("    Sum[0-7 + Hdrs]: %llu\n", nwords[1][8]);
+      printf("    Dropped Frames : %llu\n", drops[1]);
+      printf("    DDR3 Busy Count: %llu\n", rambusy[1]);
+      printf("    EB Full Count  : %llu\n", ebfull[1]);
+    }
+
     printf("    MIG WriteCnt: %u\n",     mig_cnts[1][0]);
     printf("    MIG ReadCnt: %u\n",      mig_cnts[1][1]);
     printf("    MIG WriteDataCnt: %u\n", mig_cnts[1][2]);
@@ -751,34 +761,13 @@ vtpGetBlockLevel()
   return(rval);
 }
 
-int
-vtpTiLinkGetBlockLevel(int print)
-{
-  int val;
-  CHECKINIT;
-
-  VLOCK;
-  vtp->eb.TiCtrl = VTP_EB_TICTRL_TI_BL_REQ;
-  VUNLOCK;
-
-  usleep(1000);
-
-  VLOCK;
-  val = vtp->eb.TiStatus & 0xFF;
-  VUNLOCK;
-
-  if(print)
-    printf("%s: returned %d\n", __func__, val);
-
-  return val;
-}
 
 int
 vtpSetWindow(int lookback, int width)
 {
   CHECKINIT;
 
-  switch(VTP_FW_Type)
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_DC:
       lookback/=8;
@@ -808,7 +797,7 @@ vtpGetWindowLookback()
   rval = vtp->v7.eb.Lookback;
   VUNLOCK;
 
-  switch(VTP_FW_Type)
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_DC:
       rval*=8;
@@ -831,7 +820,7 @@ vtpGetWindowWidth()
   rval = vtp->v7.eb.WindowWidth;
   VUNLOCK;
 
-  switch(VTP_FW_Type)
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_DC:
       rval*=8;
@@ -1139,7 +1128,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
   ctrl2 = sdev->Ctrl;
   status = sdev->Status;
   latency = sdev->Latency;
-  switch(VTP_FW_Type)
+  switch(VTP_FW_Type[0])
     {
     case VTP_FW_TYPE_ECS:
     case VTP_FW_TYPE_PCS:
@@ -1165,6 +1154,9 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
     case VTP_FW_TYPE_FTCAL:
       ctrl = vtp->v7.ftcalDec.Ctrl;
       break;
+    case VTP_FW_TYPE_MPDRO:
+    case VTP_FW_TYPE_VCODAROC:
+      ctrl = 0xffff;
     }
   VUNLOCK;
 
@@ -1193,7 +1185,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
 
       if((1 << dev) & chmask)
 	{
-	  printf("%2d  ", dev);
+	  printf("%2d  ", (dev+1));
 
 	  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(0))?"U":"-");
 	  printf("%s ", (status & VTP_SERDES_STATUS_LANE_UP(1))?"U":"-");
@@ -1393,28 +1385,59 @@ vtpV7PllReset(int enable)
   return OK;
 }
 
+/* Read a 4 byte aligned offset in the V7 memory space and return a 32 bit value */
+unsigned int
+vtpV7Read32(unsigned int offset)
+{
+  unsigned int val, *ptr;
+
+  /* Check 4 byte alignment of offset */
+  if ((offset&0x3) != 0) return ERROR;
+
+  ptr = (unsigned int *)((unsigned int) &vtp->v7 + offset);
+  val = *ptr;
+
+  return val;
+}
+
+
+
+
+
 int
-vtpV7GetFW_Version()
+vtpGetFW_Version(int chip)
 {
   int rval=0;
   CHECKINIT;
 
-  VLOCK;
-  rval = vtp->v7.clk.FW_Version;
-  VUNLOCK;
+  if (chip == 1) {
+    VLOCK;
+    rval = vtp->clk.FW_Version;
+    VUNLOCK;
+  }else{
+    VLOCK;
+    rval = vtp->v7.clk.FW_Version;
+    VUNLOCK;
+  }
 
   return rval;
 }
 
 int
-vtpV7GetFW_Type()
+vtpGetFW_Type(int chip)
 {
   int rval=0;
   CHECKINIT;
 
-  VLOCK;
-  rval = vtp->v7.clk.FW_Type;
-  VUNLOCK;
+  if(chip == 1) {
+      VLOCK;
+      rval = vtp->clk.FW_Type;
+      VUNLOCK;
+    }else{
+      VLOCK;
+      rval = vtp->v7.clk.FW_Type;
+      VUNLOCK;
+    }
 
   return rval;
 }
@@ -1744,7 +1767,7 @@ vtpSendScalers()
   }
 
   vtpLock();
-  switch(VTP_FW_Type)
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_ECS:
       r = vtpEcsSendErrors(host);
@@ -1873,7 +1896,7 @@ vtpEnableTriggerPayloadMask(int pp_mask)
   CHECKINIT;
 
   VLOCK;
-  switch(VTP_FW_Type)
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_ECS:
     case VTP_FW_TYPE_PCS:
@@ -1885,6 +1908,8 @@ vtpEnableTriggerPayloadMask(int pp_mask)
     case VTP_FW_TYPE_FTHODO:
     case VTP_FW_TYPE_HPS:
     case VTP_FW_TYPE_COMPTON:
+    case VTP_FW_TYPE_MPDRO:
+    case VTP_FW_TYPE_VCODAROC:
       vtp->v7.fadcDec.Ctrl = pp_mask;
       break;
     case VTP_FW_TYPE_GT:
@@ -1915,7 +1940,7 @@ vtpGetTriggerPayloadMask()
   CHECKINIT;
 
   VLOCK;
-  switch(VTP_FW_Type)
+  switch(VTP_FW_Type[0])
     {
     case VTP_FW_TYPE_ECS:
     case VTP_FW_TYPE_PCS:
@@ -1927,6 +1952,8 @@ vtpGetTriggerPayloadMask()
     case VTP_FW_TYPE_FTHODO:
     case VTP_FW_TYPE_HPS:
     case VTP_FW_TYPE_COMPTON:
+    case VTP_FW_TYPE_MPDRO:
+    case VTP_FW_TYPE_VCODAROC:
       pp_mask = vtp->v7.fadcDec.Ctrl;
       break;
     case VTP_FW_TYPE_GT:
@@ -1954,7 +1981,7 @@ vtpEnableTriggerFiberMask(int fiber_mask)
   CHECKINIT;
 
   VLOCK;
-  switch(VTP_FW_Type)
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_FTCAL:
       mask = (vtp->v7.ftcalDec.Ctrl & 0xFFFF) | (fiber_mask<<16);
@@ -1979,7 +2006,7 @@ vtpGetTriggerFiberMask()
   CHECKINIT;
 
   VLOCK;
-  switch(VTP_FW_Type)
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_FTCAL:
       val = (vtp->v7.ftcalDec.Ctrl>>16) & 0xF;
@@ -2083,7 +2110,7 @@ int
 vtpStreamingReset(int mask)
 {
   CHECKINIT;
-//  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+//  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
   vtp->tcpClient[0].Ctrl = mask;
   return OK;
 }
@@ -2093,7 +2120,7 @@ vtpStreamingInit(int mask, int ip0, int ip1, int ip2, int ip3, int dst_port)
 {
   int i, frame_len = 16383;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   VLOCK;
   vtp->clk.Ctrl = 0x7;
@@ -2170,7 +2197,7 @@ int
 vtpStreamingEnd()
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   VLOCK;
   vtp->v7.streamingEb[0].Ctrl = 0x80000000;
@@ -2185,7 +2212,7 @@ vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_i
 {
   int slot_start;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   frame_len = (frame_len+31) / 32;
   frame_len*= 32;
@@ -2214,7 +2241,7 @@ vtpStreamingGetEbCfg(int inst, int *mask, int *source_id, int *frame_len, int *r
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   if(inst<0 || inst>1)
   {
@@ -2250,7 +2277,7 @@ vtpStreamingSetTcpCfg(
   )
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   if(inst<0 || inst>1)
   {
@@ -2266,7 +2293,8 @@ vtpStreamingSetTcpCfg(
   vtp->tcpClient[inst].MAC_ADDR[1]      =                                             (       mac[0]<<8) | (       mac[1]<<0);
   vtp->tcpClient[inst].MAC_ADDR[0]      = (       mac[2]<<24) | (       mac[3]<<16) | (       mac[4]<<8) | (       mac[5]<<0);
   vtp->tcpClient[inst].TCP_DEST_ADDR[1] = (destipaddr[0]<<24) | (destipaddr[1]<<16) | (destipaddr[2]<<8) | (destipaddr[3]<<0);
-  printf("%s: TCP_DEST_ADDR = 0x%08X\n", __func__, vtp->tcpClient[inst].TCP_DEST_ADDR[1]);
+  printf("%s: TCP_DEST_ADDR (%d) = 0x%08X   %d %d %d %d \n", __func__, inst, vtp->tcpClient[inst].TCP_DEST_ADDR[1],
+	 destipaddr[0],destipaddr[1],destipaddr[2],destipaddr[3]);
   vtp->tcpClient[inst].TCP_PORT[1]      = (        10001<<16) | (destipport<<0);
   VUNLOCK;
 
@@ -2286,7 +2314,7 @@ vtpStreamingGetTcpCfg(
 {
   unsigned int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   if(inst<0 || inst>1)
   {
@@ -2313,7 +2341,7 @@ vtpStreamingGetTcpCfg(
   val = vtp->tcpClient[inst].TCP_DEST_ADDR[1];
   destipaddr[0] = ((val>>24)&0xFF); destipaddr[1] = ((val>>16)&0xFF); destipaddr[2] = ((val>>8)&0xFF); destipaddr[3] = ((val>>0)&0xFF);
 
-  printf("%s: TCP_DEST_ADDR = 0x%08X\n", __func__, vtp->tcpClient[inst].TCP_DEST_ADDR[1]);
+  printf("%s: TCP_DEST_ADDR[%d] = 0x%08X\n", __func__, inst, vtp->tcpClient[inst].TCP_DEST_ADDR[1]);
 
   val = vtp->tcpClient[inst].TCP_PORT[1];
   *destipport = ((val>>0)&0xFFFF);
@@ -2327,7 +2355,7 @@ int
 vtpStreamingEbioTxSoftWrite(int inst, int val0, int val1, int val2, int val3, int val4)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   if(inst<0 || inst>1)
   {
@@ -2351,7 +2379,7 @@ vtpStreamEbioRxReset(int inst, int rst)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   if(inst<0 || inst>1)
   {
@@ -2379,7 +2407,7 @@ vtpStreamQsfpReset(int inst, int reset)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   if(inst<0 || inst>1)
   {
@@ -2402,7 +2430,7 @@ int
 vtpStreamingSkipTcp(int inst, int skip)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   if(inst<0 || inst>1)
   {
@@ -2422,7 +2450,7 @@ int
 vtpStreamingMigFifoReset(int inst)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   if(inst<0 || inst>1)
   {
@@ -2447,7 +2475,7 @@ vtpStreamingTcpConnect(int inst, int connect)
   int j;
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
   if(inst<0 || inst>1)
   {
@@ -2582,18 +2610,28 @@ int
 vtpStreamingTcpGo()
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM);
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
 
 
   return OK;
 }
+
+
+/* Include some VTP CODA ROC Functions */
+#include "vtpRocLib.c"
+
+
+
+
+
+/****************************************************/
 
 int
 vtpSetECtrig_dt(int inst, int dt)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_EC);
+  CHECKTYPE(VTP_FW_TYPE_EC,0);
 
   dt = dt / 4;
   if(dt<0)
@@ -2621,7 +2659,7 @@ int
 vtpGetECtrig_dt(int inst, int *dt)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_EC);
+  CHECKTYPE(VTP_FW_TYPE_EC,0);
 
   VLOCK;
   *dt = ((vtp->v7.ecTrigger[inst].Hit>>16) & 0xF) * 4;
@@ -2635,7 +2673,7 @@ vtpSetECtrig_emin(int inst, int emin)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_EC);
+  CHECKTYPE(VTP_FW_TYPE_EC,0);
 
   VLOCK;
     val = vtp->v7.ecTrigger[inst].Hit;
@@ -2650,7 +2688,7 @@ int
 vtpGetECtrig_emin(int inst, int *emin)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_EC);
+  CHECKTYPE(VTP_FW_TYPE_EC,0);
 
   VLOCK;
   *emin = vtp->v7.ecTrigger[inst].Hit & 0x1FFF;
@@ -2664,7 +2702,7 @@ vtpSetECtrig_peak_multmax(int inst, int mult_max)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_EC);
+  CHECKTYPE(VTP_FW_TYPE_EC,0);
 
   VLOCK;
     val = vtp->v7.ecTrigger[inst].Hit;
@@ -2679,7 +2717,7 @@ int
 vtpGetECtrig_peak_multmax(int inst, int *mult_max)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_EC);
+  CHECKTYPE(VTP_FW_TYPE_EC,0);
 
   VLOCK;
   *mult_max = (vtp->v7.ecTrigger[inst].Hit & 0x1F000000)>>24;
@@ -2692,7 +2730,7 @@ int
 vtpSetECtrig_dalitz(int inst, int min, int max)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_EC);
+  CHECKTYPE(VTP_FW_TYPE_EC,0);
 
   VLOCK;
     vtp->v7.ecTrigger[inst].Dalitz = (max<<16) | (min<<0);
@@ -2706,7 +2744,7 @@ vtpGetECtrig_dalitz(int inst, int *min, int *max)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_EC);
+  CHECKTYPE(VTP_FW_TYPE_EC,0);
 
   VLOCK;
   val = vtp->v7.ecTrigger[inst].Dalitz;
@@ -2723,8 +2761,8 @@ vtpSetFadcSum_MaskEn(unsigned int mask[16])
   int i;
   unsigned int val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_PC:
@@ -2732,7 +2770,7 @@ vtpSetFadcSum_MaskEn(unsigned int mask[16])
     case VTP_FW_TYPE_FTCAL:
       break;
     default:
-      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type);
+      printf("%s: ERROR: VTP wrong firmware type %d\n",__func__, VTP_FW_Type[0]);
       return ERROR;
   }
 
@@ -2754,8 +2792,8 @@ vtpGetFadcSum_MaskEn(unsigned int mask[16])
   int i;
   unsigned int val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_PC:
@@ -2784,8 +2822,8 @@ vtpSetECcosmic_emin(int inst, int emin)
 {
   uint32_t val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_ECS:
@@ -2809,8 +2847,8 @@ int
 vtpGetECcosmic_emin(int inst, int *emin)
 {
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_ECS:
@@ -2832,8 +2870,8 @@ vtpSetECcosmic_multmax(int inst, int multmax)
 {
   uint32_t val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_ECS:
@@ -2857,8 +2895,8 @@ int
 vtpGetECcosmic_multmax(int inst, int *multmax)
 {
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_ECS:
@@ -2880,8 +2918,8 @@ vtpSetECcosmic_width(int inst, int hitwidth)
 {
   uint32_t val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_ECS:
@@ -2905,8 +2943,8 @@ int
 vtpGetECcosmic_width(int inst, int *hitwidth)
 {
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_ECS:
@@ -2928,8 +2966,8 @@ vtpSetECcosmic_delay(int inst, int evaldelay)
 {
   uint32_t val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_ECS:
@@ -2953,8 +2991,8 @@ int
 vtpGetECcosmic_delay(int inst, int *evaldelay)
 {
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_EC:
     case VTP_FW_TYPE_ECS:
@@ -2976,8 +3014,8 @@ vtpSetPCcosmic_emin(int emin)
 {
   uint32_t val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_PCS:
@@ -3001,8 +3039,8 @@ int
 vtpGetPCcosmic_emin(int *emin)
 {
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_PCS:
@@ -3024,8 +3062,8 @@ vtpSetPCcosmic_multmax(int multmax)
 {
   uint32_t val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_PCS:
@@ -3049,8 +3087,8 @@ int
 vtpGetPCcosmic_multmax(int *multmax)
 {
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_PCS:
@@ -3072,8 +3110,8 @@ vtpSetPCcosmic_width(int hitwidth)
 {
   uint32_t val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_PCS:
@@ -3097,8 +3135,8 @@ int
 vtpGetPCcosmic_width(int *hitwidth)
 {
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_PCS:
@@ -3120,8 +3158,8 @@ vtpSetPCcosmic_delay(int evaldelay)
 {
   uint32_t val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_PCS:
@@ -3145,8 +3183,8 @@ int
 vtpGetPCcosmic_delay(int *evaldelay)
 {
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_PCS:
@@ -3170,8 +3208,8 @@ vtpSetPCcosmic_pixel(int enable)
 {
   uint32_t val;
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_PCS:
@@ -3199,8 +3237,8 @@ int
 vtpGetPCcosmic_pixel(int *enable)
 {
   CHECKINIT;
-  /*CHECKTYPE();*/
-  switch(VTP_FW_Type)
+
+  switch(VTP_FW_Type[0])
   {
     case VTP_FW_TYPE_PC:
     case VTP_FW_TYPE_PCS:
@@ -3224,7 +3262,7 @@ vtpSetFTCALseed_emin(int emin)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  CHECKTYPE(VTP_FW_TYPE_FTCAL,0);
 
   VLOCK;
   val = vtp->v7.ftcalTrigger.Ctrl;
@@ -3240,7 +3278,7 @@ int
 vtpGetFTCALseed_emin(int *emin)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  CHECKTYPE(VTP_FW_TYPE_FTCAL,0);
 
   VLOCK;
   *emin = (vtp->v7.ftcalTrigger.Ctrl & VTP_FTCAL_CTRL_SEEDTHR_MASK)>>0;
@@ -3255,7 +3293,7 @@ vtpSetFTCALseed_dt(int dt)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  CHECKTYPE(VTP_FW_TYPE_FTCAL,0);
 
   VLOCK;
   dt = dt/4;
@@ -3272,7 +3310,7 @@ int
 vtpGetFTCALseed_dt(int *dt)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  CHECKTYPE(VTP_FW_TYPE_FTCAL,0);
 
   VLOCK;
   *dt = ((vtp->v7.ftcalTrigger.Ctrl & VTP_FTCAL_CTRL_SEEDDT_MASK)>>16)*4;
@@ -3286,7 +3324,7 @@ vtpSetFTCALhodo_dt(int dt)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  CHECKTYPE(VTP_FW_TYPE_FTCAL,0);
 
   VLOCK;
   dt = dt/4;
@@ -3303,7 +3341,7 @@ int
 vtpGetFTCALhodo_dt(int *dt)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  CHECKTYPE(VTP_FW_TYPE_FTCAL,0);
 
   VLOCK;
   *dt = ((vtp->v7.ftcalTrigger.Ctrl & VTP_FTCAL_CTRL_HODODT_MASK)>>24)*4;
@@ -3318,7 +3356,7 @@ vtpSetFTHODOemin(int emin)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTHODO);
+  CHECKTYPE(VTP_FW_TYPE_FTHODO,0);
 
   VLOCK;
   val = vtp->v7.fthodoTrigger.Ctrl;
@@ -3334,7 +3372,7 @@ int
 vtpGetFTHODOemin(int *emin)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTHODO);
+  CHECKTYPE(VTP_FW_TYPE_FTHODO,0);
 
   VLOCK;
   *emin = (vtp->v7.fthodoTrigger.Ctrl & VTP_FTHODO_CTRL_EMIN_MASK)>>0;
@@ -3348,7 +3386,7 @@ vtpSetFTCALcluster_deadtime(int deadtime)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  CHECKTYPE(VTP_FW_TYPE_FTCAL,0);
 
   VLOCK;
   deadtime = deadtime/4;
@@ -3365,7 +3403,7 @@ int
 vtpGetFTCALcluster_deadtime(int *deadtime)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  CHECKTYPE(VTP_FW_TYPE_FTCAL,0);
 
   VLOCK;
   *deadtime = ((vtp->v7.ftcalTrigger.DeadtimeCtrl & VTP_FTCAL_DEADTIMECTRL_DEADTIME_MASK)>>16)*4;
@@ -3379,7 +3417,7 @@ vtpSetFTCALcluster_deadtime_emin(int emin)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  CHECKTYPE(VTP_FW_TYPE_FTCAL,0);
 
   VLOCK;
   val = vtp->v7.ftcalTrigger.DeadtimeCtrl;
@@ -3395,7 +3433,7 @@ int
 vtpGetFTCALcluster_deadtime_emin(int *emin)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTCAL);
+  CHECKTYPE(VTP_FW_TYPE_FTCAL,0);
 
   VLOCK;
   *emin = (vtp->v7.ftcalTrigger.DeadtimeCtrl & VTP_FTCAL_DEADTIMECTRL_EMIN_MASK)>>0;
@@ -3611,7 +3649,7 @@ int
 vtpSetHPS_Cluster(int top_nbottom, int hit_dt, int seed_thr)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   hit_dt/= 4;
 
@@ -3631,7 +3669,7 @@ vtpGetHPS_Cluster(int *top_nbottom, int *hit_dt, int *seed_thr)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   VLOCK;
   val = vtp->v7.hpsCluster.Ctrl;
@@ -3650,7 +3688,7 @@ int
 vtpSetHPS_Hodoscope(int hit_width, int fadchit_thr, int hodo_thr)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   hit_width/= 4;
 
@@ -3670,7 +3708,7 @@ vtpGetHPS_Hodoscope(int *hit_width, int *fadchit_thr, int *hodo_thr)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   VLOCK;
   val = vtp->v7.hpsHodoscope.Ctrl;
@@ -3693,7 +3731,7 @@ vtpSetHPS_SingleTrigger(
 {
   int i, c[4];
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   CHECKRANGE_INT(inst         ,   0,    3);
   CHECKRANGE_INT(top_nbottom  ,   0,    1);
@@ -3745,7 +3783,7 @@ vtpGetHPS_SingleTrigger(
 {
   int i, c[4];
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   CHECKRANGE_INT(inst         ,   0,    3);
 
@@ -3792,7 +3830,7 @@ vtpSetHPS_PairTrigger(
 {
   int f;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   pair_dt/= 4;
 
@@ -3834,7 +3872,7 @@ vtpGetHPS_PairTrigger(
 {
   int f;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   CHECKRANGE_INT(inst         ,   0,    3);
 
@@ -3867,7 +3905,7 @@ vtpSetHPS_MultiplicityTrigger(
   )
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   mult_dt/= 4;
 
@@ -3904,7 +3942,7 @@ vtpGetHPS_MultiplicityTrigger(
   )
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   CHECKRANGE_INT(inst         ,   0,    1);
 
@@ -3930,7 +3968,7 @@ vtpSetHPS_CalibrationTrigger(
 {
   float period;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   cosmic_dt/= 4;
 
@@ -3957,7 +3995,7 @@ vtpGetHPS_CalibrationTrigger(
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   VLOCK;
   val = vtp->v7.hpsCalibTrigger.Ctrl;
@@ -3984,7 +4022,7 @@ int vtpSetHPS_FeeTrigger(
 {
   int i;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   CHECKRANGE_INT(cluster_emin,  0, 8191);
   CHECKRANGE_INT(cluster_emax,  0, 8191);
@@ -4062,7 +4100,7 @@ int vtpGetHPS_FeeTrigger(
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   VLOCK;
   *enable_flags = vtp->v7.hpsFeeTriggerTop.Ctrl;
@@ -4118,7 +4156,7 @@ vtpSetHPS_TriggerLatency(
   )
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   latency/= 4;
 
@@ -4139,7 +4177,7 @@ vtpGetHPS_TriggerLatency(
   )
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   VLOCK;
   *latency = vtp->v7.hpsTriggerBits.Latency;
@@ -4156,7 +4194,7 @@ vtpSetHPS_TriggerPrescale(
   )
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   CHECKRANGE_INT(inst,   0, 31);
 
@@ -4173,7 +4211,7 @@ vtpGetHPS_TriggerPrescale(
   )
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   CHECKRANGE_INT(inst,   0, 31);
 
@@ -4198,7 +4236,7 @@ vtpHPSPrintConfig()
   int prescale_xmin[7], prescale_xmax[7];
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   vtpGetHPS_Cluster(&top_nbottom, &hit_dt, &seed_thr);
   vtpGetHPS_Hodoscope(&hit_width, &fadchit_thr, &hodo_thr);
@@ -4459,7 +4497,7 @@ vtpHPSPrintScalers()
   unsigned int scalers[sizeof(scalers_name)/sizeof(scalers_name[0])], *pscalers = &scalers[0];
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HPS);
+  CHECKTYPE(VTP_FW_TYPE_HPS,0);
 
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
@@ -4654,7 +4692,7 @@ vtpSetCompton_VetrocWidth(int vetroc_width)
 {
   uint32_t reg;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+  CHECKTYPE(VTP_FW_TYPE_COMPTON,0);
   CHECKRANGE_INT(vetroc_width, 0, 0xFF);
 
   VLOCK;
@@ -4672,7 +4710,7 @@ vtpGetCompton_VetrocWidth(int *vetroc_width)
 {
   uint32_t reg = 0;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+  CHECKTYPE(VTP_FW_TYPE_COMPTON,0);
 
   VLOCK;
   reg = vtp->v7.comptonTrigger.Ctrl[0];
@@ -4687,7 +4725,7 @@ vtpSetCompton_EnableScalerReadout(int en)
 {
   uint32_t reg;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+  CHECKTYPE(VTP_FW_TYPE_COMPTON,0);
   CHECKRANGE_INT(en, 0, 1);
 
   VLOCK;
@@ -4705,7 +4743,7 @@ vtpGetCompton_EnableScalerReadout(int *en)
 {
   uint32_t reg = 0;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+  CHECKTYPE(VTP_FW_TYPE_COMPTON,0);
 
   VLOCK;
   reg = vtp->v7.comptonTrigger.Ctrl[0];
@@ -4720,7 +4758,7 @@ vtpSetCompton_Trigger(int inst, int fadc_threshold, int eplane_mult_min, int epl
 {
   int reg;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+  CHECKTYPE(VTP_FW_TYPE_COMPTON,0);
   CHECKRANGE_INT(inst, 0, 4);
   CHECKRANGE_INT(fadc_threshold, 0, 0x1FFF);
   CHECKRANGE_INT(eplane_mult_min, 0, 4);
@@ -4759,7 +4797,7 @@ vtpGetCompton_Trigger(int inst, int *fadc_threshold, int *eplane_mult_min, int *
 {
   uint32_t reg = 0;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMPTON);
+  CHECKTYPE(VTP_FW_TYPE_COMPTON,0);
   CHECKRANGE_INT(inst, 0, 4);
 
   VLOCK;
@@ -4787,7 +4825,7 @@ int
 vtpSetHTCC_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  CHECKTYPE(VTP_FW_TYPE_HTCC,0);
 
   VLOCK;
   vtp->v7.htccTrigger.Thresholds[0] = thr0;
@@ -4802,7 +4840,7 @@ int
 vtpGetHTCC_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  CHECKTYPE(VTP_FW_TYPE_HTCC,0);
 
   VLOCK;
   *thr0 = vtp->v7.htccTrigger.Thresholds[0];
@@ -4817,7 +4855,7 @@ int
 vtpSetHTCC_nframes(int nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  CHECKTYPE(VTP_FW_TYPE_HTCC,0);
 
   VLOCK;
   vtp->v7.htccTrigger.NFrames = nframes;
@@ -4830,7 +4868,7 @@ int
 vtpGetHTCC_nframes(int *nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  CHECKTYPE(VTP_FW_TYPE_HTCC,0);
 
   VLOCK;
   *nframes = vtp->v7.htccTrigger.NFrames;
@@ -4844,7 +4882,7 @@ int
 vtpSetCTOF_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  CHECKTYPE(VTP_FW_TYPE_HTCC,0);
 
   VLOCK;
   vtp->v7.ctofTrigger.Thresholds[0] = thr0;
@@ -4859,7 +4897,7 @@ int
 vtpGetCTOF_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  CHECKTYPE(VTP_FW_TYPE_HTCC,0);
 
   VLOCK;
   *thr0 = vtp->v7.ctofTrigger.Thresholds[0];
@@ -4874,7 +4912,7 @@ int
 vtpSetCTOF_nframes(int nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  CHECKTYPE(VTP_FW_TYPE_HTCC,0);
 
   VLOCK;
   vtp->v7.ctofTrigger.NFrames = nframes;
@@ -4887,7 +4925,7 @@ int
 vtpGetCTOF_nframes(int *nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  CHECKTYPE(VTP_FW_TYPE_HTCC,0);
 
   VLOCK;
   *nframes = vtp->v7.ctofTrigger.NFrames;
@@ -4909,7 +4947,7 @@ vtpHtccPrintScalers()
    };
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HTCC);
+  CHECKTYPE(VTP_FW_TYPE_HTCC,0);
 
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
@@ -5020,7 +5058,7 @@ int
 vtpSetFTOF_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTOF);
+  CHECKTYPE(VTP_FW_TYPE_FTOF,0);
 
   VLOCK;
   vtp->v7.ftofTrigger.Thresholds[0] = thr0;
@@ -5035,7 +5073,7 @@ int
 vtpGetFTOF_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTOF);
+  CHECKTYPE(VTP_FW_TYPE_FTOF,0);
 
   VLOCK;
   *thr0 = vtp->v7.ftofTrigger.Thresholds[0];
@@ -5050,7 +5088,7 @@ int
 vtpSetFTOF_nframes(int nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTOF);
+  CHECKTYPE(VTP_FW_TYPE_FTOF,0);
 
   VLOCK;
   vtp->v7.ftofTrigger.NFrames = nframes;
@@ -5063,7 +5101,7 @@ int
 vtpGetFTOF_nframes(int *nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTOF);
+  CHECKTYPE(VTP_FW_TYPE_FTOF,0);
 
   VLOCK;
   *nframes = vtp->v7.ftofTrigger.NFrames;
@@ -5084,7 +5122,7 @@ vtpFtofPrintScalers()
    };
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_FTOF);
+  CHECKTYPE(VTP_FW_TYPE_FTOF,0);
 
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
@@ -5192,7 +5230,7 @@ int
 vtpSetCND_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_CND);
+  CHECKTYPE(VTP_FW_TYPE_CND,0);
 
   VLOCK;
   vtp->v7.cndTrigger.Thresholds[0] = thr0;
@@ -5207,7 +5245,7 @@ int
 vtpGetCND_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_CND);
+  CHECKTYPE(VTP_FW_TYPE_CND,0);
 
   VLOCK;
   *thr0 = vtp->v7.cndTrigger.Thresholds[0];
@@ -5222,7 +5260,7 @@ int
 vtpSetCND_nframes(int nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_CND);
+  CHECKTYPE(VTP_FW_TYPE_CND,0);
 
   VLOCK;
   vtp->v7.cndTrigger.NFrames = nframes;
@@ -5235,7 +5273,7 @@ int
 vtpGetCND_nframes(int *nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_CND);
+  CHECKTYPE(VTP_FW_TYPE_CND,0);
 
   VLOCK;
   *nframes = vtp->v7.cndTrigger.NFrames;
@@ -5256,7 +5294,7 @@ vtpCndPrintScalers()
    };
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_CND);
+  CHECKTYPE(VTP_FW_TYPE_CND,0);
 
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
@@ -5368,7 +5406,7 @@ int
 vtpSetPCS_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   vtp->v7.pcsTrigger.Thresholds[0] = thr0;
@@ -5383,7 +5421,7 @@ int
 vtpGetPCS_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   *thr0 = vtp->v7.pcsTrigger.Thresholds[0];
@@ -5398,7 +5436,7 @@ int
 vtpSetPCS_nframes(int nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   vtp->v7.pcsTrigger.NFrames = nframes;
@@ -5411,7 +5449,7 @@ int
 vtpGetPCS_nframes(int *nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   *nframes = vtp->v7.pcsTrigger.NFrames;
@@ -5424,7 +5462,7 @@ int
 vtpSetPCS_dipfactor(int dipfactor)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   vtp->v7.pcsTrigger.Dipfactor = dipfactor;
@@ -5437,7 +5475,7 @@ int
 vtpGetPCS_dipfactor(int *dipfactor)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   *dipfactor = vtp->v7.pcsTrigger.Dipfactor;
@@ -5450,7 +5488,7 @@ int
 vtpSetPCS_nstrip(int nstripmin, int nstripmax)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   /* nstripmin is not implemented */
   VLOCK;
@@ -5464,7 +5502,7 @@ int
 vtpGetPCS_nstrip(int *nstripmin, int *nstripmax)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   /* nstripmin is not implemented */
   *nstripmax = 0;
@@ -5480,7 +5518,7 @@ int
 vtpSetPCS_dalitz(int dalitz_min, int dalitz_max)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   vtp->v7.pcsTrigger.DalitzMin = dalitz_min;
@@ -5494,7 +5532,7 @@ int
 vtpGetPCS_dalitz(int *dalitz_min, int *dalitz_max)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   *dalitz_min = vtp->v7.pcsTrigger.DalitzMin;
@@ -5579,7 +5617,7 @@ int
 vtpSetPCU_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   vtp->v7.pcuTrigger.Thresholds[0] = thr0;
@@ -5594,7 +5632,7 @@ int
 vtpGetPCU_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   *thr0 = vtp->v7.pcuTrigger.Thresholds[0];
@@ -5612,7 +5650,7 @@ int
 vtpSetECS_thresholds(int thr0, int thr1, int thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   VLOCK;
   vtp->v7.ecsTrigger.Thresholds[0] = thr0;
@@ -5627,7 +5665,7 @@ int
 vtpGetECS_thresholds(int *thr0, int *thr1, int *thr2)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   VLOCK;
   *thr0 = vtp->v7.ecsTrigger.Thresholds[0];
@@ -5642,7 +5680,7 @@ int
 vtpSetECS_nframes(int nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   VLOCK;
   vtp->v7.ecsTrigger.NFrames = nframes;
@@ -5655,7 +5693,7 @@ int
 vtpGetECS_nframes(int *nframes)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   VLOCK;
   *nframes = vtp->v7.ecsTrigger.NFrames;
@@ -5668,7 +5706,7 @@ int
 vtpSetECS_dipfactor(int dipfactor)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   VLOCK;
   vtp->v7.ecsTrigger.Dipfactor = dipfactor;
@@ -5681,7 +5719,7 @@ int
 vtpGetECS_dipfactor(int *dipfactor)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   VLOCK;
   *dipfactor = vtp->v7.ecsTrigger.Dipfactor;
@@ -5694,7 +5732,7 @@ int
 vtpSetECS_nstrip(int nstripmin, int nstripmax)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   /* nstripmin is not implemented */
   VLOCK;
@@ -5708,7 +5746,7 @@ int
 vtpGetECS_nstrip(int *nstripmin, int *nstripmax)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   /* nstripmin is not implemented */
   *nstripmax = 0;
@@ -5724,7 +5762,7 @@ int
 vtpSetECS_dalitz(int dalitz_min, int dalitz_max)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   VLOCK;
   vtp->v7.ecsTrigger.DalitzMin = dalitz_min<<3;
@@ -5738,7 +5776,7 @@ int
 vtpGetECS_dalitz(int *dalitz_min, int *dalitz_max)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   VLOCK;
   *dalitz_min = vtp->v7.ecsTrigger.DalitzMin>>3;
@@ -5764,7 +5802,7 @@ vtpEcsPrintScalers()
    };
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_ECS);
+  CHECKTYPE(VTP_FW_TYPE_ECS,0);
 
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
@@ -5874,7 +5912,7 @@ vtpSetPCScosmic_pixel(int enable)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  CHECKTYPE(VTP_FW_TYPE_PC,0);
 
   if(enable)
     enable = 1;
@@ -5893,7 +5931,7 @@ int
 vtpGetPCScosmic_pixel(int *enable)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PC);
+  CHECKTYPE(VTP_FW_TYPE_PC,0);
 
   VLOCK;
   *enable = (vtp->v7.pcCosmic.Ctrl & VTP_PCCOSMIC_CTRL_PIXEL_MASK)>>16;
@@ -5909,7 +5947,7 @@ int
 vtpSetDc_SegmentThresholdMin(int inst, int threshold)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_DC);
+  CHECKTYPE(VTP_FW_TYPE_DC,0);
 
   if(inst < 0 || inst > 1)
   {
@@ -5928,7 +5966,7 @@ int
 vtpGetDc_SegmentThresholdMin(int inst, int *threshold)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_DC);
+  CHECKTYPE(VTP_FW_TYPE_DC,0);
 
   if(inst < 0 || inst > 1)
   {
@@ -5947,7 +5985,7 @@ int
 vtpSetGt_latency(int latency)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMMON);
+  CHECKTYPE(VTP_FW_TYPE_COMMON,0);
 
   VLOCK;
   vtp->v7.trigOut.Latency = latency/4;
@@ -5961,7 +5999,7 @@ vtpGetGt_latency()
 {
   int latency;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMMON);
+  CHECKTYPE(VTP_FW_TYPE_COMMON,0);
 
   VLOCK;
   latency = vtp->v7.trigOut.Latency;
@@ -5974,7 +6012,7 @@ int
 vtpSetGt_width(int width)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMMON);
+  CHECKTYPE(VTP_FW_TYPE_COMMON,0);
 
   VLOCK;
   vtp->v7.trigOut.Width = width;
@@ -5988,7 +6026,7 @@ vtpGetGt_width()
 {
   int width;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMMON);
+  CHECKTYPE(VTP_FW_TYPE_COMMON,0);
 
   VLOCK;
   width = vtp->v7.trigOut.Width;
@@ -6002,7 +6040,7 @@ vtpSetTriggerBitDelay(int inst, int delay)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMMON);
+  CHECKTYPE(VTP_FW_TYPE_COMMON,0);
 
   if((inst < 0) || (inst > 32))
     {
@@ -6028,7 +6066,7 @@ vtpGetTriggerBitDelay(int inst, int *delay)
   int rval = 0;
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMMON);
+  CHECKTYPE(VTP_FW_TYPE_COMMON,0);
 
   if((inst < 0) || (inst > 32))
     {
@@ -6050,7 +6088,7 @@ vtpSetTriggerBitPrescaler(int inst, int prescale)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMMON);
+  CHECKTYPE(VTP_FW_TYPE_COMMON,0);
 
   if((inst < 0) || (inst > 32))
     {
@@ -6074,7 +6112,7 @@ vtpGetTriggerBitPrescaler(int inst)
 {
   int rval = 0;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_COMMON);
+  CHECKTYPE(VTP_FW_TYPE_COMMON,0);
 
   if((inst < 0) || (inst > 32))
     {
@@ -6094,7 +6132,7 @@ vtpPrintGtTriggerBitRegs()
 {
   int strig, strigmask, ctrig, pulser, i, prescaler;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_GT);
+  CHECKTYPE(VTP_FW_TYPE_GT,0);
 
   for(i=0; i<32; i++)
   {
@@ -6117,7 +6155,7 @@ vtpSetGtTriggerBit(int inst, int strigger_mask0, int sector_mask0, int mult_min0
   float f;
   int strig, strigmask, strig1, strig1mask, ctrig, pulser;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_GT);
+  CHECKTYPE(VTP_FW_TYPE_GT,0);
 
   if(inst < 0 || inst > 32)
   {
@@ -6166,7 +6204,7 @@ vtpGetGtTriggerBit(int inst, int *strigger_mask0, int *sector_mask0, int *mult_m
 {
   int strig, strigmask, strig1, strig1mask, ctrig, pulser;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_GT);
+  CHECKTYPE(VTP_FW_TYPE_GT,0);
 
   if(inst < 0 || inst > 32)
   {
@@ -6330,7 +6368,7 @@ vtpGtPrintScalers()
     };
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_GT);
+  CHECKTYPE(VTP_FW_TYPE_GT,0);
 
 
   VLOCK;
@@ -6385,7 +6423,7 @@ vtpPcsPrintScalers()
    };
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_PCS);
+  CHECKTYPE(VTP_FW_TYPE_PCS,0);
 
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
@@ -6433,7 +6471,7 @@ vtpPrintHist_PeakPosition(int inst)
   float scale, fval;
   int i;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_EC);
+  CHECKTYPE(VTP_FW_TYPE_EC,0);
 
   VLOCK;
     vtp->v7.ecTrigger[inst].HistCtrl &= ~0x00000003;
@@ -6490,7 +6528,7 @@ vtpPrintHist_ClusterPosition(int inst)
   uint32_t val;
   int i,u,v;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_EC);
+  CHECKTYPE(VTP_FW_TYPE_EC,0);
 
   VLOCK;
     vtp->v7.ecTrigger[inst].HistCtrl &= ~0x00000005;
@@ -6537,7 +6575,7 @@ int
 vtpSetHcal_ClusterCoincidence(int coin)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HCAL);
+  CHECKTYPE(VTP_FW_TYPE_HCAL,0);
 
   if(coin > 7)
   {
@@ -6556,7 +6594,7 @@ int
 vtpGetHcal_ClusterCoincidence(int *coin)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HCAL);
+  CHECKTYPE(VTP_FW_TYPE_HCAL,0);
 
   VLOCK;
   *coin = vtp->v7.hcal.ClusterPulseCoincidence * 4;
@@ -6569,7 +6607,7 @@ int
 vtpSetHcal_ClusterThreshold(int thr)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HCAL);
+  CHECKTYPE(VTP_FW_TYPE_HCAL,0);
 
   if(thr > 8191)
   {
@@ -6588,7 +6626,7 @@ int
 vtpGetHcal_ClusterThreshold(int *thr)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_HCAL);
+  CHECKTYPE(VTP_FW_TYPE_HCAL,0);
 
   VLOCK;
   *thr = vtp->v7.hcal.ClusterPulseThreshold;
@@ -6615,7 +6653,7 @@ vtpDcPrintScalers()
    };
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_DC);
+  CHECKTYPE(VTP_FW_TYPE_DC,0);
 
   VLOCK;
   vtp->v7.sd.ScalerLatch = 1;
@@ -6656,7 +6694,7 @@ vtpGetDc_RoadId(char *id_str)
 {
   int i, id[2];
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_DC);
+  CHECKTYPE(VTP_FW_TYPE_DC,0);
 
   VLOCK;
   id[0] = vtp->v7.dcrbRoadFind.Id[0];
@@ -6751,20 +6789,66 @@ vtpDcSendScalers(char *host)
 }
 #endif
 
+
+
+/* TI LINK Functions */
+
+/* Only used for mode=0 to acknowledge a trigger */
 int
-vtpTiAck(int clearsync)
+vtpTiAck()
 {
-  int val = VTP_EB_TICTRL_TI_ACK;
   CHECKINIT;
 
-  if(clearsync)
-    val |= VTP_EB_TICTRL_SYNCEVT_RST;
-
   VLOCK;
-  vtp->eb.TiCtrl = val;
+  vtp->tiLink.Ctrl = VTP_TI_CTRL_ACK;
   VUNLOCK;
 
   return OK;
+}
+
+int
+vtpTiLinkSetMode(int mode)
+{
+  /* mode=0 is full software ROC mode. All TI and Event data must be read out by the trigger routine
+     mode=1 is hardware mode. TI and Event data are sent by FPGAs. The CPU can optionally
+            include a data bank by enabling CPUSyncEvents (ROC Ctrl Register)
+  */
+
+  CHECKINIT;
+
+  VLOCK;
+
+  if(mode)
+    vtp->tiLink.Ctrl = (1<<4);
+  else
+    vtp->tiLink.Ctrl = 0;
+
+  VUNLOCK;
+
+  return OK;
+}
+
+
+int
+vtpTiLinkGetBlockLevel(int print)
+{
+  int val;
+  CHECKINIT;
+
+  VLOCK;
+  vtp->tiLink.Ctrl = VTP_TI_CTRL_BL_REQ;
+  VUNLOCK;
+
+  usleep(1000);
+
+  VLOCK;
+  val = vtp->tiLink.Status & 0xFF;
+  VUNLOCK;
+
+  if(print)
+    printf("%s: returned %d\n", __func__, val);
+
+  return val;
 }
 
 #define TI_LINK_INIT_TRIES    3
@@ -6774,23 +6858,22 @@ vtpTiLinkInit()
   int i, val;
   CHECKINIT;
 
-  printf("%s: init\n", __func__);
   for(i = 0; i < TI_LINK_INIT_TRIES; i++)
   {
     VLOCK;
-    vtp->eb.LinkCtrl = VTP_EB_LINKCTRL_RX_RESET | VTP_EB_LINKCTRL_PLL_RST | VTP_EB_LINKCTRL_RX_FIFO_RST;
-    vtp->eb.LinkCtrl = VTP_EB_LINKCTRL_RX_RESET | VTP_EB_LINKCTRL_RX_FIFO_RST;
-    vtp->eb.LinkCtrl = VTP_EB_LINKCTRL_RX_FIFO_RST;
-    vtp->eb.LinkCtrl = 0;
+    vtp->tiLink.LinkReset = VTP_TI_LINKRESET_RX | VTP_TI_LINKRESET_PLL | VTP_TI_LINKRESET_RX_FIFO;
+    vtp->tiLink.LinkReset = VTP_TI_LINKRESET_RX | VTP_TI_LINKRESET_RX_FIFO;
+    vtp->tiLink.LinkReset = VTP_TI_LINKRESET_RX_FIFO;
+    vtp->tiLink.LinkReset = 0;
     VUNLOCK;
 
     usleep(10000);
 
     VLOCK;
-    val = vtp->eb.LinkStatus;
+    val = vtp->tiLink.LinkStatus;
     VUNLOCK;
 
-    if(val & VTP_EB_LINKSTATUS_RX_READY)
+    if(val & VTP_TI_LINKSTATUS_RX_READY)
     {
       printf("%s: VTP <-> TI Link RX Ready (status=0x%08X)\n", __func__, val);
       break;
@@ -6807,10 +6890,6 @@ vtpTiLinkInit()
     }
   }
 
-  VLOCK;
-  vtp->eb.TiCtrl = VTP_EB_TICTRL_SYNCEVT_RST;
-  VUNLOCK;
-
   return OK;
 }
 
@@ -6821,22 +6900,20 @@ vtpTiLinkStatus()
   CHECKINIT;
 
   VLOCK;
-  val = vtp->eb.LinkStatus;
+  val = vtp->tiLink.LinkStatus;
   VUNLOCK;
 
   printf("%s: LinkStatus   = 0x%08X\n"
 	 "      RxReady    = %u\n"
 	 "      RxLocked   = %u\n"
-	 "      PllLocked  = %u\n"
 	 "      RxErrorCnt = %u\n",
          __func__, val,
-         (val & VTP_EB_LINKSTATUS_RX_READY) ? 1:0,
-         (val & VTP_EB_LINKSTATYS_RX_LOCKED) ? 1:0,
-         (val & VTP_EB_LINKSTATUS_GCLK_PLL_LOCK) ? 1:0,
-         (val & VTP_EB_LINKSTATUS_RX_ERROR_CNT_MASK)
+         (val & VTP_TI_LINKSTATUS_RX_READY) ? 1:0,
+         (val & VTP_TI_LINKSTATUS_RX_LOCKED) ? 1:0,
+         (val & VTP_TI_LINKSTATUS_RX_ERROR_CNT_MASK)
         );
 
-  if((val & VTP_EB_LINKSTATUS_RX_ERROR_CNT_MASK) > 1000)
+  if((val & VTP_TI_LINKSTATUS_RX_ERROR_CNT_MASK) > 1000)
     {
       rval = ERROR;
     }
@@ -6845,14 +6922,18 @@ vtpTiLinkStatus()
 }
 
 int
-vtpEbResetFifo()
+vtpTiLinkResetFifo(int rx)
 {
   CHECKINIT;
 
-  printf("%s: reset fifo\n",__func__);
   VLOCK;
-  vtp->eb.LinkCtrl |= VTP_EB_LINKCTRL_FIFO_RST;
-  vtp->eb.LinkCtrl &= ~VTP_EB_LINKCTRL_FIFO_RST;
+  if(rx) {
+  vtp->tiLink.LinkReset |= VTP_TI_LINKRESET_RX_FIFO;
+  vtp->tiLink.LinkReset &= ~VTP_TI_LINKRESET_RX_FIFO;
+  }else{
+  vtp->tiLink.LinkReset |= VTP_TI_LINKRESET_FIFO;
+  vtp->tiLink.LinkReset &= ~VTP_TI_LINKRESET_FIFO;
+  }
   VUNLOCK;
 
   return OK;
@@ -7002,46 +7083,21 @@ vtpDmaWaitDone(int id)
   return rval;
 }
 
-int
-vtpEbBuildTestEvent(int len)
-{
-  CHECKINIT;
-
-  VLOCK;
-  vtp->eb.EbCtrl = 0x8 | (len<<8);
-  VUNLOCK;
-
-  return OK;
-}
 
 int
-vtpEbReset()
-{
-  CHECKINIT;
-
-  VLOCK;
-  vtp->eb.EbCtrl = 0x0;
-  vtp->eb.LinkCtrl = 0x8;
-  vtp->eb.LinkCtrl = 0x0;
-  VUNLOCK;
-
-  return OK;
-}
-
-int
-vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
+vtpTiLinkReadEvent(uint32_t *pBuf, uint32_t maxsize)
 {
   int status, cnt = 0;
   CHECKINIT;
 
-  if(vtpEbTiEventReadErrors)
-    printf("{vtpEbTiEventReadErrors=%d}\n", vtpEbTiEventReadErrors);
+  if(vtpTiLinkEventReadErrors)
+    printf("{vtpTiLinkEventReadErrors=%d}\n", vtpTiLinkEventReadErrors);
 
   int retry=100;
   while(cnt < maxsize)
     {
       VLOCK;
-      status = vtp->eb.EbStatus;
+      status = vtp->tiLink.EBStatus;
       VUNLOCK;
 
       if(status & 0x1)
@@ -7052,14 +7108,14 @@ vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
 	    }
 	  else
 	    {
-	      vtpEbTiEventReadErrors++;
-	      printf("vtpEbTiReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpEbTiEventReadErrors);
+	      vtpTiLinkEventReadErrors++;
+	      printf("vtpTiLinkReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpTiLinkEventReadErrors);
 	      break;
 	    }
 	}
 
       VLOCK;
-      *pBuf++ = vtp->eb.TiFifo;
+      *pBuf++ = vtp->tiLink.EB_TiFifo;
       VUNLOCK;
 
       if(status & 0x10000)
