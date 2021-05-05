@@ -729,13 +729,19 @@ typedef struct ROC_EB_Struct
 
 
 /* MPD Interface */
-#define MPD_CTRL_GTX_RESET		0x00000001	/* Analog reset fiber - asserted all channels and release 1 time on SSP init and don't do again */
-#define MPD_CTRL_RESET			0x00000002	/* Fiber link reset the MPD */
+#define MPD_GTX_CTRL_FIBER_GT_RESET	(1 << 0)	/* Analog reset fiber - asserted all channels and release 1 time on SSP init and don't do again */
+#define MPD_GTX_CTRL_FIBER_RESET	(1 << 1)	/* Fiber link reset the MPD */
+#define MPD_GTX_CTRL_FIBER_POWERDOWN    (1 << 2)
 
-#define MPD_STATUS_CHANNELUP		0x00000001	/* Channel Up indicates remote MPD connected */
-#define MPD_STATUS_HARDERROR		0x00000002	/* Indicates whether hard error exists (requires CTRL_RESET to be asserted to fix) */
-#define MPD_STATUS_FRAMEERROR		0x00000004	/* Indicates whether framing error exists (requires CTRL_RESET to be asserted to fix) */
-#define MPD_STATUS_SOFTERRORS		0x0000FF00	/* Bit error counter on fiber link to MPD */
+#define MPD_GTX_STATUS_FIBER_CHANNEL_UP	(1 << 0)	/* Channel Up indicates remote MPD connected */
+#define MPD_GTX_STATUS_FIBER_HARD_ERR	(1 << 1)	/* Indicates whether hard error exists (requires CTRL_RESET to be asserted to fix) */
+#define MPD_GTX_STATUS_FIBER_FRAME_ERR  (1 << 2)	/* Indicates whether framing error exists (requires CTRL_RESET to be asserted to fix) */
+#define MPD_GTX_STATUS_TX_LOCK          (1 << 3)
+#define MPD_GTX_STATUS_TX_RESETDONE     (1 << 4)
+#define MPD_GTX_STATUS_RX_RESETDONE     (1 << 5)
+
+
+#define MPD_GTX_STATUS_FIBER_ERR_CNT    0x0000FF00	/* Bit error counter on fiber link to MPD */
 
 #define MPD_EBCTRL_ENABLE		0x00000001	/* Set to 1 to allow MPD event data to fill event builder buffer */
 

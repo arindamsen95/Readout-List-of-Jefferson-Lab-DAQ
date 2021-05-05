@@ -211,7 +211,7 @@ vtpMpdFiberReset()
   VLOCK;
   for(impd=0; impd<32; impd++)
     {
-      vtp->v7.mpdFiber[impd].gtx_ctrl = MPD_CTRL_GTX_RESET;
+      vtp->v7.mpdFiber[impd].gtx_ctrl = MPD_GTX_CTRL_FIBER_GT_RESET;
     }
   usleep(60000);
   for(impd=0; impd<32; impd++)
@@ -233,7 +233,7 @@ vtpMpdFiberLinkReset(unsigned int mpdmask)
   for(impd=0; impd<32; impd++)
     {
       if(mpdmask & (1<<impd))
-	vtp->v7.mpdFiber[impd].gtx_ctrl = MPD_CTRL_RESET;
+	vtp->v7.mpdFiber[impd].gtx_ctrl = MPD_GTX_CTRL_FIBER_RESET;
     }
   usleep(60000);
   for(impd=0; impd<32; impd++)
@@ -416,27 +416,35 @@ vtpMpdPrintStatus()
 
   printf("\n");
   printf("                           MPD Settings and Status\n\n");
-  printf("           Channel   -------ERRORS------     Event\n");
-  printf("MPD  Ctrl    Up      HARD   FRAME   SOFT    Builder\n");
+  printf("                  Channel  TX   ResetDone   -------ERRORS------     Event\n");
+  printf("MPD  Ctrl Status    Up    Lock   TX  RX     HARD   FRAME    CNT     Builder\n");
   printf("--------------------------------------------------------------------------------\n");
   for(impd=0; impd<32; impd++)
     {
-      printf("%2d     ",impd);
+      printf("%2d   ",impd);
 
-      printf("%01x    ",mr[impd].gtx_ctrl);
+      printf("%04x   ",mr[impd].gtx_ctrl);
 
-      printf("%s      ",(mr[impd].gtx_status & MPD_STATUS_CHANNELUP)?" UP ":"DOWN");
+      printf("%04x   ",mr[impd].gtx_status & 0xffff);
 
-      printf("%s    ",(mr[impd].gtx_status & MPD_STATUS_HARDERROR)?"ERR":"---");
+      printf("%s     ",(mr[impd].gtx_status & MPD_GTX_STATUS_FIBER_CHANNEL_UP)?" UP ":"DOWN");
 
-      printf("%s     ",(mr[impd].gtx_status & MPD_STATUS_FRAMEERROR)?"ERR":"---");
+      printf("%s     ",(mr[impd].gtx_status & MPD_GTX_STATUS_TX_LOCK)?"1":"0");
 
-      if(mr[impd].gtx_status & MPD_STATUS_SOFTERRORS)
+      printf("%s   ",(mr[impd].gtx_status & MPD_GTX_STATUS_TX_RESETDONE)?"1":"0");
+
+      printf("%s      ",(mr[impd].gtx_status & MPD_GTX_STATUS_RX_RESETDONE)?"1":"0");
+
+      printf("%s     ",(mr[impd].gtx_status & MPD_GTX_STATUS_FIBER_HARD_ERR)?"ERR":"---");
+
+      printf("%s    ",(mr[impd].gtx_status & MPD_GTX_STATUS_FIBER_FRAME_ERR)?"ERR":"---");
+
+      if(mr[impd].gtx_status & MPD_GTX_STATUS_FIBER_ERR_CNT)
 	{
-	  printf("%3d    ",(mr[impd].gtx_status & MPD_STATUS_SOFTERRORS)>>8);
+	  printf("%3d     ",(mr[impd].gtx_status & MPD_GTX_STATUS_FIBER_FRAME_ERR)>>8);
 	}
       else
-	printf("---    ");
+	printf("---     ");
 
       printf("%s",(mr[impd].eb_ctrl & MPD_EBCTRL_ENABLE)?"ENABLED ":"DISABLED");
 
@@ -462,7 +470,7 @@ vtpMpdGetChanUpMask()
   for(impd=0; impd<32; impd++)
     {
       status = vtp->v7.mpdFiber[impd].gtx_status;
-      status &= MPD_STATUS_CHANNELUP;
+      status &= MPD_GTX_STATUS_FIBER_CHANNEL_UP;
       if(status)
 	rval |= (1 << impd);
     }
