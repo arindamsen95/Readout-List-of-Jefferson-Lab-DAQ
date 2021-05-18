@@ -340,6 +340,7 @@ vtpMpdReadRegs(int impd)
   for(ireg = (0x0>>2); ireg < (0x200>>2); ireg++)
     {
       vtp->v7.mpd.addr = (impd << 24) | (ireg << 2);
+      rval = vtp->v7.mpd.data;
 
       if((ireg%4)==0)
 	printf("\n%05x\t",ireg<<2);
@@ -419,6 +420,8 @@ vtpMpdPrintStatus()
   printf("                  Channel  TX   ResetDone   -------ERRORS------     Event\n");
   printf("MPD  Ctrl Status    Up    Lock   TX  RX     HARD   FRAME    CNT     Builder\n");
   printf("--------------------------------------------------------------------------------\n");
+  /*      31   0000   0038   DOWN     1     1   1      ---     ---    ---     ENABLED  */
+
   for(impd=0; impd<32; impd++)
     {
       printf("%2d   ",impd);
