@@ -14,6 +14,10 @@
 
 #include <VTP_source.h>
 
+/* Note that ROCID is a static readout list variable that gets set
+   automatically in the ROL initialization at Download. */
+
+
 #undef USE_DMA
 #undef READOUT_TI
 #undef READOUT_VTP
@@ -36,8 +40,12 @@ int vtpComptonEnableScalerReadout = 0;
 int trigBankType = 0xff10;
 int firstEvent;
 
-/* Data necessary to connect using EMUSocket */
-unsigned int emuData[] = {0x634d736,0x20697320,0x636f6f63,6,0,4196352,1,1};
+/* Data necessary to connect using EMUSocket
+#define CMSG_MAGIC_INT1 0x634d7367
+#define CMSG_MAGIC_INT2 0x20697320
+#define CMSG_MAGIC_INT3 0x636f6f6c
+*/
+unsigned int emuData[] = {0x634d7367,0x20697320,0x636f6f6c,6,0,4196352,1,1};
 
 
 /**
@@ -50,7 +58,7 @@ rocDownload()
   int stat;
   char buf[1000];
   /* Streaming firmware files for VTP */
-  const char *z7file="fe_vtp_vxs_readout_z7_apr27.bin";
+  const char *z7file="fe_vtp_vxs_readout_z7_may14.bin";
   const char *v7file="fe_vtp_vxs_readout_v7_may4.bin";
 
   firstEvent = 1;
@@ -101,10 +109,10 @@ rocDownload()
 
   firstEvent = 1;
 
-
+  
 
   /* Configure the ROC*/
-  //  vtpRocEbReset();
+  *(rol->async_roc) = 1;
   vtpRocReset(0);
   printf(" Set ROC ID = %d \n",ROCID);
   vtpRocSetID(ROCID);
@@ -134,6 +142,9 @@ rocPrestart()
     vtpConfig(rol->usrConfig);
 
 
+  /* Reset the ROC */
+  vtpRocReset(0);
+
   /* Initialize the TI Interface */
   vtpTiLinkInit();
 
@@ -158,7 +169,7 @@ rocPrestart()
     // Destination IP
     destip[0]=129; destip[1]=57; destip[2]=109; destip[3]=231;
     // Desination Port
-    destipport = 46100;
+    destipport = 46101;
 
     printf(" ipaddr=%d.%d.%d.%d\n",ipaddr[0],ipaddr[1],ipaddr[2],ipaddr[3]);
     printf(" subnet=%d.%d.%d.%d\n",subnet[0],subnet[1],subnet[2],subnet[3]);
@@ -205,15 +216,15 @@ rocPrestart()
        //vtpRocTcpConnect(1,0,0);
   }
 
-
+  
   /* Reset and Configure the MIG and ROC Event Builder */
   vtpRocMigReset();
-
+  
   vtpRocEbStop();
   vtpRocEbConfig(0x010005,0x010002,0x010003,0x1004);
-
+  
   vtpRocEbioReset();
-
+  
 
   /* Set TI readout to Hardware mode */
   vtpTiLinkSetMode(1);
@@ -294,6 +305,7 @@ rocEnd()
 
   /* Get total event information and set the counter */
   *(rol->nevents) = vtpRocGetTrigCnt();
+  *(rol->last_event) = vtpRocGetTrigCnt();
 
   /*Send End Event*/
   vtpRocEvioWriteControl(0xffd4,rol->runNumber,*(rol->nevents));
@@ -319,7 +331,7 @@ rocTrigger(int EVTYPE)
 /* Right now this is a dummy routine as the trigger and readout is
    running in the FPGAs. In principle however the ROC can poll on
    some parameter which will allow it to enter this routine and the
-   User can insert an asynchonous event into the data stream.
+   User can insert an asynchonous event into the data stream. 
 
    Also the ROC can reqire that every trigger is managed by this routine.
    Esentially, one can force the FPGA to get an acknowledge of the trigger
@@ -346,6 +358,10 @@ rocTrigger_done()
 void
 rocReset()
 {
+
+  /* Disconnect the socket */
+  vtpRocTcpConnect(0,0,0);  
+
 #ifdef USE_DMA
   vtpDmaMemClose();
 #endif
