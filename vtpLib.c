@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <string.h>
+#include <arpa/inet.h>
 #ifdef IPC
 #include "ipc.h"
 #endif
