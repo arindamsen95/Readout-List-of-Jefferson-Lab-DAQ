@@ -14,9 +14,9 @@ QUIET	?= 1
 ARCH=armv7l
 
 # Plug in your primary readout lists here..
-VMEROL		= vtp_list.so
+VMEROL		= vtp_list.so vtp_mpdro_list.o
 # Add shared library dependencies here.  (jvme already included)
-ROLLIBS		= -lvtp -li2c
+ROLLIBS		= -lvtp -li2c -lmpd -lconfig
 
 COMPILE_TIME	= \""$(shell date)"\"
 
@@ -29,7 +29,7 @@ CC			= gcc
 AR                      = ar
 RANLIB                  = ranlib
 ifdef DEBUG
-CFLAGS			= -Wall -g
+CFLAGS			= -Wall -Wno-unused -g
 else
 CFLAGS			= -O3
 endif
@@ -41,18 +41,18 @@ INCS			= -I. -I$(HOME)/Linux-$(ARCH)/include \
 LIBS			= -L. -L$(HOME)/Linux-$(ARCH)/lib \
 				-L${LINUXVME_LIB} \
 				-L${CODA}/${MACHINE}/lib \
-				-lrt -lpthread -ljvme $(ROLLIBS)
+				-lrt -lpthread $(ROLLIBS)
 
 # DEFs for compiling CODA readout lists
 CCRL			= ${CODA_BIN}/ccrl
 CODA_INCS		= -I.  -I${LINUXVME_INC} -I${CODA}/common/include
 CODA_LIBDIRS            = -L. -L${LINUXVME_LIB} -L${CODA}/${MACHINE}/lib
-CODA_LIBS		= -ljvme
+CODA_LIBS		=
 CODA_DEFS		= -DLINUX -DDAYTIME=$(COMPILE_TIME)
 CODA_CFLAGS		= -O -w -fpic -shared ${CODA_INCS} ${CODA_LIBDIRS} \
 			  ${CODA_LIBS} ${CODA_DEFS}
 ifdef DEBUG
-CODA_CFLAGS		+= -Wall -g
+CODA_CFLAGS		+= -Wall -Wno-unused -g
 endif
 CRLFILES		= $(wildcard *.crl)
 CFILES			= $(CRLFILES:.crl=.c)
@@ -81,8 +81,12 @@ crl: $(SOBJS)
 	$(Q)$(CC) -fpic -shared  $(CFLAGS) $(INCS) $(LIBS) \
 		-DINIT_NAME=$(@:.so=__init) -DINIT_NAME_POLL=$(@:.so=__poll) -o $@ $<
 
+%.o: %.c
+	@echo " CC     $@"
+	$(Q)$(CC) $(CFLAGS) $(INCS) -c -o $@ $<
+
 clean distclean:
-	$(Q)rm -f  $(VMEROL) $(SOBJS) $(CFILES) *~ $(DEPS)
+	$(Q)rm -f  $(VMEROL) $(SOBJS) $(CFILES) *~ $(DEPS) vtp_mpdro_list.o
 
 %.d: %.c
 	@echo " DEP    $@"
@@ -91,6 +95,6 @@ clean distclean:
 	sed 's,\($*\)\.o[ :]*,\1.so $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 
--include $(DEPS)
+#-include $(DEPS)
 
 .PHONY: clean distclean

@@ -6,12 +6,13 @@
  *     To be used with the vtp HW ROC readout list
  *
  */
-
+#define VTP
 #include <unistd.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "vtp.h"
 #include "mpdLib.h"
 #include "mpdConfig.h"
 #include "vtpMpdConfig.h"
@@ -22,6 +23,7 @@ extern pthread_mutex_t   vtpMutex;
 #define VUNLOCK   if(pthread_mutex_unlock(&vtpMutex)<0) perror("pthread_mutex_unlock");
 extern volatile ZYNC_REGS *vtp;
 
+extern void daLogMsg(char *severity, char *fmt,...);
 /*
   Global to configure pedestal subtraction mode
       0 : subtraction mode DISABLED
@@ -36,7 +38,6 @@ int last_soft_err_cnt[32];
 
 /* vtp defs */
 /* extern int vtpSoftReset(int id); */
-extern int vtpMpdGetSoftErrorCount(int id, int fiber);
 
 /*MPD Definitions*/
 extern uint32_t mpdRead32(volatile uint32_t * reg);
@@ -77,7 +78,7 @@ vtpMpdDalogStatus(unsigned int fmask)
   MPDFIBER_REGS *mr;
   int impd=0;
 
-  mr = (MPD_regs *)malloc(32*sizeof(MPD_regs));
+  mr = (MPDFIBER_REGS *)malloc(32*sizeof(MPDFIBER_REGS));
   printf("fmask = 0x%08x\n", fmask);
 
   for(impd=0; impd<32; impd++)
@@ -157,6 +158,7 @@ vtpMpdDalogStatus(unsigned int fmask)
   return OK;
 }
 
+#ifdef MPD_EB_NOT_SUPPORTED
 int
 vtpDalogEbStatus()
 {
@@ -171,6 +173,7 @@ vtpDalogEbStatus()
 
   return(0);
 }
+#endif
 
 void
 vtpPrintMPD_OB_STATUS(int dalogFlag)
@@ -351,14 +354,14 @@ void vtp_mpd_setup()
 
   vtpMpdEbSetFlags(build_all_samples, build_debug_headers, enable_cm);
 
-  vtpSetBlockLevel(BLOCKLEVEL);
-
   //char* mpdSlot[10],apvId[10],cModeMin[10],cModeMax[10];
-  int mpdSlot, apvId, cModeMin, cModeMax;
+  int apvId, cModeMin, cModeMax;
   int fiberID = -1, last_mpdSlot = -1;
+#ifdef COMMON_MODE_SUPPORTED
   //FILE *fcommon   = fopen("/home/sbs-onl/cfg/CommonModeRange.txt","r");
   //FILE *fcommon   = NULL;
   FILE *fcommon   = fopen("/home/sbs-onl/cfg/CommonModeRange_986.txt","r");
+#endif
 
   //valid pedestal file => will load APV offset file and subtract from APV samples
   //NULL => will load 0's for all APV offsets
@@ -399,7 +402,7 @@ void vtp_mpd_setup()
       {
 	getline(&line_ptr, &line_len, fpedestal);
 
-	n = sscanf(line_ptr, "%10s %d %d %d", buf, &i2, &i3);
+	n = sscanf(line_ptr, "%10s %d %d", buf, &i2, &i3);
 	if( (n == 4) && !strcmp("APV", buf))
           {
             fiberID = i2;
@@ -418,6 +421,7 @@ void vtp_mpd_setup()
     fclose(fpedestal);
   }
 
+#ifdef COMMON_MODE_SUPPORTED
   // Load common-mode file settings
   if(fcommon==NULL){
     printf("no commonMode file\n");
@@ -434,10 +438,10 @@ void vtp_mpd_setup()
     }
     fclose(fcommon);
   }
+#endif
 
-
-  vtpMigReset(1);
-  vtpMigReset(0);
+  vtpRocMigReset(1);
+  vtpRocMigReset(0);
   //  vtpPrintMigStatus(0);
 
   vtpMpdPrintStatus(0);
@@ -455,7 +459,7 @@ void vtp_mpd_setup()
   // In VTP mode, par1(fiber mask) and par3(number of mpds) are not used in mpdInit(par1, par2, par3, par4)
   // Instead, they come from the configuration file
   mpdInit(0, 0, 0,
-	  MPD_INIT_VTP_MODE | MPD_INIT_NO_CONFIG_FILE_CHECK);
+	  MPD_INIT_FIBER_MODE | MPD_INIT_NO_CONFIG_FILE_CHECK);
   fnMPD = mpdGetNumberMPD();
 
 
@@ -681,7 +685,7 @@ rocDownload()
 {
   printf("%s: Build date/time %s/%s\n", __func__, __DATE__, __TIME__);
 
-
+#ifdef PEDSUB_USRSTRING
   /* Check usrString for pedestal subtraction mode */
   if(strcmp("PedSub",rol->usrString) == 0)
     {
@@ -691,7 +695,7 @@ rocDownload()
     {
       vtpSetPedSubtractionMode(0);
     }
-
+#endif
 
   apvbuffer = (char *)malloc(1024*50*sizeof(char));
   errorbuffer = (char *)malloc(1024*50*sizeof(char));
@@ -724,10 +728,6 @@ rocGo()
 {
   int UseSdram, FastReadout;
 
-  /* Print out the Run Number and Run Type (config id) */
-  printf("rocGo: Activating Run Number %d, Config id = %d\n",
-	 rol->runNumber,rol->runType);
-
   /* Enable modules, if needed, here */
   daLogMsg("INFO", apvbuffer);
 
@@ -756,14 +756,9 @@ rocGo()
   }
 
 
-  /* Get the current block level */
-  BLOCKLEVEL = tiGetCurrentBlockLevel();
-  printf("%s: Current Block Level = %d\n",
-	 __FUNCTION__,BLOCKLEVEL);
-
   vtpMpdPrintStatus(0);
 
-  vtpMpdDalogStatus(0, mpdGetVTPFiberMask());
+  vtpMpdDalogStatus(mpdGetVTPFiberMask());
   /* Use this info to change block level is all modules */
 
   daLogMsg("INFO","VTP Pedestal Subtraction Mode %s",
@@ -784,8 +779,6 @@ rocEnd()
     mpdTRIG_Disable(mpdSlot(k));
   }
   //mpd close
-
-  printf("rocEnd: Ended after %d blocks\n",tiGetIntCount());
 
 }
 
@@ -817,6 +810,6 @@ vtpSetPedSubtractionMode(int enable)
 
 /*
   Local Variables:
-  compile-command: "make -k -B vtp_mpdro_list.so"
+  compile-command: "make -k -B vtp_mpdro_list.o"
   End:
 */
