@@ -1,3 +1,8 @@
+#ifndef LSWAP
+#include <byteswap.h>
+#define LSWAP(x) bswap_32(x)
+#endif
+
 int
 vtpRocStatus(int flag)
 {
