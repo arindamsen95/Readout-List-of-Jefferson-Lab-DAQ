@@ -58,7 +58,7 @@ rocDownload()
   int stat;
   char buf[1000];
   /* Streaming firmware files for VTP */
-  const char *z7file="fe_vtp_vxs_readout_z7_may14.bin";
+  const char *z7file="fe_vtp_vxs_readout_z7_jun11.bin";
   const char *v7file="fe_vtp_vxs_readout_v7_may4.bin";
 
   firstEvent = 1;
@@ -109,14 +109,21 @@ rocDownload()
 
   firstEvent = 1;
 
-  
+
+
+ /* print some connection info from the ROC */
+  printf(" **Info from ROC Connection Structure**\n");
+  printf("   ROC Type = %s\n", rol->rlinkP->type);
+  printf("   EMU name = %s\n", rol->rlinkP->name);
+  printf("   EMU IP   = %s\n", rol->rlinkP->net);
+  printf("   EMU port = %d\n", rol->rlinkP->port);
 
   /* Configure the ROC*/
-  *(rol->async_roc) = 1;
+  *(rol->async_roc) = 1;  // don't send Control events to the EB
   vtpRocReset(0);
   printf(" Set ROC ID = %d \n",ROCID);
   vtpRocSetID(ROCID);
-  emuData[4] = ROCID;  /* define ROCID for the EB Connection as well*/
+  emuData[4] = ROCID;  /* define ROCID in the EB Connection data as well*/
   vtpRocStatus(0);
 
 }
@@ -127,7 +134,8 @@ rocDownload()
 void
 rocPrestart()
 {
-  int ii;
+
+  unsigned int emuip, emuport;
 
   VTPflag = 0;
 
@@ -141,6 +149,10 @@ rocPrestart()
   if(rol->usrConfig)
     vtpConfig(rol->usrConfig);
 
+  /* Get EB connection info to program the VTP TCP stack */
+  emuip = vtpRoc_inet_addr(rol->rlinkP->net);
+  emuport = rol->rlinkP->port;
+  printf(" EMU IP = 0x%08x  Port= %d\n",emuip, emuport);
 
   /* Reset the ROC */
   vtpRocReset(0);
@@ -149,7 +161,7 @@ rocPrestart()
   vtpTiLinkInit();
 
 
-   /* Get Stream connection info from file. Then Setup the VTP connection registers manually and connect */
+   /* Setup the VTP 10Gig network registers manually and connect */
   {
     unsigned char ipaddr[4];
     unsigned char subnet[4];
@@ -162,21 +174,10 @@ rocPrestart()
     ipaddr[0]=129; ipaddr[1]=57; ipaddr[2]=109; ipaddr[3]=124;
     // Subnet mask
     subnet[0]=255; subnet[1]=255; subnet[2]=255; subnet[3]=0;
-    // gateway
+    // Gateway
     gateway[0]=129; gateway[1]=57; gateway[2]=109; gateway[3]=1;
     // VTP MAC
     mac[0]=0xce; mac[1]=0xba; mac[2]=0xf0; mac[3]=0x03; mac[4]=0x00; mac[5]=0xa8;
-    // Destination IP
-    destip[0]=129; destip[1]=57; destip[2]=109; destip[3]=231;
-    // Desination Port
-    destipport = 46101;
-
-    printf(" ipaddr=%d.%d.%d.%d\n",ipaddr[0],ipaddr[1],ipaddr[2],ipaddr[3]);
-    printf(" subnet=%d.%d.%d.%d\n",subnet[0],subnet[1],subnet[2],subnet[3]);
-    printf(" gateway=%d.%d.%d.%d\n",gateway[0],gateway[1],gateway[2],gateway[3]);
-    printf(" mac=%02x:%02x:%02x:%02x:%02x:%02x\n",mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
-    printf(" destip=%d.%d.%d.%d\n",destip[0],destip[1],destip[2],destip[3]);
-    printf(" destipport=%d\n",destipport);
 
       /* Set VTP connection registers */
       vtpRocSetTcpCfg(
@@ -184,8 +185,8 @@ rocPrestart()
           subnet,
           gateway,
           mac,
-          destip,
-          destipport
+          emuip,
+          emuport
       );
 
       /*Read it back to to make sure */
@@ -207,24 +208,19 @@ rocPrestart()
 
 
       /* Make the Connection . Pass Data needed to complete connection with the EMU */
-       /*
-	 for (ii=0;ii<8;ii++) {
-	 emuData[ii] = htonl(emuData[ii]);
-	 }
-       */
        vtpRocTcpConnect(1,emuData,8);
        //vtpRocTcpConnect(1,0,0);
   }
 
-  
+
   /* Reset and Configure the MIG and ROC Event Builder */
   vtpRocMigReset();
-  
+
   vtpRocEbStop();
   vtpRocEbConfig(0x010005,0x010002,0x010003,0x1004);
-  
+
   vtpRocEbioReset();
-  
+
 
   /* Set TI readout to Hardware mode */
   vtpTiLinkSetMode(1);
@@ -233,6 +229,9 @@ rocPrestart()
   vtpRocEnable(0x5);
 
   vtpRocEbStart();
+
+  /* Print Run Number and Run Type */
+  printf(" Run Number = %d, Run Type = %d \n",rol->runNumber,rol->runType);
 
   /*Send Prestart Event*/
   vtpRocEvioWriteControl(0xffd1,rol->runNumber,rol->runType);
@@ -300,12 +299,17 @@ rocGo()
 void
 rocEnd()
 {
+  unsigned int ntrig;
+  unsigned long long nlongs;
+
   VTPflag = 0;
   CDODISABLE(VTP, 1, 0);
 
-  /* Get total event information and set the counter */
-  *(rol->nevents) = vtpRocGetTrigCnt();
-  *(rol->last_event) = vtpRocGetTrigCnt();
+  /* Get total event information and set the Software ROC counters */
+  ntrig = vtpRocGetTriggerCnt();
+  *(rol->nevents) = ntrig;
+  *(rol->last_event) = ntrig;
+
 
   /*Send End Event*/
   vtpRocEvioWriteControl(0xffd4,rol->runNumber,*(rol->nevents));
@@ -319,6 +323,13 @@ rocEnd()
 
   /* Disconnect the socket */
   vtpRocTcpConnect(0,0,0);
+
+
+  /* Print final Stats */
+  nlongs = vtpRocGetNlongs();
+  *(rol->totalwds) = nlongs;
+  printf(" TOTAL Triggers = %d   Nlongs = %llu\n",ntrig, nlongs);
+
 }
 
 /**
@@ -331,7 +342,7 @@ rocTrigger(int EVTYPE)
 /* Right now this is a dummy routine as the trigger and readout is
    running in the FPGAs. In principle however the ROC can poll on
    some parameter which will allow it to enter this routine and the
-   User can insert an asynchonous event into the data stream. 
+   User can insert an asynchonous event into the data stream.
 
    Also the ROC can reqire that every trigger is managed by this routine.
    Esentially, one can force the FPGA to get an acknowledge of the trigger
@@ -360,11 +371,13 @@ rocReset()
 {
 
   /* Disconnect the socket */
-  vtpRocTcpConnect(0,0,0);  
+  vtpRocTcpConnect(0,0,0);
 
 #ifdef USE_DMA
   vtpDmaMemClose();
 #endif
+
+  /* Close the VTP Library */
   vtpClose(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
 }
 
