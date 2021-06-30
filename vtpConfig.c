@@ -127,6 +127,7 @@ vtpConfig(char *fname)
 {
   int res;
 
+  /* Do this call outside of this routine for testing - DJA*/
   //vtpInitGlobals();
 
   /* reading and parsing config file */
@@ -453,6 +454,25 @@ vtpInitGlobals()
   vtpConf.fadc_streaming.eb[1].destip[3] = 0;
   vtpConf.fadc_streaming.eb[1].destipport = 0;
 
+  // VTP ROC Configuration
+  vtpConf.vtp_roc.roc_id = 0;
+  vtpConf.vtp_roc.destip = 0;
+  vtpConf.vtp_roc.destipport = 0;
+  vtpConf.vtp_roc.nwords = 0;
+  for(i=0;i<20;i++)
+    vtpConf.vtp_roc.ebdata[i] = 0;
+  vtpConf.vtp_roc.eb.connect = 0;
+  vtpConf.vtp_roc.eb.ipaddr = 0;
+  vtpConf.vtp_roc.eb.subnet = 0;
+  vtpConf.vtp_roc.eb.gateway = 0;
+  vtpConf.vtp_roc.eb.mac[0] = 0;
+  vtpConf.vtp_roc.eb.mac[1] = 0;
+  vtpConf.vtp_roc.eb.mac[2] = 0;
+  vtpConf.vtp_roc.eb.mac[3] = 0;
+  vtpConf.vtp_roc.eb.mac[4] = 0;
+  vtpConf.vtp_roc.eb.mac[5] = 0;
+
+
   // Compton Configuration
   vtpConf.compton.trig.latency = 1000;
   vtpConf.compton.trig.width = 100;
@@ -489,7 +509,7 @@ vtpReadConfigFile(char *filename_in)
   char *envDir;
   int do_parsing;
 
-  gethostname(host,ROCLEN);  /* obtain our hostname */
+  gethostname(host,ROCLEN);  /* obtain our hostname - and drop any domain extension */
   for(jj=0; jj<strlen(host); jj++)
     {
       if(host[jj] == '.')
@@ -624,6 +644,8 @@ vtpReadConfigFile(char *filename_in)
 		  continue;
 		}
 
+	      /* If the ROC_name does not match the hostname or the string "all" then do not parse
+                 any more of the file. Just read through to the end of the file */
 	      if(!active)
 		continue;
 
@@ -1584,6 +1606,9 @@ vtpReadConfigFile(char *filename_in)
 
 		  vtpConf.hps.trig.prescale[argi[0]] = argi[1];
 		}
+
+
+	      // FADC STREAMING PARAMETERS
         else if(!strcmp(keyword,"VTP_STREAMING_ROCID"))
         {
           sscanf (str_tmp, "%*s %d", &argi[0]);
@@ -1674,9 +1699,25 @@ vtpReadConfigFile(char *filename_in)
           sscanf (str_tmp, "%*s %d", &argi[0]);
           vtpConf.fadc_streaming.eb[streaming_eb].destipport = argi[0];
         }
+	      // VTP ROC CONFIG PARAMETERS
+        else if(!strcmp(keyword,"VTP_ROC_ROCID"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.vtp_roc.roc_id = argi[0];
+	}
+        else if(!strcmp(keyword,"VTP_ROC_DEST_IP"))
+        {
+          sscanf (str_tmp, "%*s %x", &argi[0]);
+          vtpConf.vtp_roc.destip = argi[0];
+        }
+        else if(!strcmp(keyword,"VTP_ROC_DEST_PORT"))
+        {
+          sscanf (str_tmp, "%*s %d", &argi[0]);
+          vtpConf.vtp_roc.destipport = argi[0];
+        }
 
 
-
+	      // COMPTON CONFIG PARAMETERS
         else if(!strcmp(keyword,"VTP_COMPTON_VETROC_WIDTH"))
 		{
 		  sscanf (str_tmp, "%*s %d", &argi[0]);
@@ -1867,6 +1908,9 @@ vtpDownloadAll()
 
   printf("%s: V7 Chip vtpConfig type = %d\n",
 	 __func__, vtpConf.fw_type[0]);
+  printf("%s: Z7 Chip vtpConfig type = %d\n",
+	 __func__, vtpConf.fw_type[1]);
+
 
   // Set parameters based on firmware type
   vtpSetWindow(vtpConf.window_offset, vtpConf.window_width);
@@ -2158,9 +2202,7 @@ vtpDownloadAll()
     vtpSetGt_width(vtpConf.compton.trig.width);
   }
 
-  if((vtpConf.fw_type[0] == VTP_FW_TYPE_FADCSTREAM) ||
-     (vtpConf.fw_type[0] == VTP_FW_TYPE_MPDRO))
-
+  if((vtpConf.fw_type[0] == VTP_FW_TYPE_FADCSTREAM))
   {
     for(inst=0;inst<2;inst++)
     {
@@ -2196,6 +2238,15 @@ vtpDownloadAll()
 	  */
     }
   }
+
+  // VTP ROC Configuration
+  if((vtpConf.fw_type[0] == VTP_FW_TYPE_VCODAROC)&&(vtpConf.fw_type[1] == ZYNC_FW_TYPE_ZCODAROC))
+    {
+      printf("vtpDownloadAll: Writing VTP ROC Parameters \n");
+      //vtpRocSetID(vtpConf.vtp_roc.roc_id);
+      printf("vtpDownloadAll: ROC ID = %d  Dest IP = 0x%08x  Dest port = %d\n",
+	     vtpConf.vtp_roc.roc_id,vtpConf.vtp_roc.destip,vtpConf.vtp_roc.destipport);
+    }
 
   vtpUploadAllPrint();
 
@@ -2484,8 +2535,7 @@ vtpUploadAll(char *string, int length)
 			   );
       vtpConf.hps.fee_trig.en             = (enable_flags & 0x80000000) ? 1 : 0;
 
-      if((vtpConf.fw_type[0] == VTP_FW_TYPE_FADCSTREAM) ||
-	 (vtpConf.fw_type[0] == VTP_FW_TYPE_MPDRO))
+      if((vtpConf.fw_type[0] == VTP_FW_TYPE_FADCSTREAM))
   {
     for(inst=0;inst<2;inst++)
     {

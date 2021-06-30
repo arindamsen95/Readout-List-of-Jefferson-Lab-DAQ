@@ -97,6 +97,15 @@ typedef struct
   unsigned short destipport;
 } streaming_eb_cfg;
 
+typedef struct
+{
+  unsigned int connect;
+  unsigned int ipaddr;
+  unsigned int subnet;
+  unsigned int gateway;
+  unsigned char mac[6];
+} roc_tcp_cfg;
+
 
 /** VTP configuration parameters **/
 typedef struct {
@@ -112,6 +121,17 @@ typedef struct {
 
   int payload_en;
   int fiber_en;
+
+  struct
+  {
+    int roc_id;
+    unsigned int destip;
+    unsigned int destipport;
+    unsigned int nwords;
+    unsigned int ebdata[20];
+    roc_tcp_cfg eb;
+  } vtp_roc;
+
 
   struct
   {

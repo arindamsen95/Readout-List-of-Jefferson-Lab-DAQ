@@ -50,6 +50,8 @@
 #define VTP_DBGN(x,format, ...) {if(vtpDebugMask&x) {printf("%s: DEBUG%d: ",__FUNCTION__, x); printf(format, ## __VA_ARGS__);fflush(stdout);} }
 
 
+
+/* Old Event Builder Sturcture. replaced by TILINK_REGs structure - dja */
 typedef struct EventBuilder_Struct
 {
   /** 0x0000 */ volatile uint32_t LinkCtrl;
@@ -709,7 +711,8 @@ typedef struct ROC_Struct
   /** 0x002c */ volatile uint32_t CpuAsyncEventLenStatus;
   /** 0x0030 */ BLANK[(0x040-0x030)/4];
   /** 0x0040 */ volatile uint32_t TiTriggerCnt;
-  /** 0x0044 */ BLANK[(0x100-0x044)/4];
+  /** 0x0044 */ volatile uint32_t BytesSent[2];
+  /** 0x004c */ BLANK[(0x100-0x04c)/4];
 } ROC_REGS;
 
 #define VTP_ROC_STATE_TCPFULL   (1<<16);
@@ -995,6 +998,7 @@ typedef struct zync_reg_struct
 #define VTP_INIT_SKIP                (1<<16)
 #define VTP_INIT_SKIP_FIRMWARE_CHECK (1<<18)
 
+/* These are created in the Virtex 7 VHDL files */
 #define VTP_FW_TYPE_COMMON            0
 #define VTP_FW_TYPE_EC                1
 #define VTP_FW_TYPE_GT                2
@@ -1305,10 +1309,13 @@ int vtpStreamingTcpGo();
 int vtpRocStatus(int flag);
 int vtpRocReset(int enflag);
 int vtpRocSetID(int roc_id);
+unsigned int vtpRocGetTriggerCnt();
+unsigned long long vtpRocGetNlongs();
 int vtpRocEnable(int en_mask);
 int vtpRocGetCfg(int *roc_id, int *en_mask);
 int vtpRocGetTcpCfg(unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short *destipport);
-int vtpRocSetTcpCfg(unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short destipport);
+int vtpRocSetTcpCfg(unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned int destipaddr, unsigned int destipport);
+unsigned int vtpRoc_inet_addr(const char *ip4);
 int vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen);
 int vtpRocTcpConnected();
 int vtpRocEvioWriteControl(unsigned int type, unsigned int val0, unsigned int val1);

@@ -3,7 +3,7 @@ vtpRocStatus(int flag)
 {
 
   int  ii, status, fw_version, fw_type, timestamp;
-  unsigned int ctrl, tcp_ctrl, tcp_state, tcp_status, ti[4], rocid, roc[6],
+  unsigned int ctrl, tcp_ctrl, tcp_state, tcp_status, ti[4], rocid, roc[6], totalBytes[2],
     tiTrigCnt, eb_ctrl, eb_status,  ebiotx[2], ebiorx[2], evioBank[3], slot[16], ppState[16];
 
   CHECKINIT;
@@ -40,14 +40,16 @@ vtpRocStatus(int flag)
     ppState[ii] = vtp->v7.rocEB.pp_state[ii];
   }
 
-  rocid      = vtp->roc.rocID;
-  tiTrigCnt  = vtp->roc.TiTriggerCnt;
-  roc[0]     = vtp->roc.Ctrl;
-  roc[1]     = vtp->roc.State;
-  roc[2]     = vtp->roc.CpuSyncEventStatus;
-  roc[3]     = vtp->roc.CpuSyncEventLenStatus;
-  roc[4]     = vtp->roc.CpuAsyncEventStatus;
-  roc[5]     = vtp->roc.CpuAsyncEventLenStatus;
+  rocid         = vtp->roc.rocID;
+  tiTrigCnt     = vtp->roc.TiTriggerCnt;
+  totalBytes[0] = vtp->roc.BytesSent[0];
+  totalBytes[1] = vtp->roc.BytesSent[1];
+  roc[0]        = vtp->roc.Ctrl;
+  roc[1]        = vtp->roc.State;
+  roc[2]        = vtp->roc.CpuSyncEventStatus;
+  roc[3]        = vtp->roc.CpuSyncEventLenStatus;
+  roc[4]        = vtp->roc.CpuAsyncEventStatus;
+  roc[5]        = vtp->roc.CpuAsyncEventLenStatus;
 
   VUNLOCK;
 
@@ -70,7 +72,10 @@ vtpRocStatus(int flag)
   printf("TCP LINK Status:\n");
   printf("    Ctrl            = %08x\n",tcp_ctrl);
   printf("    State           = %08x\n",tcp_state);
-  printf("    Status          = %08x\n",tcp_status);
+  if(tcp_status)
+    printf("    Status          = %08x  (Connected)\n",tcp_status);
+  else
+    printf("    Status          = %08x  (No connection)\n",tcp_status);
 
   printf("\nEBIO (EB->ROC) Link:\n");
   printf("  TX Control : Status: 0x%08X | 0x%08X\n", ebiotx[0],ebiotx[1]);
@@ -78,11 +83,12 @@ vtpRocStatus(int flag)
 
   printf("\n");
   printf("VTP ROC Status (ID = %d):\n",rocid);
-  printf("    TI Trigger Cnt  = %d\n",tiTrigCnt);
   printf("    TI Link  Ctrl   = %08x\n",ti[0]);
   printf("    TI Link  Status = %08x\n",ti[1]);
   printf("    TI Status       = %08x\n",ti[2]);
   printf("    TI (EB Status)  = %08x\n",ti[3]);
+  printf("    Trigger Cnt  = %d\n",tiTrigCnt);
+  printf("    Bytes Sent   = 0x%08x%08x\n",totalBytes[1],totalBytes[0]);
   printf("\n");
 
   printf("    ROC_EB   Ctrl   = %08x\n",eb_ctrl);
@@ -211,16 +217,48 @@ vtpRocSetID(int roc_id)
   return roc_id;
 }
 
+
+/* Return the TI trigger count */
 unsigned int
-vtpRocGetTrigCnt()
+vtpRocGetTriggerCnt()
 {
-  CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+
+  if(vtp==NULL)
+    return(0);
+
+  /* for some reason vtp!=NULL after a library load and unload so this CHECKTYPE
+     generates an error message we do not want to care about */
+  //  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   return(vtp->roc.TiTriggerCnt);
 
 }
 
+/* Return the number of 32bit ints sent. This is a 64 bit counter */
+unsigned long long
+vtpRocGetNlongs()
+{
+  unsigned int bytes[2];
+  unsigned long long total;
+
+  if(vtp==NULL)
+    return(0);
+
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+
+  VLOCK;
+  bytes[0] = vtp->roc.BytesSent[0];
+  bytes[1] = vtp->roc.BytesSent[1];
+  VUNLOCK;
+
+  total = bytes[1];
+  total = (total<<32) + bytes[0] ;
+  /* convert to longs */
+  total = total>>2;
+
+  return(total);
+
+}
 
 int
 vtpRocEnable(int en_mask)
@@ -265,13 +303,19 @@ vtpRocSetTcpCfg(
     unsigned char subnet[4],
     unsigned char gateway[4],
     unsigned char mac[6],
-    unsigned char destipaddr[4],
-    unsigned short destipport
+    unsigned int destipaddr,
+    unsigned int destipport
   )
 {
   int inst=0, link=0;
   CHECKINIT;
   CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+
+  /* Check for valid port range (16 bits) */
+  if(destipport > 0xffff) {
+    printf("%s: ERROR: Destination Port out of range (%d)\n",__func__,destipport);
+    return ERROR;
+  }
 
   VLOCK;
   vtp->tcpClient[inst].IP4_StateRequest = 0;
@@ -280,9 +324,9 @@ vtpRocSetTcpCfg(
   vtp->tcpClient[inst].IP4_GatewayAddr  = (   gateway[0]<<24) | (   gateway[1]<<16) | (   gateway[2]<<8) | (   gateway[3]<<0);
   vtp->tcpClient[inst].MAC_ADDR[1]      =                                             (       mac[0]<<8) | (       mac[1]<<0);
   vtp->tcpClient[inst].MAC_ADDR[0]      = (       mac[2]<<24) | (       mac[3]<<16) | (       mac[4]<<8) | (       mac[5]<<0);
-  vtp->tcpClient[inst].TCP_DEST_ADDR[link] = (destipaddr[0]<<24) | (destipaddr[1]<<16) | (destipaddr[2]<<8) | (destipaddr[3]<<0);
+  vtp->tcpClient[inst].TCP_DEST_ADDR[link] = destipaddr;
   printf("%s: TCP_DEST_ADDR = 0x%08X (link=%d)\n", __func__, vtp->tcpClient[inst].TCP_DEST_ADDR[link], link);
-  vtp->tcpClient[inst].TCP_PORT[link]      = (        10001<<16) | (destipport<<0);
+  vtp->tcpClient[inst].TCP_PORT[link]      = (10001<<16) | destipport;
   VUNLOCK;
 
   return OK;
@@ -332,6 +376,30 @@ vtpRocGetTcpCfg(
 }
 
 
+
+/* Convert a standard IP4 address string (eg "129.57.29.1") into an unsigned integer
+   that can be used for the VTP TCP stack registers */
+unsigned int
+vtpRoc_inet_addr(const char *ip4)
+{
+  unsigned int addr=0;
+
+  CHECKINIT;
+
+  addr = inet_addr(ip4);
+  if (addr == 0xffffffff) {
+    printf("ERROR: No valid IP4 address provided (%s) \n",ip4);
+    return 0;
+  }
+
+  /* must swap for proper VTP endianess */
+  addr = LSWAP(addr);
+
+  return addr;
+}
+
+
+
 int
 vtpRocEvioWriteControl(unsigned int type, unsigned int val0, unsigned int val1)
 {
@@ -347,7 +415,7 @@ vtpRocEvioWriteControl(unsigned int type, unsigned int val0, unsigned int val1)
   rocid = vtp->roc.rocID;
 
   /* cMsg Header */
-  if(type == 0xffd4)
+  if(type == 0xffd4) // End Event
     vtp->roc.CpuAsyncEventData = 3;
   else
     vtp->roc.CpuAsyncEventData = 1;
@@ -602,24 +670,12 @@ vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen)
     if((cdata!=0)&&(dlen!=0)) {
       printf("%s: Sending connection info (%d words)\n",__func__,dlen);
       for(jj=0; jj<dlen; jj++) {
-	printf(" 0x%08x ",cdata[jj]);
+	//printf(" 0x%08x ",cdata[jj]);
 	vtp->roc.CpuAsyncEventData = cdata[jj];
       }
       printf("\n");
       vtp->roc.CpuAsyncEventLen = dlen;
     }
-
-    /*
-    vtp->roc.CpuAsyncEventData = 0x634d736;   // cMsg
-    vtp->roc.CpuAsyncEventData = 0x20697320;  //  is
-    vtp->roc.CpuAsyncEventData = 0x636f6f63;  // cool
-    vtp->roc.CpuAsyncEventData = cMsg_Vers;
-    vtp->roc.CpuAsyncEventData = maxBufSize;
-    vtp->roc.CpuAsyncEventData = 1;           // Total # of sockets
-    vtp->roc.CpuAsyncEventData = 1;           // socket #
-
-    vtp->roc.CpuAsyncEventLen = 7;
-    */
 
 
   }
@@ -635,7 +691,8 @@ vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen)
     }
     */
     vtp->tcpClient[inst].IP4_StateRequest = 0;
-    vtp->tcpClient[inst].Ctrl = 0x03C5;           // tcp: reset: phy, qsfp, tcp
+    usleep(500000);        // We can't reset hardware too soon, or the socket on the EB side might not close cleanly
+    //    vtp->tcpClient[inst].Ctrl = 0x03C5;           // tcp: reset: phy, qsfp, tcp   maybe we dont need to do this
   }
   VUNLOCK;
 
