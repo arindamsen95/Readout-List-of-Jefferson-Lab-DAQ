@@ -16,12 +16,12 @@ ARCH=armv7l
 # Plug in your primary readout lists here..
 VMEROL		= vtp_list.so vtp_mpdro_list.o
 # Add shared library dependencies here.  (jvme already included)
-ROLLIBS		= -lvtp -li2c -lmpd -lconfig
+ROLLIBS		= -li2c -lmpd -lconfig -lvtp
 
 COMPILE_TIME	= \""$(shell date)"\"
 
 LINUXVME_LIB	?= $(CODA)/Linux-$(ARCH)/lib
-LINUXVME_INC	?= $(CODA)/linuxvme/include
+LINUXVME_INC	?= $(CODA_VME)/include
 LINUXVME_BIN	?= $(CODA)/Linux-$(ARCH)/bin
 
 # DEFs for compiling primary readout lists
@@ -37,6 +37,7 @@ CFLAGS			+= -DJLAB -DLINUX -DDAYTIME=$(COMPILE_TIME)
 
 INCS			= -I. -I$(HOME)/Linux-$(ARCH)/include \
 				-isystem${LINUXVME_INC} \
+				-isystem${CODA_VME}/include \
 				-isystem${CODA}/common/include
 LIBS			= -L. -L$(HOME)/Linux-$(ARCH)/lib \
 				-L${LINUXVME_LIB} \

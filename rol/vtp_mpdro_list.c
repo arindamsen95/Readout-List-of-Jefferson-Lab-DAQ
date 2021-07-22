@@ -7,6 +7,7 @@
  *
  */
 #define VTP
+#include <VTP_source.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -298,9 +299,6 @@ vtpPrintMPD_OB_STATUS(int dalogFlag)
       printf("\n");
     }
 }
-
-/* function prototype */
-void rocTrigger(int arg);
 
 void vtp_mpd_setup()
 {
@@ -685,6 +683,80 @@ rocDownload()
 {
   printf("%s: Build date/time %s/%s\n", __func__, __DATE__, __TIME__);
 
+  {
+    int stat;
+    char buf[1000];
+    /* Streaming firmware files for VTP */
+    const char *z7file="fe_vtp_vxs_readout_z7_jun11.bin";
+    const char *v7file="fe_vtp_vxs_readout_v7_may4.bin";
+
+    firstEvent = 1;
+
+    /* Open VTP library */
+    stat = vtpOpen(VTP_FPGA_OPEN | VTP_I2C_OPEN | VTP_SPI_OPEN);
+    if(stat < 0)
+      {
+	printf(" Unable to Open VTP driver library.\n");
+      }
+
+
+    /* Load firmware here */
+    sprintf(buf, "/usr/local/src/vtp/firmware/%s", z7file);
+    if(vtpZ7CfgLoad(buf) != OK)
+      {
+	printf("Z7 programming failed... (%s)\n", buf);
+      }
+
+    sprintf(buf, "/usr/local/src/vtp/firmware/%s", v7file);
+    if(vtpV7CfgLoad(buf) != OK)
+      {
+	printf("V7 programming failed... (%s)\n", buf);
+      }
+
+
+    ltm4676_print_status();
+
+    if(vtpInit(VTP_INIT_CLK_VXS_250))
+      {
+	printf("vtpInit() **FAILED**. User should not continue.\n");
+	return;
+      }
+
+
+
+
+
+    if(vtpDmaMemOpen(2, MAXBUFSIZE * 4) == OK)
+      {
+	printf("%s: VTP Memory allocation successful.\n", __func__);
+      }
+    else
+      {
+	daLogMsg("ERROR","VTP Memory allocation failed");
+	return;
+      }
+
+    firstEvent = 1;
+
+
+
+    /* print some connection info from the ROC */
+    printf(" **Info from ROC Connection Structure**\n");
+    printf("   ROC Type = %s\n", rol->rlinkP->type);
+    printf("   EMU name = %s\n", rol->rlinkP->name);
+    printf("   EMU IP   = %s\n", rol->rlinkP->net);
+    printf("   EMU port = %d\n", rol->rlinkP->port);
+
+    /* Configure the ROC*/
+    *(rol->async_roc) = 1;  // don't send Control events to the EB
+    vtpRocReset(0);
+    printf(" Set ROC ID = %d \n",ROCID);
+    vtpRocSetID(ROCID);
+    emuData[4] = ROCID;  /* define ROCID in the EB Connection data as well*/
+    vtpRocStatus(0);
+  }
+
+
 #ifdef PEDSUB_USRSTRING
   /* Check usrString for pedestal subtraction mode */
   if(strcmp("PedSub",rol->usrString) == 0)
@@ -709,6 +781,110 @@ rocDownload()
 void
 rocPrestart()
 {
+  {
+    unsigned int emuip, emuport;
+
+    VTPflag = 0;
+
+    printf("calling VTP_READ_CONF_FILE ..\n");fflush(stdout);
+
+    printf("%s: rol->usrConfig = %s\n",
+	   __func__, rol->usrConfig);
+
+    /* Read Config file and Intialize VTP */
+    vtpInitGlobals();
+    if(rol->usrConfig)
+      vtpConfig(rol->usrConfig);
+
+    /* Get EB connection info to program the VTP TCP stack */
+    emuip = vtpRoc_inet_addr(rol->rlinkP->net);
+    emuport = rol->rlinkP->port;
+    printf(" EMU IP = 0x%08x  Port= %d\n",emuip, emuport);
+
+    /* Reset the ROC */
+    vtpRocReset(0);
+
+    /* Initialize the TI Interface */
+    vtpTiLinkInit();
+
+
+    /* Setup the VTP 10Gig network registers manually and connect */
+    {
+      unsigned char ipaddr[4];
+      unsigned char subnet[4];
+      unsigned char gateway[4];
+      unsigned char mac[6];
+      unsigned char destip[4];
+      unsigned short destipport;
+
+      // VTP IP Address
+      ipaddr[0]=129; ipaddr[1]=57; ipaddr[2]=109; ipaddr[3]=124;
+      // Subnet mask
+      subnet[0]=255; subnet[1]=255; subnet[2]=255; subnet[3]=0;
+      // Gateway
+      gateway[0]=129; gateway[1]=57; gateway[2]=109; gateway[3]=1;
+      // VTP MAC
+      mac[0]=0xce; mac[1]=0xba; mac[2]=0xf0; mac[3]=0x03; mac[4]=0x00; mac[5]=0xa8;
+
+      /* Set VTP connection registers */
+      vtpRocSetTcpCfg(
+		      ipaddr,
+		      subnet,
+		      gateway,
+		      mac,
+		      emuip,
+		      emuport
+		      );
+
+      /*Read it back to to make sure */
+      vtpRocGetTcpCfg(
+		      ipaddr,
+		      subnet,
+		      gateway,
+		      mac,
+		      destip,
+		      &destipport
+		      );
+      printf(" Readback of TCP CLient Registers:\n");
+      printf("   ipaddr=%d.%d.%d.%d\n",ipaddr[0],ipaddr[1],ipaddr[2],ipaddr[3]);
+      printf("   subnet=%d.%d.%d.%d\n",subnet[0],subnet[1],subnet[2],subnet[3]);
+      printf("   gateway=%d.%d.%d.%d\n",gateway[0],gateway[1],gateway[2],gateway[3]);
+      printf("   mac=%02x:%02x:%02x:%02x:%02x:%02x\n",mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+      printf("   destip=%d.%d.%d.%d\n",destip[0],destip[1],destip[2],destip[3]);
+      printf("   destipport=%d\n",destipport);
+
+
+      /* Make the Connection . Pass Data needed to complete connection with the EMU */
+      vtpRocTcpConnect(1,emuData,8);
+      //vtpRocTcpConnect(1,0,0);
+    }
+
+
+    /* Reset and Configure the MIG and ROC Event Builder */
+    vtpRocMigReset();
+
+    vtpRocEbStop();
+    vtpRocEbConfig(0x010005,0x010002,0x010003,0x1004);
+
+    vtpRocEbioReset();
+
+
+    /* Set TI readout to Hardware mode */
+    vtpTiLinkSetMode(1);
+
+    /* Enable Async&EB Events for ROC   bit2 - Async, bit1 - Sync, bit0 V7-EB */
+    vtpRocEnable(0x5);
+
+    vtpRocEbStart();
+
+    /* Print Run Number and Run Type */
+    printf(" Run Number = %d, Run Type = %d \n",rol->runNumber,rol->runType);
+
+    /*Send Prestart Event*/
+    vtpRocEvioWriteControl(0xffd1,rol->runNumber,rol->runType);
+
+  }
+
   int i;
 
   // Setup in Prestart since TI clock glitches at end of Download()
@@ -721,12 +897,57 @@ rocPrestart()
 }
 
 /****************************************
+ *  PAUSE
+ ****************************************/
+void
+rocPause()
+{
+  VTPflag = 0;
+  CDODISABLE(VTP, 1, 0);
+}
+
+/****************************************
  *  GO
  ****************************************/
 void
 rocGo()
 {
   int UseSdram, FastReadout;
+
+  {
+    /* Clear TI Link recieve FIFO */
+    vtpTiLinkResetFifo(1);
+
+
+    if(vtpSerdesCheckLinks() == ERROR)
+      {
+	printf("ERROR: VTP Serdes links not up");
+      }
+
+    printf("Calling vtpSerdesStatusAll()\n");
+    vtpSerdesStatusAll();
+
+    /* Start the ROC Event Builder */
+    vtpRocEbStart();
+
+    /*
+      blklevel = vtpTiLinkGetBlockLevel(0);
+      printf("Block level read from TI: %d\n", blklevel);
+    */
+    printf("Setting VTP block level to: %d\n", blklevel);
+    vtpSetBlockLevel(blklevel);
+
+
+
+    /*Send Go Event*/
+    vtpRocEvioWriteControl(0xffd2,0,*(rol->nevents));
+
+
+    /* Enable to recieve Triggers */
+    CDOENABLE(VTP, 1, 0);
+    VTPflag = 0;
+
+  }
 
   /* Enable modules, if needed, here */
   daLogMsg("INFO", apvbuffer);
@@ -772,7 +993,39 @@ rocGo()
 void
 rocEnd()
 {
+  {
+    unsigned int ntrig;
+    unsigned long long nlongs;
 
+    VTPflag = 0;
+    CDODISABLE(VTP, 1, 0);
+
+    /* Get total event information and set the Software ROC counters */
+    ntrig = vtpRocGetTriggerCnt();
+    *(rol->nevents) = ntrig;
+    *(rol->last_event) = ntrig;
+
+
+    /*Send End Event*/
+    vtpRocEvioWriteControl(0xffd4,rol->runNumber,*(rol->nevents));
+
+
+    /* Disable the ROC EB */
+    vtpRocEbStop();
+
+
+    vtpRocStatus(0);
+
+    /* Disconnect the socket */
+    vtpRocTcpConnect(0,0,0);
+
+
+    /* Print final Stats */
+    nlongs = vtpRocGetNlongs();
+    *(rol->totalwds) = nlongs;
+    printf(" TOTAL Triggers = %d   Nlongs = %llu\n",ntrig, nlongs);
+
+  }
   //mpd close
   int k;
   for (k=0;k<fnMPD;k++) { // only active mpd set
@@ -781,6 +1034,30 @@ rocEnd()
   //mpd close
 
 }
+
+/* function hastily added to get all symbols loaded */
+void rocTrigger(int arg) {};
+
+void
+rocTrigger_done()
+{
+  CDOACK(VTP, 0, 0);
+}
+
+void
+rocReset()
+{
+
+  /* Disconnect the socket */
+  vtpRocTcpConnect(0,0,0);
+
+#ifdef USE_DMA
+  vtpDmaMemClose();
+#endif
+
+  /* Close the VTP Library */
+  vtpClose(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
+};
 
 
 
@@ -810,6 +1087,6 @@ vtpSetPedSubtractionMode(int enable)
 
 /*
   Local Variables:
-  compile-command: "make -k -B vtp_mpdro_list.o"
+  compile-command: "make -k -B vtp_mpdro_list.so"
   End:
 */
