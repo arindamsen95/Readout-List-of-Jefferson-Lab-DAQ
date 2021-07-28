@@ -1056,6 +1056,7 @@ int
 vtpSerdesCheckLinks()
 {
   uint32_t i, status, ctrl, pass, tries;
+  int chmask=0;
   CHECKINIT;
 
   for(tries=0; tries<VTP_SERDES_MAX_TRIES; tries++)
@@ -1088,7 +1089,9 @@ vtpSerdesCheckLinks()
             printf(" FB%d", i-15);
 
           pass = 0;
-        }
+        }else{
+	  chmask |= (1<<i);
+	}
       }
     }
 
@@ -1107,7 +1110,7 @@ vtpSerdesCheckLinks()
   if(tries>=VTP_SERDES_MAX_TRIES)
     printf("%s: ERROR - all serdes links not up!\n", __func__);
 
-  return pass;
+  return chmask;
 }
 
 int
@@ -6828,11 +6831,14 @@ vtpTiLinkSetMode(int mode)
 int
 vtpTiLinkGetBlockLevel(int print)
 {
-  int val;
+  int val = 0;
+  unsigned int reg=0;
   CHECKINIT;
 
+  /* Need to do a RMW here t opreserve the Ctrl Register */
   VLOCK;
-  vtp->tiLink.Ctrl = VTP_TI_CTRL_BL_REQ;
+  reg = vtp->tiLink.Ctrl;
+  vtp->tiLink.Ctrl = (reg|VTP_TI_CTRL_BL_REQ);
   VUNLOCK;
 
   usleep(1000);

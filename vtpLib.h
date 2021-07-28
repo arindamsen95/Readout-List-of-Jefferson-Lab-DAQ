@@ -681,6 +681,7 @@ typedef struct TILink_Struct
 #define VTP_TI_LINKRESET_PLL      (1<<1)
 #define VTP_TI_LINKRESET_RX       (1<<0)
 
+#define VTP_TI_CTRL_MODE        (1<<4)
 #define VTP_TI_CTRL_ACK         (1<<1)
 #define VTP_TI_CTRL_BL_REQ      (1<<0)
 
@@ -712,7 +713,15 @@ typedef struct ROC_Struct
   /** 0x0030 */ BLANK[(0x040-0x030)/4];
   /** 0x0040 */ volatile uint32_t TiTriggerCnt;
   /** 0x0044 */ volatile uint32_t BytesSent[2];
-  /** 0x004c */ BLANK[(0x100-0x04c)/4];
+  /** 0x004c */ BLANK[(0x060-0x04c)/4];
+  /** 0x0060 */ volatile uint32_t DDRRecordsUsed;
+  /** 0x0064 */ volatile uint32_t DDRBytesUsed;
+  /** 0x0068 */ volatile uint32_t DDRStart;
+  /** 0x006c */ volatile uint32_t DDREnd;
+  /** 0x0070 */ volatile uint32_t MaxRecordSize;
+  /** 0x0074 */ volatile uint32_t MaxBlocks;
+  /** 0x0078 */ volatile uint32_t RecordTimeout;
+  /** 0x007c */ BLANK[(0x100-0x07c)/4];
 } ROC_REGS;
 
 #define VTP_ROC_STATE_TCPFULL   (1<<16);
@@ -1307,6 +1316,7 @@ int vtpStreamingTcpGo();
 
 // VTP ROC functions
 int vtpRocStatus(int flag);
+int vtpRocConfig(int roc_id, int max_rec_size, int max_blocks, int rec_timeout);
 int vtpRocReset(int enflag);
 int vtpRocSetID(int roc_id);
 unsigned int vtpRocGetTriggerCnt();

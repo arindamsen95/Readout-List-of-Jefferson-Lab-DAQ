@@ -2,13 +2,16 @@
 #include <byteswap.h>
 #define LSWAP(x) bswap_32(x)
 #endif
+/* Simple Acknowledge of Trigger with CPU Synchonous Events are enabled */
+#define VTP_ROC_ACK   vtp->roc.CpuSyncEventLen = 0
+
 
 int
 vtpRocStatus(int flag)
 {
 
   int  ii, status, fw_version, fw_type, timestamp;
-  unsigned int ctrl, tcp_ctrl, tcp_state, tcp_status, ti[4], rocid, roc[6], totalBytes[2],
+  unsigned int ctrl, tcp_ctrl, tcp_state, tcp_status, ti[4], rocid, roc[12], totalBytes[2],
     tiTrigCnt, eb_ctrl, eb_status,  ebiotx[2], ebiorx[2], evioBank[3], slot[16], ppState[16];
 
   CHECKINIT;
@@ -55,6 +58,9 @@ vtpRocStatus(int flag)
   roc[3]        = vtp->roc.CpuSyncEventLenStatus;
   roc[4]        = vtp->roc.CpuAsyncEventStatus;
   roc[5]        = vtp->roc.CpuAsyncEventLenStatus;
+  roc[6]        = vtp->roc.MaxRecordSize;
+  roc[7]        = vtp->roc.MaxBlocks;
+  roc[8]        = vtp->roc.RecordTimeout;
 
   VUNLOCK;
 
@@ -88,12 +94,16 @@ vtpRocStatus(int flag)
 
   printf("\n");
   printf("VTP ROC Status (ID = %d):\n",rocid);
-  printf("    TI Link  Ctrl   = %08x\n",ti[0]);
+  if((ti[0]&VTP_TI_CTRL_MODE))
+    printf("    TI Link  Ctrl   = %08x  (Hardware Mode)\n",ti[0]);
+  else
+    printf("    TI Link  Ctrl   = %08x  (Software Sync Mode)\n",ti[0]);
   printf("    TI Link  Status = %08x\n",ti[1]);
   printf("    TI Status       = %08x\n",ti[2]);
   printf("    TI (EB Status)  = %08x\n",ti[3]);
   printf("    Trigger Cnt  = %d\n",tiTrigCnt);
   printf("    Bytes Sent   = 0x%08x%08x\n",totalBytes[1],totalBytes[0]);
+  printf("    Record Config: Size = %d, Max Blocks = %d, Timeout = %d\n",roc[6],roc[7],roc[8]);
   printf("\n");
 
   printf("    ROC_EB   Ctrl   = %08x\n",eb_ctrl);
@@ -133,6 +143,58 @@ vtpRocStatus(int flag)
 }
 
 
+/* Configure the ROC ID and buffering parameters
+
+     roc_id        : valid IDs are numbers from 0-255
+     max_rec_size  : Record buffer size in bytes.
+                     0 will use default  4194304 (4MB)
+     max_blocks    : max number of blocks allowed before sending a Record (1-128)
+                     0 will use default  32
+     rec_timeout   : clock timeout before sending a record in seconds (1-25)
+                     0 will use default 1
+*/
+
+#define VTP_ROC_TICKS_PER_SEC   78125000    // 12.5ns per tick
+
+int
+vtpRocConfig(int roc_id, int max_rec_size, int max_blocks, int rec_timeout)
+{
+  CHECKINIT;
+  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+
+  VLOCK;
+
+  vtp->roc.rocID = roc_id;
+
+  if(max_rec_size == 0) {
+    vtp->roc.MaxRecordSize = 4193404;
+  }else{
+    vtp->roc.MaxRecordSize = max_rec_size;
+  }
+
+  if(max_blocks == 0) {
+    vtp->roc.MaxBlocks = 32;
+  }else{
+    if(max_blocks > 128)
+      vtp->roc.MaxBlocks = 128;
+    else
+      vtp->roc.MaxBlocks = max_blocks;
+  }
+
+  if(rec_timeout == 0) {
+    vtp->roc.RecordTimeout = VTP_ROC_TICKS_PER_SEC;
+  }else{
+    if(rec_timeout > 25)
+      vtp->roc.RecordTimeout = (VTP_ROC_TICKS_PER_SEC*25);
+    else
+      vtp->roc.RecordTimeout = (VTP_ROC_TICKS_PER_SEC*rec_timeout);
+  }
+
+  VUNLOCK;
+
+  return OK;
+}
+
 
 int
 vtpRocReset(int en_mask)
@@ -140,6 +202,7 @@ vtpRocReset(int en_mask)
   CHECKINIT;
   CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
+  VLOCK;
   vtp->roc.Ctrl = 1; /* Enable Reset */
 
   if(en_mask)
@@ -147,6 +210,7 @@ vtpRocReset(int en_mask)
   else
     vtp->roc.Ctrl = 0;
 
+  VUNLOCK;
 
   return OK;
 }
@@ -197,7 +261,7 @@ int
 vtpRocEnd()
 {
   CHECKINIT;
-  //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   VLOCK;
   vtp->tcpClient[0].IP4_StateRequest = 0;
@@ -223,6 +287,51 @@ vtpRocSetID(int roc_id)
 }
 
 
+/* Routine to Poll the trigger status for the VTP ROC.  This should be used when
+   the User has enabled Synchronous CPU events in the ROC Ctrl Register. It returns
+   the total number of readout triggers in the queue. This should be no more than
+   the buffer level set by the TS/TI Master */
+
+int
+vtpRocPoll()
+{
+  int ntrig = 0;
+
+  CHECKINIT;
+
+  /* return the number of outstanding triggers */
+  ntrig = ((vtp->roc.CpuSyncEventLenStatus)&0x2ff0000)>>16;
+
+  return ntrig;
+}
+
+
+/* Rotuine to Write a Data Bank to the ROC Synchonous Event Fifo. This Bank MUST
+   be properly formated with the correct Bank length or it will hang the ROC. */
+void
+vtpRocWriteBank( unsigned int *bank, int blen)
+{
+  int ii;
+
+  VLOCK;
+  if(blen == 0) {  /* Just write 0 to the Len fifo to Acknowledge the trigger */
+    VTP_ROC_ACK;
+  }else{
+    if(bank != NULL) {
+      for(ii=0;ii<blen;ii++) {                 // Write data into FIFO
+	vtp->roc.CpuSyncEventData = bank[ii];
+      }
+      vtp->roc.CpuSyncEventLen = blen;         // Write the Length to acknowledge
+    }
+  }
+
+  VUNLOCK;
+
+  return;
+}
+
+
+
 /* Return the TI trigger count */
 unsigned int
 vtpRocGetTriggerCnt()
@@ -231,7 +340,7 @@ vtpRocGetTriggerCnt()
   if(vtp==NULL)
     return(0);
 
-  /* for some reason vtp!=NULL after a library load and unload so this CHECKTYPE
+  /* for some reason vtp!=NULL after a library load and unload so this //CHECKTYPE
      generates an error message we do not want to care about */
   //  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
@@ -249,7 +358,7 @@ vtpRocGetNlongs()
   if(vtp==NULL)
     return(0);
 
-  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   VLOCK;
   bytes[0] = vtp->roc.BytesSent[0];
@@ -265,6 +374,13 @@ vtpRocGetNlongs()
 
 }
 
+
+/* vtpRocEnable defines available data sources for the ROC
+   to collect data from to send in an event. These include
+   Vertex 7 payload slot EB                  (bit 8)
+   Synchronous Data from the software ROC    (bit 9)
+   Asynchonous Data from the software ROC    (bit 10)
+*/
 int
 vtpRocEnable(int en_mask)
 {
@@ -483,12 +599,15 @@ vtpRocEbStop()
   CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   VLOCK;
-  vtp->v7.rocEB.Ctrl = 1;
+  vtp->v7.rocEB.Ctrl = 1;   /* Set Reset bit but do not clear it */
   VUNLOCK;
 
   return OK;
 }
 
+
+/* Readout List build config routine. Up to 3 available Banks can accept data from
+   16 payload slots. Bank0,Bank1,Bank2 correspond to value 1,2,3 in the pp_cfg[slot] registers */
 int
 vtpRocEbConfig(unsigned int bank0, unsigned int bank1, unsigned int bank2, int slot_mask)
 {
@@ -497,15 +616,30 @@ vtpRocEbConfig(unsigned int bank0, unsigned int bank1, unsigned int bank2, int s
   CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   VLOCK;
-  vtp->v7.rocEB.evio_cfg[0] = bank0&0xffffff;
-  vtp->v7.rocEB.evio_cfg[1] = bank1&0xffffff;
-  vtp->v7.rocEB.evio_cfg[2] = bank2&0xffffff;
-
-  /* Setup default Slot configuration - all available modules build to bank0) */
-  for(ii=0;ii<16;ii++) {
-    if(slot_mask&(1<<ii)) vtp->v7.rocEB.pp_cfg[ii] = 1;
+  /* Check that EB is stopped (reset bit enabled) */
+  if(((vtp->v7.rocEB.Ctrl)&1) == 0) {
+    printf("%s: ERROR: EB is enabled (call vtpRocEbStop() first)\n", __func__);
+    VUNLOCK;
+    return ERROR;
   }
 
+
+  VLOCK;
+  /* Only update registers if the Bank info is set */
+  if(bank0 != 0) vtp->v7.rocEB.evio_cfg[0] = bank0&0xffffff;
+  if(bank1 != 0) vtp->v7.rocEB.evio_cfg[1] = bank1&0xffffff;
+  if(bank2 != 0) vtp->v7.rocEB.evio_cfg[2] = bank2&0xffffff;
+
+  /* Setup default Slot configuration - all available payload modules build to bank0 for now) */
+  if (slot_mask != 0) {
+    for(ii=0;ii<16;ii++) {
+      if(slot_mask&(1<<ii))
+	vtp->v7.rocEB.pp_cfg[ii] = 1;
+      else
+	vtp->v7.rocEB.pp_cfg[ii] = 0;  /* clear any old programming */
+
+    }
+  }
 
   VUNLOCK;
 
@@ -527,7 +661,7 @@ vtpRocMigReset()
   usleep(10000);
   vtp->v7.mig[0].Ctrl = 0x2;                 // Assert FIFO_RST
   usleep(10000);
-  vtp->v7.mig[0].Ctrl = 0x0;
+  vtp->v7.mig[0].Ctrl = 0x0;         // Release all Resets
   usleep(10000);
   VUNLOCK;
 
