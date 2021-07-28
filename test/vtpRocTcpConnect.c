@@ -48,6 +48,8 @@ coda_download()
       printf("V7 programming failed... (%s)\n", buf);
     }
 
+  ltm4676_print_status();
+
   if(vtpInit(VTP_INIT_CLK_VXS_250))
   {
     printf("vtpInit() **FAILED**. User should not continue.\n");
@@ -57,7 +59,7 @@ coda_download()
 
   /* Configure the ROC*/
   vtpRocReset(0);
-  vtpRocSetID(ROCID);
+  vtpRocConfig(ROCID, 0, 8, 0);  /* Use defaults for other parameters MaxRecSize, Max#Blocks, timeout*/
   vtpRocStatus(0);
 
 }
@@ -67,8 +69,6 @@ coda_prestart()
 {
   /* Read Config file and Intialize VTP */
   vtpInitGlobals();
-  vtpConfig("/daqfs/coda/3.10_devel/src/vtp/vtp_readout/config/vtpRocTriggered.cnf");
-
 
   /* Reset the ROC */
   vtpRocReset(0);
@@ -89,19 +89,17 @@ coda_prestart()
     uint16_t destipport2;
 
     // VTP IP Address
-    ipaddr[0]=129; ipaddr[1]=57; ipaddr[2]=109; ipaddr[3]=124;
-    /* ipaddr[0]=129; ipaddr[1]=57; ipaddr[2]=109; ipaddr[3]=128; */
+    ipaddr[0]=129; ipaddr[1]=57; ipaddr[2]=109; ipaddr[3]=128;
     // Subnet mask
     subnet[0]=255; subnet[1]=255; subnet[2]=255; subnet[3]=0;
     // gateway
     gateway[0]=129; gateway[1]=57; gateway[2]=109; gateway[3]=1;
     // VTP MAC
-    mac[0]=0xce; mac[1]=0xba; mac[2]=0xf0; mac[3]=0x03; mac[4]=0x00; mac[5]=0xa8;
-    /* mac[0]=0xce; mac[1]=0xba; mac[2]=0xf0; mac[3]=0x03; mac[4]=0x00; mac[5]=0xfa; */
+    mac[0]=0xce; mac[1]=0xba; mac[2]=0xf0; mac[3]=0x03; mac[4]=0x00; mac[5]=0xfa;
     // Destination IP
     destip = 0x81396DA2;
     // Desination Port
-    destipport = 46101;
+    destipport = 6006;
 
     printf(" ipaddr=%d.%d.%d.%d\n",ipaddr[0],ipaddr[1],ipaddr[2],ipaddr[3]);
     printf(" subnet=%d.%d.%d.%d\n",subnet[0],subnet[1],subnet[2],subnet[3]);
@@ -141,21 +139,15 @@ coda_prestart()
        uint32_t emuData[] = {0x634d7367,0x20697320,0x636f6f6c,6,0,4196352,1,1};
        emuData[4] = ROCID;
 
-       /* Make the Connection . Pass Data needed to complete connection with the EMU */
-       /*
-	 for (ii=0;ii<8;ii++) {
-	 emuData[ii] = htonl(emuData[ii]);
-	 }
-       */
        vtpRocTcpConnect(1,emuData,8);
-       //vtpRocTcpConnect(1,0,0);
   }
 
   /* Reset and Configure the MIG and ROC Event Builder */
   vtpRocMigReset();
 
+  int32_t ppmask = 0;  //(payload ports(vme slot) 3(9), 6(15), 12(18), 13(4))
   vtpRocEbStop();
-  vtpRocEbConfig(0x010005,0x010002,0x010003,0x1004);
+  vtpRocEbConfig(0x010005,0x010002,0x010003,ppmask);
 
   vtpRocEbioReset();
 
@@ -166,12 +158,41 @@ coda_prestart()
   /* Enable Async&EB Events for ROC   bit2 - Async, bit1 - Sync, bit0 V7-EB */
   vtpRocEnable(0x5);
 
-  vtpRocEbStart();
+  /* vtpRocEbStart(); */
 
   /*Send Prestart Event*/
   vtpRocEvioWriteControl(0xffd1,1234,5);
 
   vtpRocStatus(0);
+}
+
+void
+coda_go()
+{
+  /* Clear TI Link recieve FIFO */
+  vtpTiLinkResetFifo(1);
+
+
+  int32_t chmask = vtpSerdesCheckLinks();
+  printf("VTP Serdes link up mask = 0x%05x\n",chmask);
+
+  printf("Calling vtpSerdesStatusAll()\n");
+  vtpSerdesStatusAll();
+
+  /* Update the ROC EB to readout all available FADC boards */
+  //  vtpRocEbConfig(0,0,0,(chmask&0xffff));
+
+  /* Start the ROC Event Builder */
+  vtpRocEbStart();
+
+  /* Get the current Block Level from the TI */
+  int32_t blklevel = vtpTiLinkGetBlockLevel(0);
+  printf("\nBlock level read from TI Link = %d\n", blklevel);
+
+
+  /*Send Go Event*/
+  vtpRocEvioWriteControl(0xffd2,0,6);
+
 }
 
 void
@@ -189,9 +210,14 @@ main(int argc, char *argv[])
   printf("\n Enter to download\n");
   coda_download();
 
+  sleep(1);
   printf("\n Enter to prestart\n");
   coda_prestart();
 
+  sleep(1);
+  coda_go();
+
+  sleep(1);
   printf("\n Enter to end\n");
   coda_end();
 
