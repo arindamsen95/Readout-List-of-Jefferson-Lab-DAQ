@@ -447,7 +447,8 @@ void vtp_mpd_setup()
 
   // In VTP mode, par1(fiber mask) and par3(number of mpds) are not used in mpdInit(par1, par2, par3, par4)
   // Instead, they come from the configuration file
-  mpdInit(0, 0, 0,
+  unsigned int chanmask = vtpMpdGetChanUpMask();
+  mpdInit(chanmask, 0, 32,
 	  MPD_INIT_FIBER_MODE | MPD_INIT_NO_CONFIG_FILE_CHECK);
   fnMPD = mpdGetNumberMPD();
 
@@ -698,6 +699,7 @@ vtpMpdPrestart()
 {
   // Setup in Prestart since TI clock glitches at end of Download()
   vtp_mpd_setup();
+  mpdGStatus(0);
 
 }
 
@@ -738,6 +740,7 @@ vtpMpdGo()
     mpd_evt[i]=0;
   }
 
+  mpdGStatus(0);
 
   vtpMpdPrintStatus(0);
 
@@ -755,6 +758,8 @@ vtpMpdEnd()
   for (k=0;k<fnMPD;k++) { // only active mpd set
     mpdTRIG_Disable(mpdSlot(k));
   }
+
+  mpdGStatus(0);
 }
 
 void

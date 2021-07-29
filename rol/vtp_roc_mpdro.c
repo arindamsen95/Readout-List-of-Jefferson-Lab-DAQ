@@ -64,7 +64,7 @@ rocDownload()
       printf(" Unable to Open VTP driver library.\n");
     }
 
-
+#ifdef RELOAD_FIRMWARE
   /* Load firmware here */
   sprintf(buf, "/daqfs/daq_setups/vtp-mpdro/firmware/%s", z7file);
   if(vtpZ7CfgLoad(buf) != OK)
@@ -78,6 +78,7 @@ rocDownload()
     {
       printf("V7 programming failed... (%s)\n", buf);
     }
+#endif /* RELOAD_FIRMWARE */
 
 
   /* ltm4676_print_status(); */
@@ -109,6 +110,8 @@ rocDownload()
   emuData[4] = ROCID;  /* define ROCID in the EB Connection data as well*/
   vtpRocStatus(0);
 
+  daLogMsg("INFO","Call vtpMpdDownload");
+  vtpMpdDownload();
 }
 
 /**
@@ -117,6 +120,7 @@ rocDownload()
 void
 rocPrestart()
 {
+
 
   unsigned int emuip, emuport;
   int ppmask=0;
@@ -130,6 +134,11 @@ rocPrestart()
   vtpInitGlobals();
   if(rol->usrConfig)
     vtpConfig(rol->usrConfig);
+  else
+    vtpConfig("/daqfs/daq_setups/vtp-mpdro/cfg/davtp3.config");
+
+  daLogMsg("INFO","Call vtpMpdPrestart");
+  vtpMpdPrestart();
 
   /* Get EB connection info to program the VTP TCP stack */
   emuip = vtpRoc_inet_addr(rol->rlinkP->net);
@@ -205,7 +214,8 @@ rocPrestart()
 
 
   /* Payload port map - defines which slots to readout */
-  ppmask = 0;  //(payload ports(vme slot) 3(9), 6(15), 12(18), 13(4))
+  /* FIXME: need to get this parameter from a common location */
+  ppmask = 0x80;  //(payload ports(vme slot) 3(9), 6(15), 12(18), 13(4))
   vtpRocEbStop();
   vtpRocEbConfig(0x010005,0x010002,0x010003,ppmask);
 
@@ -240,6 +250,7 @@ rocPause()
 {
   VTPflag = 0;
   CDODISABLE(VTP, 1, 0);
+  vtpMpdPause();
 }
 
 /**
@@ -250,15 +261,19 @@ rocGo()
 {
   int chmask = 0;
 
+  daLogMsg("INFO","Call vtpMpdGo");
+  vtpMpdGo();
+
   /* Clear TI Link recieve FIFO */
   vtpTiLinkResetFifo(1);
 
-
+#ifdef DO_SERDES_CHECK
   chmask = vtpSerdesCheckLinks();
   printf("VTP Serdes link up mask = 0x%05x\n",chmask);
 
   printf("Calling vtpSerdesStatusAll()\n");
   vtpSerdesStatusAll();
+#endif
 
   /* Update the ROC EB to readout all available FADC boards */
   //  vtpRocEbConfig(0,0,0,(chmask&0xffff));
@@ -293,6 +308,9 @@ rocEnd()
 
   VTPflag = 0;
   CDODISABLE(VTP, 1, 0);
+
+  daLogMsg("INFO","Call vtpMpdEnd");
+  vtpMpdEnd();
 
   /* Get total event information and set the Software ROC counters */
   ntrig = vtpRocGetTriggerCnt();
@@ -358,7 +376,11 @@ rocTrigger_done()
 void
 rocReset()
 {
+  daLogMsg("INFO","Call vtpMpdReset");
+  vtpMpdReset();
 
+  daLogMsg("INFO","Call vtpMpdCleanup");
+  vtpMpdCleanup();
   /* Disconnect the socket */
   vtpRocTcpConnect(0,0,0);
 
