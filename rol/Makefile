@@ -14,7 +14,7 @@ QUIET	?= 1
 ARCH=armv7l
 
 # Plug in your primary readout lists here..
-VMEROL		= vtp_list.so vtp_mpdro_list.o
+VMEROL		= vtp_roc_mpdro.so
 # Add shared library dependencies here.  (jvme already included)
 ROLLIBS		= -li2c -lmpd -lconfig -lvtp
 
@@ -35,12 +35,10 @@ CFLAGS			= -O3
 endif
 CFLAGS			+= -DJLAB -DLINUX -DDAYTIME=$(COMPILE_TIME)
 
-INCS			= -I. -I$(HOME)/Linux-$(ARCH)/include \
-				-isystem${LINUXVME_INC} \
+INCS			= -I. -isystem${LINUXVME_INC} \
 				-isystem${CODA_VME}/include \
 				-isystem${CODA}/common/include
-LIBS			= -L. -L$(HOME)/Linux-$(ARCH)/lib \
-				-L${LINUXVME_LIB} \
+LIBS			= -L. -L${LINUXVME_LIB} \
 				-L${CODA}/${MACHINE}/lib \
 				-lrt -lpthread $(ROLLIBS)
 
@@ -87,7 +85,7 @@ crl: $(SOBJS)
 	$(Q)$(CC) $(CFLAGS) $(INCS) -c -o $@ $<
 
 clean distclean:
-	$(Q)rm -f  $(VMEROL) $(SOBJS) $(CFILES) *~ $(DEPS) vtp_mpdro_list.o
+	$(Q)rm -f  $(VMEROL) $(SOBJS) $(CFILES) *~ $(DEPS)
 
 %.d: %.c
 	@echo " DEP    $@"
