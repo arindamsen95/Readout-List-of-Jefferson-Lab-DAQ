@@ -1322,6 +1322,56 @@ vtpSerdesSettings(int type, uint16_t idx, int txpre, int txpost, int txswing, in
   return OK;
 }
 
+/* Payload Port configure routine. Pass an array of PP_CONF structures
+
+    port    - Payload slot ID  1-16
+    module  - Module ID:  None=0, FADC250=1, MPD=2, ..., UNKNOWN=15
+    lag     - Link Info:  1-> bonded lanes  0-> 4 independent lanes/modules
+    bank    - Bank Info:  bits0-1   BankID for LANE1 or for a Bonded Link
+      This is used by     bits8-9   BankID for LANE2
+      the ROC Event       bits16-17 BankID for LANE3
+      Builder             bits24-25 BankID for LANE4
+*/
+int
+vtpPayloadConfig(int port, PP_CONF *ppc, int module, unsigned int lag, unsigned int bank)
+{
+  int ii, pp_mask = 0;
+  int mod_mask = 0;
+
+  if((port<1)||(port>16)) {
+    printf("ERROR: %s:  Port ID is out of range (=%d)\n",__func__,port);
+    return ERROR;
+  }else{
+    port = port-1;  // index from 0-15
+  }
+
+  if(bank==0) {   // Not allowed. Must have a least one Bank defined
+    printf("ERROR: %s: Bank Info cannot be 0 \n",__func__);
+    return ERROR;
+  }
+
+  if(lag==0) { // create a module mask for this port using bank info
+    if((bank&0x03)>0)       mod_mask  = 0x0100;
+    if((bank&0x0300)>0)     mod_mask |= 0x0200;
+    if((bank&0x030000)>0)   mod_mask |= 0x0400;
+    if((bank&0x03000000)>0) mod_mask |= 0x0800;
+  }
+
+  ppc[port].module_id = module;
+  ppc[port].laneInfo  = mod_mask|(lag&0xff);
+  ppc[port].bankInfo  = bank;
+
+  /* establish the mask of ports that are currently configured */
+  for (ii=0;ii<16;ii++) {
+    if(ppc[ii].module_id)
+      pp_mask |= (1<<ii);
+  }
+
+  return pp_mask;
+}
+
+
+
 int
 vtpV7PllLocked()
 {
@@ -6792,7 +6842,8 @@ vtpDcSendScalers(char *host)
 
 /* TI LINK Functions */
 
-/* Only used for mode=0 to acknowledge a trigger */
+
+/* vtpTiAck() Only used for mode=0 to acknowledge a trigger */
 int
 vtpTiAck()
 {
@@ -6808,9 +6859,10 @@ vtpTiAck()
 int
 vtpTiLinkSetMode(int mode)
 {
-  /* mode=0 is full software ROC mode. All TI and Event data must be read out by the trigger routine
+  /* mode=0 is full software ROC mode. All TI and Event data must be read out and acknowledged
+            by a software trigger routine
      mode=1 is hardware mode. TI and Event data are sent by FPGAs. The CPU can optionally
-            include a data bank by enabling CPUSyncEvents (ROC Ctrl Register)
+            include a data bank by enabling CPUSyncEvents (in the ROC Ctrl Register)
   */
 
   CHECKINIT;

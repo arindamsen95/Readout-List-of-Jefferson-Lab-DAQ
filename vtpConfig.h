@@ -335,7 +335,7 @@ typedef struct {
     int fadc_threshold[5];
     int eplane_mult_min[5];
     int eplane_mask[5];
-	int fadc_mask[5];
+    int fadc_mask[5];
 
     struct
     {

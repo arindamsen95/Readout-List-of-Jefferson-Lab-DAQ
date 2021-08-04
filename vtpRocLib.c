@@ -10,12 +10,12 @@ int
 vtpRocStatus(int flag)
 {
 
-  int  ii, status, fw_version, fw_type, timestamp;
+  int  ii, jj, status, fw_version, fw_type, timestamp;
   unsigned int ctrl, tcp_ctrl, tcp_state, tcp_status, ti[4], rocid, roc[12], totalBytes[2],
-    tiTrigCnt, eb_ctrl, eb_status,  ebiotx[2], ebiorx[2], evioBank[3], slot[16], ppState[16];
+    tiTrigCnt, eb_ctrl, eb_status,  ebiotx[2], ebiorx[2], evioBank[3], port[16], slot[16], ppState[16];
 
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   VLOCK;
   ctrl       = vtp->clk.Ctrl;
@@ -44,7 +44,7 @@ vtpRocStatus(int flag)
   evioBank[1]  = vtp->v7.rocEB.evio_cfg[1];
   evioBank[2]  = vtp->v7.rocEB.evio_cfg[2];
   for(ii=0;ii<16;ii++) {
-    slot[ii]    = (vtp->v7.rocEB.pp_cfg[ii])&0x3;
+    port[ii]    = (vtp->v7.rocEB.pp_cfg[ii]);
     ppState[ii] = vtp->v7.rocEB.pp_state[ii];
   }
 
@@ -63,6 +63,19 @@ vtpRocStatus(int flag)
   roc[8]        = vtp->roc.RecordTimeout;
 
   VUNLOCK;
+
+  /* Calculate total number of modules/port */
+  for(ii=0;ii<16;ii++) {
+    slot[ii]=0;
+    for(jj=0;jj<4;jj++) {
+      if((port[ii])&(3<<(jj*8))) {
+	slot[ii] += 1;
+	//	printf("debug: port[%d]=0x%08x, slot[%d] = %d\n",(ii+1),port[ii],(ii+1),slot[jj]);
+      }
+    }
+  }
+
+
 
   printf("---------------------------------------\n");
   printf("--VTP (Z7) Statistics                --\n");
@@ -160,7 +173,7 @@ int
 vtpRocConfig(int roc_id, int max_rec_size, int max_blocks, int rec_timeout)
 {
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   VLOCK;
 
@@ -200,7 +213,7 @@ int
 vtpRocReset(int en_mask)
 {
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   VLOCK;
   vtp->roc.Ctrl = 1; /* Enable Reset */
@@ -220,7 +233,7 @@ vtpRocTCPInit(int mask, int ip0, int ip1, int ip2, int ip3, int dst_port)
 {
 
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   VLOCK;
   vtp->clk.Ctrl = 0x7;
@@ -261,7 +274,7 @@ int
 vtpRocEnd()
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   VLOCK;
   vtp->tcpClient[0].IP4_StateRequest = 0;
@@ -274,7 +287,7 @@ int
 vtpRocSetID(int roc_id)
 {
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   VLOCK;
 
@@ -342,7 +355,7 @@ vtpRocGetTriggerCnt()
 
   /* for some reason vtp!=NULL after a library load and unload so this //CHECKTYPE
      generates an error message we do not want to care about */
-  //  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   return(vtp->roc.TiTriggerCnt);
 
@@ -358,7 +371,7 @@ vtpRocGetNlongs()
   if(vtp==NULL)
     return(0);
 
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   VLOCK;
   bytes[0] = vtp->roc.BytesSent[0];
@@ -385,7 +398,7 @@ int
 vtpRocEnable(int en_mask)
 {
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   VLOCK;
 
@@ -404,7 +417,7 @@ vtpRocGetCfg(int *roc_id, int *en_mask)
 {
   uint32_t val;
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   VLOCK;
 
@@ -430,7 +443,7 @@ vtpRocSetTcpCfg(
 {
   int inst=0, link=0;
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   /* Check for valid port range (16 bits) */
   if(destipport > 0xffff) {
@@ -465,7 +478,7 @@ vtpRocGetTcpCfg(
 {
   unsigned int val, inst=0, link=0;
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
 
   VLOCK;
@@ -528,7 +541,7 @@ vtpRocEvioWriteControl(unsigned int type, unsigned int val0, unsigned int val1)
   unsigned int rocid=0;
 
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
 
   VLOCK;
@@ -569,7 +582,7 @@ int
 vtpRocEbReset()
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   VLOCK;
   vtp->v7.rocEB.Ctrl = 1;
@@ -583,7 +596,7 @@ int
 vtpRocEbStart()
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   VLOCK;
   vtp->v7.rocEB.Ctrl = 2;
@@ -596,7 +609,7 @@ int
 vtpRocEbStop()
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   VLOCK;
   vtp->v7.rocEB.Ctrl = 1;   /* Set Reset bit but do not clear it */
@@ -606,14 +619,15 @@ vtpRocEbStop()
 }
 
 
-/* Readout List build config routine. Up to 3 available Banks can accept data from
-   16 payload slots. Bank0,Bank1,Bank2 correspond to value 1,2,3 in the pp_cfg[slot] registers */
+/* Initialize the ROC Eventbuilder Bank Tags and Block Level and clear all the
+   payload port config registers */
+
 int
-vtpRocEbConfig(unsigned int bank0, unsigned int bank1, unsigned int bank2, int slot_mask)
+vtpRocEbInit(unsigned int bank0, unsigned int bank1, unsigned int bank2)
 {
   int ii;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   VLOCK;
   /* Check that EB is stopped (reset bit enabled) */
@@ -623,25 +637,98 @@ vtpRocEbConfig(unsigned int bank0, unsigned int bank1, unsigned int bank2, int s
     return ERROR;
   }
 
+  /* If Bank tag is 0 then define a default Bank0 = 1, Bank1 = 2  and Bank2 = 3*/
 
-  VLOCK;
-  /* Only update registers if the Bank info is set */
-  if(bank0 != 0) vtp->v7.rocEB.evio_cfg[0] = bank0&0xffffff;
-  if(bank1 != 0) vtp->v7.rocEB.evio_cfg[1] = bank1&0xffffff;
-  if(bank2 != 0) vtp->v7.rocEB.evio_cfg[2] = bank2&0xffffff;
+  if(bank0 != 0)
+    vtp->v7.rocEB.evio_cfg[0] = 0x010000 | (bank0&0xffff);
+  else
+    vtp->v7.rocEB.evio_cfg[0] = 0x010001;
 
-  /* Setup default Slot configuration - all available payload modules build to bank0 for now) */
-  if (slot_mask != 0) {
-    for(ii=0;ii<16;ii++) {
-      if(slot_mask&(1<<ii))
-	vtp->v7.rocEB.pp_cfg[ii] = 1;
-      else
-	vtp->v7.rocEB.pp_cfg[ii] = 0;  /* clear any old programming */
+  if(bank1 != 0)
+    vtp->v7.rocEB.evio_cfg[1] = 0x010000 | (bank1&0xffff);
+  else
+    vtp->v7.rocEB.evio_cfg[1] = 0x010002;
 
-    }
+  if(bank2 != 0)
+    vtp->v7.rocEB.evio_cfg[2] = 0x010000 | (bank2&0xffff);
+  else
+    vtp->v7.rocEB.evio_cfg[2] = 0x010003;
+
+
+  /* Clear Slot configuration registers */
+  for(ii=0;ii<16;ii++) {
+      vtp->v7.rocEB.pp_cfg[ii] = 0;
   }
 
   VUNLOCK;
+
+  return OK;
+}
+
+
+ /* Readout List build config routine. Pass the Payload Port Config array to fill in the
+    payload port config registers */
+int
+vtpRocEbConfig(PP_CONF *ppInfo, int blocklevel)
+{
+  int ii, ppmask = 0;
+  unsigned int reg;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+
+  /* Check that EB is stopped (reset bit enabled) */
+  VLOCK;
+  if(((vtp->v7.rocEB.Ctrl)&1) == 0) {
+    printf("%s: ERROR: EB is enabled (call vtpRocEbStop() first)\n", __func__);
+    VUNLOCK;
+    return ERROR;
+  }
+
+
+  /* loop through all the ppInfo elements */
+  for(ii=0;ii<16;ii++) {
+    if(ppInfo[ii].module_id) {
+      vtp->v7.rocEB.pp_cfg[ii] = ppInfo[ii].bankInfo;
+      ppmask |= (1<<ii);
+    }
+  }
+
+  /* If Block level is > 0 then set that info as well for each Bank Config register*/
+  if((blocklevel>0)&&(blocklevel<255)) {
+    reg =  vtp->v7.rocEB.evio_cfg[0];
+    vtp->v7.rocEB.evio_cfg[0] = (blocklevel<<16)|reg;
+    reg =  vtp->v7.rocEB.evio_cfg[1];
+    vtp->v7.rocEB.evio_cfg[1] = (blocklevel<<16)|reg;
+    reg =  vtp->v7.rocEB.evio_cfg[2];
+    vtp->v7.rocEB.evio_cfg[2] = (blocklevel<<16)|reg;
+  }
+
+  VUNLOCK;
+
+  return ppmask;
+}
+
+/* Set the Block level for the ROC EventBuilder */
+int
+vtpRocEbSetBlockLevel(int blocklevel)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+
+  unsigned int reg=0;
+
+  /* If Block level is > 0 then set that info as well for each Bank Config register*/
+  if((blocklevel>0)&&(blocklevel<255)) {
+    reg =  vtp->v7.rocEB.evio_cfg[0];
+    vtp->v7.rocEB.evio_cfg[0] = (blocklevel<<16)|reg;
+    reg =  vtp->v7.rocEB.evio_cfg[1];
+    vtp->v7.rocEB.evio_cfg[1] = (blocklevel<<16)|reg;
+    reg =  vtp->v7.rocEB.evio_cfg[2];
+    vtp->v7.rocEB.evio_cfg[2] = (blocklevel<<16)|reg;
+  }else{
+    return ERROR;
+  }
+
 
   return OK;
 }
@@ -651,7 +738,7 @@ int
 vtpRocMigReset()
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   printf("%s()\n", __func__);
 
@@ -674,7 +761,7 @@ vtpRocQsfpReset(int inst, int reset)
 {
   int val;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   if(inst<0 || inst>1)
   {
@@ -698,7 +785,7 @@ int
 vtpRocSkipTcp(int inst, int skip)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   if(inst<0 || inst>1)
   {
@@ -770,7 +857,7 @@ vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen)
 
 
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
   printf("%s(%d,%d)\n", __func__, inst, connect);
 
@@ -843,7 +930,7 @@ int
 vtpRocTcpGo()
 {
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
 
   /* Nothing to do here yet */
@@ -859,7 +946,7 @@ vtpRocTcpConnected()
   int status=0;
 
   CHECKINIT;
-  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   status = (vtp->tcpClient[0].IP4_TCPStatus)&0xff;
 

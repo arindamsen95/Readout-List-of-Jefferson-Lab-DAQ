@@ -50,8 +50,33 @@
 #define VTP_DBGN(x,format, ...) {if(vtpDebugMask&x) {printf("%s: DEBUG%d: ",__FUNCTION__, x); printf(format, ## __VA_ARGS__);fflush(stdout);} }
 
 
+/* Define a Payload Port Config Structure */
+typedef struct Payload_Port_Config
+{
+  int           module_id;    /* module type plugged in the port (eg None = 0, FADC250 = 1, MPD = 2) */
+  int           laneInfo;     /* lane bonding and link mask for the 4 lanes */
+  unsigned int  bankInfo;     /* EVIO Data bank ID to store data for each lane
+                                 BankID = 1,2 or 3.  LaneID = byte 0,1,2,3  */
+} PP_CONF;
 
-/* Old Event Builder Sturcture. replaced by TILINK_REGs structure - dja */
+#define VTP_PP_MODULE_FADC250   0x1
+#define VTP_PP_MODULE_MPD       0x2
+#define VTP_PP_MODULE_UNKNOWN   0xF
+
+#define VTP_PP_LANE_BONDED      0
+#define VTP_PP_LANE_X4          1
+#define VTP_PP_LANE_MASK  0x10000
+#define VTP_PP_LINK_MASK      0xF
+
+#define VTP_PP_BANKID_MASK     0x30000
+#define VTP_PP_LANE1_MASK         0x03
+#define VTP_PP_LANE2_MASK       0x0300
+#define VTP_PP_LANE3_MASK     0x030000
+#define VTP_PP_LANE4_MASK   0x03000000
+
+
+
+/* Old Event Builder Structure. replaced by TILINK_REGs structure - dja */
 typedef struct EventBuilder_Struct
 {
   /** 0x0000 */ volatile uint32_t LinkCtrl;
@@ -1053,6 +1078,8 @@ int  vtpSerdesEnable(int type, uint16_t idx, int enable);
 int  vtpSerdesStatusAll();
 int  vtpSerdesCheckLinks();
 
+int  vtpPayloadConfig(int port, PP_CONF *ppc, int module, unsigned int lag, unsigned int bank);
+
 int  vtpV7PllReset(int enable);
 int  vtpV7PllLocked();
 
@@ -1332,7 +1359,9 @@ int vtpRocEvioWriteControl(unsigned int type, unsigned int val0, unsigned int va
 int vtpRocEbReset();
 int vtpRocEbStart();
 int vtpRocEbStop();
-int vtpRocEbConfig(unsigned int bank0, unsigned int bank1, unsigned int bank2, int slot_mask);
+int vtpRocEbInit(unsigned int bank0, unsigned int bank1, unsigned int bank2);
+int vtpRocEbConfig(PP_CONF *ppInfo, int blocklevel);
+int vtpRocEbSetBlockLevel(int blocklevel);
 int vtpRocEbioReset();
 int vtpRocMigReset();
 

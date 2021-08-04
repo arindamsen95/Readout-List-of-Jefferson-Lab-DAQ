@@ -29,6 +29,10 @@ unsigned int gDmaBufPhys_TI;
 unsigned int gDmaBufPhys_VTP;
 
 
+/* define an array of Payload port Config Structures */
+PP_CONF ppInfo[16];
+
+
 int blklevel = 1;
 int maxdummywords = 200;
 int vtpComptonEnableScalerReadout = 0;
@@ -96,7 +100,7 @@ rocDownload()
 
 
 
-
+#ifdef USE_DMA
   if(vtpDmaMemOpen(2, MAXBUFSIZE * 4) == OK)
     {
       printf("%s: VTP Memory allocation successful.\n", __func__);
@@ -106,6 +110,7 @@ rocDownload()
       daLogMsg("ERROR","VTP Memory allocation failed");
       return;
     }
+#endif
 
   firstEvent = 1;
 
@@ -122,7 +127,7 @@ rocDownload()
   *(rol->async_roc) = 1;  // don't send Control events to the EB
   vtpRocReset(0);
   printf(" Set ROC ID = %d \n",ROCID);
-  vtpRocSetID(ROCID);
+  vtpRocConfig(ROCID, 0, 2, 0);  /* Use defaults for other parameters MaxRecSize, Max#Blocks, timeout*/
   emuData[4] = ROCID;  /* define ROCID in the EB Connection data as well*/
   vtpRocStatus(0);
 
@@ -136,6 +141,7 @@ rocPrestart()
 {
 
   unsigned int emuip, emuport;
+  int ppmask=0;
 
   VTPflag = 0;
 
@@ -216,9 +222,28 @@ rocPrestart()
   /* Reset and Configure the MIG and ROC Event Builder */
   vtpRocMigReset();
 
-  vtpRocEbStop();
-  vtpRocEbConfig(0x010005,0x010002,0x010003,0x1004);
 
+  /* Program Payload Port information - All FADC boards, bonded lanes, build to bank 1*/
+  vtpPayloadConfig(3,ppInfo,1,1,0x01);
+  vtpPayloadConfig(6,ppInfo,1,1,0x01);
+  vtpPayloadConfig(12,ppInfo,1,1,0x01);
+  vtpPayloadConfig(7,ppInfo,1,1,0x01);
+  vtpPayloadConfig(9,ppInfo,1,1,0x01);
+  ppmask = vtpPayloadConfig(13,ppInfo,1,1,0x01);
+
+  /* Example for payload port 8  hosting 4 MPD boards, building to bank 2 */
+  //  vtpPayloadConfig(8,ppInfo,2,0,0x02020202);
+
+
+  printf("vtpPayloadConfig ppmask = 0x%04x\n",ppmask);
+
+  /* Initialize and program the ROC Event Builder*/
+  vtpRocEbStop();
+  vtpRocEbInit(5,6,7);   // define bank1 tag = 5, bank2 tag = 6, bank3 tag = 7
+  vtpRocEbConfig(ppInfo,0);  // blocklevel=0 will skip setting the block level
+
+
+  /* Reset the data Link between V7 ROC EB and the Zync FPGA ROC */
   vtpRocEbioReset();
 
 
@@ -228,7 +253,6 @@ rocPrestart()
   /* Enable Async&EB Events for ROC   bit2 - Async, bit1 - Sync, bit0 V7-EB */
   vtpRocEnable(0x5);
 
-  vtpRocEbStart();
 
   /* Print Run Number and Run Type */
   printf(" Run Number = %d, Run Type = %d \n",rol->runNumber,rol->runType);
@@ -257,30 +281,29 @@ rocPause()
 void
 rocGo()
 {
+  int chmask = 0;
 
   /* Clear TI Link recieve FIFO */
   vtpTiLinkResetFifo(1);
 
 
-  if(vtpSerdesCheckLinks() == ERROR)
-    {
-      printf("ERROR: VTP Serdes links not up");
-    }
+  chmask = vtpSerdesCheckLinks();
+  printf("VTP Serdes link up mask = 0x%05x\n",chmask);
 
   printf("Calling vtpSerdesStatusAll()\n");
   vtpSerdesStatusAll();
 
+  /* Get the current Block Level from the TI */
+  blklevel = vtpTiLinkGetBlockLevel(0);
+  printf("\nBlock level read from TI Link = %d\n", blklevel);
+
+
+  /* Update the ROC EB blocklevel in the EVIO banks */
+  vtpRocEbSetBlockLevel(blklevel);
+
+
   /* Start the ROC Event Builder */
   vtpRocEbStart();
-
-  /*
-  blklevel = vtpTiLinkGetBlockLevel(0);
-  printf("Block level read from TI: %d\n", blklevel);
-  */
-  printf("Setting VTP block level to: %d\n", blklevel);
-  vtpSetBlockLevel(blklevel);
-
-
 
   /*Send Go Event*/
   vtpRocEvioWriteControl(0xffd2,0,*(rol->nevents));

@@ -13,8 +13,13 @@
 #define POLLING_MODE
 
 #include <rol.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include "remexLib.h"
 #include "vtpLib.h"
 
+int vtpUploadAll(char *string, int length);
 extern int vtpConfig(char *fname);
 extern void vtpInitGlobals();
 
@@ -37,12 +42,14 @@ void rocReset();
 
 static int VTP_handlers, VTPflag;
 static int VTP_isAsync;
-/* static unsigned int VTP_prescale = 1; */
-/* static unsigned int VTP_count = 0; */
+static unsigned int VTP_prescale = 1;
+static unsigned int VTP_count = 0;
 
 static void
 vtptinit(int code)
 {
+  VTP_count = 0;
+  VTP_prescale = 1;
   /* vtpOpen(0xffff); */
 }
 
@@ -61,7 +68,8 @@ vtptdisable(int code, int val)
 static void
 vtptack(int code, unsigned int intMask)
 {
-  vtpTiAck(1); /* argument=1 forces TI to clear sync event flag */
+  if(code == 0)
+    vtpTiAck();
 }
 
 static unsigned int
