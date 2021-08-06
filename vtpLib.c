@@ -842,6 +842,24 @@ vtpCheckAddresses()
 
   base = (unsigned long) &test.eb.LinkCtrl;
 
+  offset = ((unsigned long) &test.roc) - base;
+  expected = 0x8200;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->roc not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
+  offset = ((unsigned long) &test.roc.RecordTimeout) - base;
+  expected = 0x8278;
+  if(offset != expected)
+    {
+      printf("%s: ERROR VTPp->roc.RecordTimeout not at offset = 0x%lx (@ 0x%lx)\n",
+	     __func__,expected,offset);
+      rval = ERROR;
+    }
+
   offset = ((unsigned long) &test.v7) - base;
   expected = 0x10000;
   if(offset != expected)
@@ -850,7 +868,6 @@ vtpCheckAddresses()
 	     __func__,expected,offset);
       rval = ERROR;
     }
-
   offset = ((unsigned long) &test.v7.clk) - base;
   expected = 0x10100;
   if(offset != expected)

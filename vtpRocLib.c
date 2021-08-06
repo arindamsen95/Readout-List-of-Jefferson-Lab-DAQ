@@ -674,7 +674,7 @@ vtpRocEbConfig(PP_CONF *ppInfo, int blocklevel)
   int ii, ppmask = 0;
   unsigned int reg;
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  /* CHECKTYPE(VTP_FW_TYPE_VCODAROC,0); */
 
   /* Check that EB is stopped (reset bit enabled) */
   VLOCK;
@@ -713,7 +713,7 @@ int
 vtpRocEbSetBlockLevel(int blocklevel)
 {
   CHECKINIT;
-  CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
+  /* CHECKTYPE(VTP_FW_TYPE_VCODAROC,0); */
 
   unsigned int reg=0;
 

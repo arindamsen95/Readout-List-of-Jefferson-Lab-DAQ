@@ -760,6 +760,7 @@ vtpMpdEnd()
   }
 
   mpdGStatus(0);
+  vtpMpdPrintStatus(0);
 }
 
 void

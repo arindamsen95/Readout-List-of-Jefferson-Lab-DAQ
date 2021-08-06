@@ -19,6 +19,9 @@
 
 #define NUM_VTP_CONNECTIONS 1
 
+/* define an array of Payload port Config Structures */
+PP_CONF ppInfo[16];
+
 int blklevel = 1;
 
 /* trigBankType:
@@ -52,9 +55,6 @@ rocDownload()
   const char *z7file="fe_vtp_vxs_readout_z7.bin";
   const char *v7file="fe_vtp_v7_mpd.bin";
 
-  /* const char *z7file="fe_vtp_vxs_readout_z7_jul23.bin"; */
-  /* const char *v7file="fe_vtp_vxs_readout_v7_jul22.bin"; */
-
   firstEvent = 1;
 
   /* Open VTP library */
@@ -64,6 +64,7 @@ rocDownload()
       printf(" Unable to Open VTP driver library.\n");
     }
 
+#define RELOAD_FIRMWARE
 #ifdef RELOAD_FIRMWARE
   /* Load firmware here */
   sprintf(buf, "/daqfs/daq_setups/vtp-mpdro/firmware/%s", z7file);
@@ -145,8 +146,8 @@ rocPrestart()
   emuport = rol->rlinkP->port;
 
   /* Temp override for netcat */
-  emuip = 0x81396DA2;
-  emuport = 6006;
+  /* emuip = 0x81396DA2; */
+  /* emuport = 6006; */
 
   printf(" EMU IP = 0x%08x  Port= %d\n",emuip, emuport);
 
@@ -212,13 +213,21 @@ rocPrestart()
   vtpRocMigReset();
 
 
+  memset(ppInfo, 0, sizeof(ppInfo));
 
-  /* Payload port map - defines which slots to readout */
-  /* FIXME: need to get this parameter from a common location */
-  ppmask = 0x80;  //(payload ports(vme slot) 3(9), 6(15), 12(18), 13(4))
+  /* Configure payload port 13 (elma vme slot 3)
+     1 MPD boards (lane 4) building to bank 2 */
+  ppmask = vtpPayloadConfig(13,ppInfo,2,0,0x02000000);
+
+  printf("vtpPayloadConfig ppmask = 0x%04x\n",ppmask);
+
+  /* Initialize and program the ROC Event Builder*/
   vtpRocEbStop();
-  vtpRocEbConfig(0x010005,0x010002,0x010003,ppmask);
+  vtpRocEbInit(5,6,7);   // define bank1 tag = 5, bank2 tag = 6, bank3 tag = 7
+  vtpRocEbConfig(ppInfo,0);  // blocklevel=0 will skip setting the block level
 
+
+  /* Reset the data Link between V7 ROC EB and the Zync FPGA ROC */
   vtpRocEbioReset();
 
 
@@ -228,8 +237,6 @@ rocPrestart()
   /* Enable Async&EB Events for ROC   bit2 - Async, bit1 - Sync, bit0 V7-EB */
   vtpRocEnable(0x5);
 
-  /* Do this in Go instead */
-  // vtpRocEbStart();
 
   /* Print Run Number and Run Type */
   printf(" Run Number = %d, Run Type = %d \n",rol->runNumber,rol->runType);
@@ -267,19 +274,13 @@ rocGo()
   /* Clear TI Link recieve FIFO */
   vtpTiLinkResetFifo(1);
 
-#ifdef DO_SERDES_CHECK
+#ifdef CHECKSERDES
   chmask = vtpSerdesCheckLinks();
   printf("VTP Serdes link up mask = 0x%05x\n",chmask);
 
   printf("Calling vtpSerdesStatusAll()\n");
   vtpSerdesStatusAll();
 #endif
-
-  /* Update the ROC EB to readout all available FADC boards */
-  //  vtpRocEbConfig(0,0,0,(chmask&0xffff));
-
-  /* Start the ROC Event Builder */
-  vtpRocEbStart();
 
   /* Get the current Block Level from the TI */
   blklevel = vtpTiLinkGetBlockLevel(0);
