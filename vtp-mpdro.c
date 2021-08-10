@@ -399,12 +399,15 @@ vtpMpdGetSoftErrorCount(int fiber)
 }
 
 int
-vtpMpdPrintStatus()
+vtpMpdPrintStatus(uint32_t pmask)
 {
   MPDFIBER_REGS mr[32];
   int impd=0;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
+
+  if(pmask == 0)
+    pmask = 0xFFFFFFFF;
 
   VLOCK;
   for(impd=0; impd<32; impd++)
@@ -412,6 +415,7 @@ vtpMpdPrintStatus()
       mr[impd].gtx_ctrl   = vtp->v7.mpdFiber[impd].gtx_ctrl;
       mr[impd].gtx_status = vtp->v7.mpdFiber[impd].gtx_status;
       mr[impd].eb_ctrl = vtp->v7.mpdFiber[impd].eb_ctrl;
+      mr[impd].max_rx_len = vtp->v7.mpdFiber[impd].max_rx_len;
     }
   VUNLOCK;
 
@@ -424,6 +428,7 @@ vtpMpdPrintStatus()
 
   for(impd=0; impd<32; impd++)
     {
+      if( ((1 << impd) & pmask) == 0) continue;
       printf("%2d   ",impd);
 
       printf("%04x   ",mr[impd].gtx_ctrl);
@@ -450,6 +455,31 @@ vtpMpdPrintStatus()
 	printf("---     ");
 
       printf("%s",(mr[impd].eb_ctrl & MPD_EBCTRL_ENABLE)?"ENABLED ":"DISABLED");
+
+      printf("\n");
+    }
+
+
+  printf("                     Decoder  Avgb     EvWriter Words         Input Buffer\n");
+  printf("MPD  MAX_RX_LEN      State    State    State    Received      Busy\n");
+  printf("--------------------------------------------------------------------------------\n");
+  /*      31   0x12345678      0x7      0x7      0x7      0x123456      1   */
+
+  for(impd=0; impd<32; impd++)
+    {
+      printf("%2d   ", impd);
+
+      printf("0x%08x      ", mr[impd].max_rx_len);
+
+      printf("0x%x      ", (mr[impd].max_rx_len & MPD_MRL_DECODER_STATE_MASK) >> 29);
+
+      printf("0x%x      ", (mr[impd].max_rx_len & MPD_MRL_AVGB_STATE_MASK) >> 26);
+
+      printf("0x%x      ", (mr[impd].max_rx_len & MPD_MRL_EVENT_WRITER_STATE_MASK) >> 23);
+
+      printf("0x%06x      ", (mr[impd].max_rx_len & MPD_MRL_WORDS_RECV_MASK) >> 1);
+
+      printf("%d", (mr[impd].max_rx_len & MPD_MRL_VTP_INPUT_BUFFER_BUSY) ? 1 : 0);
 
       printf("\n");
     }

@@ -41,7 +41,7 @@ unsigned int emuData[] = {0x634d7367,0x20697320,0x636f6f6c,6,0,4196352,1,1};
 /* Start of MPD specific configuration */
 #include "vtp_mpdro.c"
 
-
+void rocStatus();
 /**
                         DOWNLOAD
 **/
@@ -113,6 +113,8 @@ rocDownload()
 
   daLogMsg("INFO","Call vtpMpdDownload");
   vtpMpdDownload();
+
+  rocStatus();
 }
 
 /**
@@ -244,6 +246,7 @@ rocPrestart()
   /*Send Prestart Event*/
   vtpRocEvioWriteControl(0xffd1,rol->runNumber,rol->runType);
 
+  rocStatus();
 
   printf(" Done with User Prestart\n");
 
@@ -286,14 +289,30 @@ rocGo()
   blklevel = vtpTiLinkGetBlockLevel(0);
   printf("\nBlock level read from TI Link = %d\n", blklevel);
 
+  /* Update the ROC EB blocklevel in the EVIO banks */
+  vtpRocEbSetBlockLevel(blklevel);
+
+  /* Start the ROC Event Builder */
+  vtpRocEbStart();
 
   /*Send Go Event*/
   vtpRocEvioWriteControl(0xffd2,0,*(rol->nevents));
 
+  rocStatus();
 
   /* Enable to recieve Triggers */
   CDOENABLE(VTP, 1, 0);
   VTPflag = 0;
+
+}
+
+void
+rocStatus()
+{
+  /* Put out some Status' for debug */
+  mpdGStatus(0);
+  vtpMpdPrintStatus(0);
+  vtpRocStatus(0);
 
 }
 
@@ -327,7 +346,7 @@ rocEnd()
   vtpRocEbStop();
 
 
-  vtpRocStatus(0);
+  rocStatus();
 
   /* Disconnect the socket */
   vtpRocTcpConnect(0,0,0);

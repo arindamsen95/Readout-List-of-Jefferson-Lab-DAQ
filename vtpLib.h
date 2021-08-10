@@ -782,6 +782,12 @@ typedef struct ROC_EB_Struct
 
 #define MPD_EBCTRL_ENABLE		0x00000001	/* Set to 1 to allow MPD event data to fill event builder buffer */
 
+#define MPD_MRL_DECODER_STATE_MASK      0xE0000000
+#define MPD_MRL_AVGB_STATE_MASK         0x1C000000
+#define MPD_MRL_EVENT_WRITER_STATE_MASK 0x03800000
+#define MPD_MRL_WORDS_RECV_MASK         0x007FFFFE
+#define MPD_MRL_VTP_INPUT_BUFFER_BUSY     (1 << 0)
+
 typedef struct MpdFiber_Struct
 {
   /** 0x0000 */ volatile uint32_t gtx_ctrl;

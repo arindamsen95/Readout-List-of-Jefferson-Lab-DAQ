@@ -433,8 +433,6 @@ void vtp_mpd_setup()
   vtpRocMigReset(0);
   //  vtpPrintMigStatus(0);
 
-  vtpMpdPrintStatus(0);
-
   /*****************
    *   MPD SETUP
    *****************/
@@ -699,7 +697,6 @@ vtpMpdPrestart()
 {
   // Setup in Prestart since TI clock glitches at end of Download()
   vtp_mpd_setup();
-  mpdGStatus(0);
 
 }
 
@@ -740,10 +737,6 @@ vtpMpdGo()
     mpd_evt[i]=0;
   }
 
-  mpdGStatus(0);
-
-  vtpMpdPrintStatus(0);
-
   vtpMpdDalogStatus(mpdGetVTPFiberMask());
 
 }
@@ -759,8 +752,6 @@ vtpMpdEnd()
     mpdTRIG_Disable(mpdSlot(k));
   }
 
-  mpdGStatus(0);
-  vtpMpdPrintStatus(0);
 }
 
 void

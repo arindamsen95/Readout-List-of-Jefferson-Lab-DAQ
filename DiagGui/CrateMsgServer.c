@@ -467,6 +467,8 @@ next_port:
 
       if( (strncmp(address,"129.57.37.",10) != 0) &&
 	  (strncmp(address,"129.57.192.",11) != 0) &&
+	  (strncmp(address,"129.57.29.",10) != 0) &&
+	  (strncmp(address,"129.57.109.",11) != 0) &&
 	  (strncmp(address,"129.57.193.",11) != 0) )
 	{
 	  printf("ListenerThread:  ignore request from %s (port %d)\n",

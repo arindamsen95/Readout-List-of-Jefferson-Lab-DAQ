@@ -40,7 +40,7 @@ int  vtpMpdReadRegs(int impd);
 unsigned int vtpMpdReadReg(int impd, unsigned int reg);
 int  vtpMpdWriteReg(int impd, unsigned int reg, unsigned int value);
 int  vtpMpdGetSoftErrorCount(int fiber);
-int  vtpMpdPrintStatus();
+int  vtpMpdPrintStatus(uint32_t pmask);
 unsigned int vtpMpdGetChanUpMask();
 int  vtpGetMpdMaxRxLen(int impd);
 
