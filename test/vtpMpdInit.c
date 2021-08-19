@@ -5,9 +5,14 @@
  * Description:
  *    Show status of VTP and their attached MPDs
  *
+ *   if a filename is provided, only initialize those MPD defined
+ *
+ *   otherwise, only attempt to initialize MPDs found via the fiber+serial
+ *    connection (channel must be up).
+ *
  *
  * Usage:
- *      vtpMpdStatus
+ *      vtpMpdStatus <optional filename>
  *
  */
 
@@ -31,18 +36,25 @@ int main(int argc, char *argv[])
   int stat;
   apvbuffer = (char *)malloc(1024*50*sizeof(char));
   errorbuffer = (char *)malloc(1024*50*sizeof(char));
+  int useConfigFile = 0;
+  char filename[100];
 
-  int iFlag = 0xFFFF0000;// | VTP_INIT_SKIP_FIRMWARE_CHECK;
-
-  if(vtpMpdConfigInit("/daqfs/daq_setups/vtp-mpdro/cfg/vtp_config.cfg") == ERROR)
+  if(argc > 1)
     {
-      printf("ERROR: Error in configuration file");
-      return -1;
+      /* assume the only argument is the path to the config file */
+      strncpy(filename, argv[1], sizeof(filename));
+      useConfigFile = 1;
+
+      if(vtpMpdConfigInit(filename) == ERROR)
+	{
+	  printf("ERROR: Error in configuration file\n\t%s", filename);
+	  return -1;
+	}
+
+      vtpMpdConfigLoad();
     }
 
-  vtpMpdConfigLoad();
-
-  char *rol_usrConfig = "/daqfs/daq_setups/vtp-mpdro/cfg/davtp3.config";
+  char *rol_usrConfig = "/home/sbs-onl/vtp/cfg/sbsvtp3.config";
 
   vtpOpen(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
   vtpInit(VTP_INIT_CLK_VXS_250);
@@ -63,7 +75,8 @@ int main(int argc, char *argv[])
   vtpMpdEnable(0xffffffff);
 
   vtpStatus(0);
-  vtpMpdPrintStatus();
+  vtpMpdPrintStatus(0,0);
+  vtpMpdPrintStatus(0,1);
 
   /*****************
    *   MPD SETUP
@@ -71,21 +84,32 @@ int main(int argc, char *argv[])
   int rval = OK;
   unsigned int errSlotMask = 0;
 
-  mpdSetPrintDebug(0);
-
   // discover MPDs and initialize memory mapping
 
   // In VTP mode, par1(fiber mask) and par3(number of mpds) are not used in mpdInit(par1, par2, par3, par4)
   // Instead, they come from the configuration file
-  unsigned int chanmask = vtpMpdGetChanUpMask();
-  mpdInit(chanmask, 0, 32,
-	  MPD_INIT_FIBER_MODE | MPD_INIT_NO_CONFIG_FILE_CHECK);
+  int initFlag = MPD_INIT_FIBER_MODE;
+  unsigned int chanmask;
+
+  if(useConfigFile)
+    {
+      chanmask = mpdGetVTPFiberMask();
+    }
+  else
+    {
+      chanmask = vtpMpdGetChanUpMask();
+      initFlag |= MPD_INIT_NO_CONFIG_FILE_CHECK;
+    }
+
+  mpdInit(chanmask, 0, 32, initFlag);
+
   int fnMPD = mpdGetNumberMPD();
 
 
   //fnMPD = 1;
   if (fnMPD<=0) { // test all possible vme slot ?
     printf("ERR: no MPD discovered, cannot continue\n");
+    vtpUnlock();
     return -1;
   }
 

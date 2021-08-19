@@ -31,7 +31,8 @@ int  vtpMpdSetApvThreshold(int fiber, int apv, int strip, int threshold);
 int  vtpMpdFiberReset();
 int  vtpMpdFiberLinkReset(unsigned int mpdmask);
 
-int  vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers, int enable_cm);
+int  vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers,
+		      int enable_cm, int noprocessing_prescale);
 
 int  vtpMpdEnable(unsigned int mpdmask);
 int  vtpMpdDisable(unsigned int mpdmask);
@@ -40,7 +41,7 @@ int  vtpMpdReadRegs(int impd);
 unsigned int vtpMpdReadReg(int impd, unsigned int reg);
 int  vtpMpdWriteReg(int impd, unsigned int reg, unsigned int value);
 int  vtpMpdGetSoftErrorCount(int fiber);
-int  vtpMpdPrintStatus(uint32_t pmask);
+int  vtpMpdPrintStatus(uint32_t pmask, int upOnly);
 unsigned int vtpMpdGetChanUpMask();
 int  vtpGetMpdMaxRxLen(int impd);
 

@@ -780,7 +780,11 @@ typedef struct ROC_EB_Struct
 
 #define MPD_GTX_STATUS_FIBER_ERR_CNT    0x0000FF00	/* Bit error counter on fiber link to MPD */
 
-#define MPD_EBCTRL_ENABLE		0x00000001	/* Set to 1 to allow MPD event data to fill event builder buffer */
+#define MPD_EBCTRL_ENABLE		(1<<0)	/* Set to 1 to allow MPD event data to fill event builder buffer */
+#define MPD_EBCTRL_BUILD_ALL_SAMPLES    (1<<1)
+#define MPD_EBCTRL_BUILD_DEBUG_HEADERS  (1<<2)
+#define MPD_EBCTRL_ENABLE_CM            (1<<3)
+#define MPD_EBCTRL_NOPROCESSING_PRESCALE_MASK 0xFFFF0000
 
 #define MPD_MRL_DECODER_STATE_MASK      0xE0000000
 #define MPD_MRL_AVGB_STATE_MASK         0x1C000000

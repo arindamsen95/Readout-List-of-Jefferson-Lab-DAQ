@@ -246,7 +246,8 @@ vtpMpdFiberLinkReset(unsigned int mpdmask)
 }
 
 int
-vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers, int enable_cm)
+vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers,
+		 int enable_cm, int noprocessing_prescale)
 {
   int impd=0, val;
   CHECKINIT;
@@ -258,13 +259,15 @@ vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers, int enable_cm)
       val = vtp->v7.mpdFiber[impd].eb_ctrl & 0xFFFFFFF1;
 
       if(build_all_samples)
-	val |= 0x2;
+	val |= MPD_EBCTRL_BUILD_ALL_SAMPLES;
 
       if(build_debug_headers)
-	val |= 0x4;
+	val |= MPD_EBCTRL_BUILD_DEBUG_HEADERS;
 
       if(enable_cm)
-	val |= 0x8;
+	val |= MPD_EBCTRL_ENABLE_CM;
+
+      val |= (noprocessing_prescale & 0xFFFF)<<16;
 
       vtp->v7.mpdFiber[impd].eb_ctrl = val;
     }
@@ -399,15 +402,19 @@ vtpMpdGetSoftErrorCount(int fiber)
 }
 
 int
-vtpMpdPrintStatus(uint32_t pmask)
+vtpMpdPrintStatus(uint32_t pmask, int upOnly)
 {
   MPDFIBER_REGS mr[32];
+  uint32_t upMask = 0;
   int impd=0;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   if(pmask == 0)
     pmask = 0xFFFFFFFF;
+
+  if(!upOnly)
+    upMask = 0xFFFFFFFF;
 
   VLOCK;
   for(impd=0; impd<32; impd++)
@@ -416,6 +423,9 @@ vtpMpdPrintStatus(uint32_t pmask)
       mr[impd].gtx_status = vtp->v7.mpdFiber[impd].gtx_status;
       mr[impd].eb_ctrl = vtp->v7.mpdFiber[impd].eb_ctrl;
       mr[impd].max_rx_len = vtp->v7.mpdFiber[impd].max_rx_len;
+
+      if(mr[impd].gtx_status & MPD_GTX_STATUS_FIBER_CHANNEL_UP)
+	upMask |= 1<<impd;
     }
   VUNLOCK;
 
@@ -428,7 +438,9 @@ vtpMpdPrintStatus(uint32_t pmask)
 
   for(impd=0; impd<32; impd++)
     {
-      if( ((1 << impd) & pmask) == 0) continue;
+      if (( ((1 << impd) & pmask) == 0)  ||
+	  ( ((1 << impd) & upMask) == 0))
+	continue;
       printf("%2d   ",impd);
 
       printf("%04x   ",mr[impd].gtx_ctrl);
@@ -467,6 +479,9 @@ vtpMpdPrintStatus(uint32_t pmask)
 
   for(impd=0; impd<32; impd++)
     {
+      if (( ((1 << impd) & pmask) == 0)  ||
+	  ( ((1 << impd) & upMask) == 0))
+	continue;
       printf("%2d   ", impd);
 
       printf("0x%08x      ", mr[impd].max_rx_len);
