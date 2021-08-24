@@ -5,7 +5,6 @@
  * Description:
  *    Show status of VTP and their attached MPDs
  *
- *
  *   This first looks at the connections between VTP <---> MPD.
  *
  *   If a channel is up (good fiber+serial connections), it will be
@@ -52,7 +51,7 @@ int main(int argc, char *argv[])
   vtpMpdPrintStatus(0,1);
 
   unsigned int chanmask = vtpMpdGetChanUpMask();
-  mpdInit(chanmask, 0, 32, MPD_INIT_FIBER_MODE | MPD_INIT_NO_CONFIG_FILE_CHECK);
+  mpdInitVTP(chanmask, MPD_INIT_FIBER_MODE | MPD_INIT_NO_CONFIG_FILE_CHECK);
 
   mpdGStatus(1);
 

@@ -1,9 +1,9 @@
 /*
  * File:
- *    vtpMpdStatus.c
+ *    vtpMpdInit.c
  *
  * Description:
- *    Show status of VTP and their attached MPDs
+ *    Initialize VTP and their attached MPDs
  *
  *   if a filename is provided, only initialize those MPD defined
  *
@@ -12,7 +12,7 @@
  *
  *
  * Usage:
- *      vtpMpdStatus <optional filename>
+ *      vtpMpdInit <optional filename>
  *
  */
 
@@ -98,10 +98,13 @@ int main(int argc, char *argv[])
   else
     {
       chanmask = vtpMpdGetChanUpMask();
+      mpdSetVTPFiberMap_preInit(chanmask);
       initFlag |= MPD_INIT_NO_CONFIG_FILE_CHECK;
     }
 
-  mpdInit(chanmask, 0, 32, initFlag);
+  mpdSetPrintDebug(0xffffffff);
+  mpdInitVTP(chanmask, initFlag);
+  mpdSetPrintDebug(0);
 
   int fnMPD = mpdGetNumberMPD();
 
@@ -122,8 +125,6 @@ int main(int argc, char *argv[])
     i = mpdSlot(k);
 
     int try_cnt = 0;
-
-    mpdHISTO_MemTest(i);
 
   retry:
 
