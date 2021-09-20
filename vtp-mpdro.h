@@ -23,16 +23,16 @@
 #ifdef MPD_MON_NOT_SUPPORTED
 int  vtpMpdMonEnable(int fiber);
 int  vtpMpdMonDump(int fiber);
-int  vtpMpdSetAvg(int fiber, int apv, int min, int max);
 #endif /* MPD_MON_NOT_SUPPORTED */
 
+int  vtpMpdSetAvg(int fiber, int apv, int min, int max);
 int  vtpMpdSetApvOffset(int fiber, int apv, int strip, int offset);
 int  vtpMpdSetApvThreshold(int fiber, int apv, int strip, int threshold);
 int  vtpMpdFiberReset();
 int  vtpMpdFiberLinkReset(unsigned int mpdmask);
 
 int  vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers,
-		      int enable_cm, int noprocessing_prescale);
+		      int enable_cm, int noprocessing_prescale, int allow_peak_any_time, int min_avg_samples);
 
 int  vtpMpdEnable(unsigned int mpdmask);
 int  vtpMpdDisable(unsigned int mpdmask);

@@ -108,6 +108,7 @@ vtpMpdMonDump(int fiber)
   VUNLOCK;
   return OK;
 }
+#endif // MPD_MON_NOT_SUPPORTED
 
 int
 vtpMpdSetAvg(int fiber, int apv, int min, int max)
@@ -127,16 +128,19 @@ vtpMpdSetAvg(int fiber, int apv, int min, int max)
       return ERROR;
     }
 
-  val = ((min & 0x1fff)<<0) |
-        ((max & 0x1fff)<<13) |
-        (apv<<26);
-
   VLOCK;
-  vtp->v7.mpdFiber[fiber].apv_avg = val | 0x80000000;
+  //    [min threshold]       [apvid]     [0=min]   [use APV15 offset space]
+  val = ((min & 0x1fff)<<0) | (apv<<17) | (0<<16) | (15<<23);
+  vtp->v7.mpdFiber[fiber].apv_offset = val | 0x80000000;
+
+  //    [max threshold]       [apvid]     [1=max]   [use APV15 offset space]
+  val = ((max & 0x1fff)<<0) | (apv<<17) | (1<<16) | (15<<23);
+  vtp->v7.mpdFiber[fiber].apv_offset = val | 0x80000000;
+
   VUNLOCK;
+
   return OK;
 }
-#endif // MPD_MON_NOT_SUPPORTED
 
 int
 vtpMpdSetApvOffset(int fiber, int apv, int strip, int offset)
@@ -247,11 +251,15 @@ vtpMpdFiberLinkReset(unsigned int mpdmask)
 
 int
 vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers,
-		 int enable_cm, int noprocessing_prescale)
+		 int enable_cm, int noprocessing_prescale,
+                 int allow_peak_any_time, int min_avg_samples)
 {
   int impd=0, val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
+
+  printf("%s(build_all_samples=%d,build_debug_headers=%d,enable_cm=%d,noprocessing_prescale=%d,allow_peak_any_time=%d,min_avg_samples=%d\n",
+    __func__, build_all_samples, build_debug_headers, enable_cm, noprocessing_prescale, allow_peak_any_time, min_avg_samples);
 
   VLOCK;
   for(impd=0; impd<32; impd++)
@@ -267,7 +275,12 @@ vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers,
       if(enable_cm)
 	val |= MPD_EBCTRL_ENABLE_CM;
 
+      if(allow_peak_any_time)
+        val |= MPD_EBCTRL_ALLOW_PEAK_ANY_TIME;
+
       val |= (noprocessing_prescale & 0xFFFF)<<16;
+
+      val |= (min_avg_samples & 0xFF)<<8;
 
       vtp->v7.mpdFiber[impd].eb_ctrl = val;
     }
@@ -472,10 +485,10 @@ vtpMpdPrintStatus(uint32_t pmask, int upOnly)
     }
 
 
-  printf("                     Decoder  Avgb     EvWriter Words         Input Buffer\n");
-  printf("MPD  MAX_RX_LEN      State    State    State    Received      Busy\n");
-  printf("--------------------------------------------------------------------------------\n");
-  /*      31   0x12345678      0x7      0x7      0x7      0x123456      1   */
+  printf("                     Decoder  Avgb     EvWriter Words         Input Buffer Prescale AvgMin Flags\n");
+  printf("MPD  MAX_RX_LEN      State    State    State    Received      Busy         Proc     Strips\n");
+  printf("------------------------------------------------------------------------------------------------\n");
+  /*      31   0x12345678      0x7      0x7      0x7      0x123456      1            0        0*/
 
   for(impd=0; impd<32; impd++)
     {
@@ -494,8 +507,13 @@ vtpMpdPrintStatus(uint32_t pmask, int upOnly)
 
       printf("0x%06x      ", (mr[impd].max_rx_len & MPD_MRL_WORDS_RECV_MASK) >> 1);
 
-      printf("%d", (mr[impd].max_rx_len & MPD_MRL_VTP_INPUT_BUFFER_BUSY) ? 1 : 0);
+      printf("%d        ", (mr[impd].max_rx_len & MPD_MRL_VTP_INPUT_BUFFER_BUSY) ? 1 : 0);
 
+      printf("%5d       ", (mr[impd].eb_ctrl & MPD_EBCTRL_NOPROCESSING_PRESCALE_MASK)>>16);
+
+      printf("%3d    ", (mr[impd].eb_ctrl & MPD_EBCTRL_AVGNSTRIPS_MIN_MASK)>>8);
+
+      printf("%01X ", (mr[impd].eb_ctrl & (MPD_EBCTRL_BUILD_ALL_SAMPLES|MPD_EBCTRL_BUILD_DEBUG_HEADERS|MPD_EBCTRL_ENABLE_CM|MPD_EBCTRL_ALLOW_PEAK_ANY_TIME))>>1);
       printf("\n");
     }
 
