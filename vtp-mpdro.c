@@ -127,6 +127,26 @@ vtpMpdSetAvg(int fiber, int apv, int min, int max)
       printf("%s: ERROR: invalid apv %d\n",__func__,apv);
       return ERROR;
     }
+  if(min<-4095)
+    {
+      printf("%s: Warning: min(%d)<0, setting min to -4095\n",__func__,min);
+      min = -4095;
+    }
+  if(min>4095)
+    {
+      printf("%s: Warning: min(%d)>4095, setting min to 4095\n",__func__,min);
+      min = 4095;
+    }
+  if(max<-4095)
+    {
+      printf("%s: Warning: max(%d)<0, setting min to -4095\n",__func__,max);
+      max = -4095;
+    }
+  if(max>4095)
+    {
+      printf("%s: Warning: max(%d)>4095, setting max to 4095\n",__func__,max);
+      max = 4095;
+    }
 
   VLOCK;
   //    [min threshold]       [apvid]     [0=min]   [use APV15 offset space]
@@ -165,6 +185,16 @@ vtpMpdSetApvOffset(int fiber, int apv, int strip, int offset)
       printf("%s: ERROR: invalid strip %d\n",__func__,strip);
       return ERROR;
     }
+  if(offset<-4095)
+    {
+      printf("%s: Warning: offset(%d)<0, setting offset to -4095\n",__func__,offset);
+      offset = -4095;
+    }
+  if(offset>4095)
+    {
+      printf("%s: Warning: offset(%d)>4095, setting offset to 4095\n",__func__,offset);
+      offset = 4095;
+    }
 
   val = (offset & 0x1fff) | (strip<<16) | (apv<<23);
 
@@ -194,6 +224,16 @@ vtpMpdSetApvThreshold(int fiber, int apv, int strip, int threshold)
     {
       printf("%s: ERROR: invalid strip %d\n",__func__,strip);
       return ERROR;
+    }
+  if(threshold>511)
+    {
+      printf("%s: Warning: threshold(%d)>511, setting threshold to 511\n",__func__,threshold);
+      threshold = 511;
+    }
+  if(threshold<0)
+    {
+      printf("%s: Warning: threshold(%d)<0, setting threshold to 0\n",__func__,threshold);
+      threshold = 0;
     }
 
   val = (threshold & 0x1fff) | (strip<<16) | (apv<<23);
