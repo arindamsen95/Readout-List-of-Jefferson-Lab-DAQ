@@ -124,6 +124,19 @@ typedef struct {
 
   struct
   {
+    char pedestal_filename[FNLEN];
+    char common_mode_filename[FNLEN];
+    int build_all_samples;
+    int build_debug_headers;
+    int enable_cm;
+    int noprocessing_prescale;
+    int allow_peak_any_time;
+    int min_avg_samples;
+    streaming_eb_cfg eb;
+  } mpdro;
+
+  struct
+  {
     int roc_id;
     unsigned int destip;
     unsigned int destipport;

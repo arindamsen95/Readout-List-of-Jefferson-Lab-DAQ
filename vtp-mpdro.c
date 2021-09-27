@@ -330,6 +330,36 @@ vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers,
 }
 
 int
+vtpMpdEbGetFlags(int *build_all_samples, int *build_debug_headers,
+		 int *enable_cm, int *noprocessing_prescale,
+                 int *allow_peak_any_time, int *min_avg_samples)
+{
+  int impd=0;
+  unsigned int val = 0;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
+
+  VLOCK;
+  impd = 0;
+  val = vtp->v7.mpdFiber[impd].eb_ctrl;
+  VUNLOCK;
+
+
+  *build_all_samples = (val & MPD_EBCTRL_BUILD_ALL_SAMPLES) ? 1 : 0;
+
+  *build_debug_headers = (val & MPD_EBCTRL_BUILD_DEBUG_HEADERS) ? 1 : 0;
+
+  *enable_cm = (val & MPD_EBCTRL_ENABLE_CM) ? 1 : 0;
+
+  *allow_peak_any_time = (val & MPD_EBCTRL_ALLOW_PEAK_ANY_TIME) ? 1 : 0;
+
+  *noprocessing_prescale = (val & MPD_EBCTRL_NOPROCESSING_PRESCALE_MASK) >> 16;
+
+  *min_avg_samples = (val & MPD_EBCTRL_AVGNSTRIPS_MIN_MASK) >> 8;
+
+  return OK;
+}
+int
 vtpMpdEnable(unsigned int mpdmask)
 {
   int impd=0;

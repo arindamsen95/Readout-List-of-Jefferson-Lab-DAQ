@@ -32,7 +32,11 @@ int  vtpMpdFiberReset();
 int  vtpMpdFiberLinkReset(unsigned int mpdmask);
 
 int  vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers,
-		      int enable_cm, int noprocessing_prescale, int allow_peak_any_time, int min_avg_samples);
+		      int enable_cm, int noprocessing_prescale,
+		      int allow_peak_any_time, int min_avg_samples);
+int  vtpMpdEbGetFlags(int *build_all_samples, int *build_debug_headers,
+		      int *enable_cm, int *noprocessing_prescale,
+		      int *allow_peak_any_time, int *min_avg_samples);
 
 int  vtpMpdEnable(unsigned int mpdmask);
 int  vtpMpdDisable(unsigned int mpdmask);
