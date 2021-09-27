@@ -2068,6 +2068,15 @@ vtpReadConfigFile(char *filename_in)
 #endif
 		  vtpConf.mpdro.build_all_samples = argi[0];
 		}
+	      else if(!strcmp(keyword, "VTP_MPDRO_BUILD_DEBUG_HEADERS"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_MPDRO_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.mpdro.build_debug_headers = argi[0];
+		}
 	      else if(!strcmp(keyword, "VTP_MPDRO_ENABLE_CM"))
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
@@ -3811,6 +3820,10 @@ vtpUploadAll(char *string, int length)
 
 	  sprintf(sss, "VTP_MPDRO_BUILD_ALL_SAMPLES %d\n",
 		  vtpConf.mpdro.build_all_samples);
+	  ADD_TO_STRING;
+
+	  sprintf(sss, "VTP_MPDRO_BUILD_DEBUG_HEADERS %d\n",
+		  vtpConf.mpdro.build_debug_headers);
 	  ADD_TO_STRING;
 
 	  sprintf(sss, "VTP_MPDRO_ENABLE_CM %d\n",
