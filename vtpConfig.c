@@ -13,8 +13,8 @@
 #include "vtpLib.h"
 //#include "xxxConfig.h"
 
-//#undef DEBUG
-#define DEBUG
+#undef DEBUG
+/* #define DEBUG */
 
 #define ADD_TO_STRING				\
   len1 = strlen(str);				\
@@ -2041,7 +2041,6 @@ vtpReadConfigFile(char *filename_in)
 		  printf("Set DELAY: %d %d\n", argi[0], argi[1]);
 		  vtpConf.compton.trig.delay[argi[0]] = argi[1];
 		}
-	      // MPDRO parameters
 	      else if(!strcmp(keyword, "VTP_MPDRO_COMMON_MODE_FILENAME"))
 		{
 		  sscanf(str_tmp, "%*s %250s", vtpConf.mpdro.common_mode_filename);
@@ -2064,7 +2063,7 @@ vtpReadConfigFile(char *filename_in)
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %d\m",
+		  printf("%s = %d\n",
 			 keyword, argi[0]);
 #endif
 		  vtpConf.mpdro.build_all_samples = argi[0];
@@ -2073,7 +2072,7 @@ vtpReadConfigFile(char *filename_in)
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %d\m",
+		  printf("%s = %d\n",
 			 keyword, argi[0]);
 #endif
 		  vtpConf.mpdro.enable_cm = argi[0];
@@ -2082,7 +2081,7 @@ vtpReadConfigFile(char *filename_in)
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %d\m",
+		  printf("%s = %d\n",
 			 keyword, argi[0]);
 #endif
 		  vtpConf.mpdro.noprocessing_prescale = argi[0];
@@ -2091,7 +2090,7 @@ vtpReadConfigFile(char *filename_in)
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %d\m",
+		  printf("%s = %d\n",
 			 keyword, argi[0]);
 #endif
 		  vtpConf.mpdro.allow_peak_any_time = argi[0];
@@ -2100,7 +2099,7 @@ vtpReadConfigFile(char *filename_in)
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %d\m",
+		  printf("%s = %d\n",
 			 keyword, argi[0]);
 #endif
 		  vtpConf.mpdro.min_avg_samples = argi[0];
@@ -2109,7 +2108,7 @@ vtpReadConfigFile(char *filename_in)
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %d\m",
+		  printf("%s = %d\n",
 			 keyword, argi[0]);
 #endif
 		  if(argi[0] > 0)
@@ -2122,7 +2121,7 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1],
 			 &argi[2], &argi[3]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %d.%d.%d.%d\m",
+		  printf("%s = %d.%d.%d.%d\n",
 			 keyword, argi[0], argi[1], argi[2], argi[3]);
 #endif
 		  vtpConf.mpdro.eb.ipaddr[0] = argi[0];
@@ -2135,7 +2134,7 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1],
 			 &argi[2], &argi[3]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %d.%d.%d.%d\m",
+		  printf("%s = %d.%d.%d.%d\n",
 			 keyword, argi[0], argi[1], argi[2], argi[3]);
 #endif
 		  vtpConf.mpdro.eb.subnet[0] = argi[0];
@@ -2148,7 +2147,7 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1],
 			 &argi[2], &argi[3]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %d.%d.%d.%d\m",
+		  printf("%s = %d.%d.%d.%d\n",
 			 keyword, argi[0], argi[1], argi[2], argi[3]);
 #endif
 		  vtpConf.mpdro.eb.gateway[0] =
@@ -2166,7 +2165,7 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[0], &argi[1], &argi[2], &argi[3], &argi[4],
 			 &argi[5]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %02x:%02x:%02x:%02x:%02x:%02x:\m",
+		  printf("%s = %02x:%02x:%02x:%02x:%02x:%02x\n",
 			 keyword,
 			 argi[0], argi[1], argi[2],
 			 argi[3], argi[4], argi[5]);
@@ -2183,13 +2182,22 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1],
 			 &argi[2], &argi[3]);
 #ifdef DEBUG_MPDRO_CONFIG
-		  printf("%s = %d.%d.%d.%d\m",
+		  printf("%s = %d.%d.%d.%d\n",
 			 keyword, argi[0], argi[1], argi[2], argi[3]);
 #endif
 		  vtpConf.mpdro.eb.destip[0] = argi[0];
 		  vtpConf.mpdro.eb.destip[1] = argi[1];
 		  vtpConf.mpdro.eb.destip[2] = argi[2];
 		  vtpConf.mpdro.eb.destip[3] = argi[3];
+		}
+	      else if(!strcmp(keyword, "VTP_MPDRO_DESTIPPORT"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_MPDRO_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.mpdro.eb.destipport = argi[0];
 		}
 	      else
 		{
@@ -2657,6 +2665,8 @@ vtpDownloadAll()
   // MPDRO Configuration
   if((vtpConf.fw_type[0] == VTP_FW_TYPE_MPDRO))
     {
+      vtpSetCommonModeFilename(vtpConf.mpdro.common_mode_filename);
+      vtpSetPedestalFilename(vtpConf.mpdro.pedestal_filename);
       vtpRocSetTcpCfg(vtpConf.mpdro.eb.ipaddr,
 		      vtpConf.mpdro.eb.subnet,
 		      vtpConf.mpdro.eb.gateway,
@@ -3050,6 +3060,9 @@ vtpUploadAll(char *string, int length)
 
   if(vtpConf.fw_type[0] == VTP_FW_TYPE_MPDRO)
     {
+      vtpGetCommonModeFilename(vtpConf.mpdro.common_mode_filename);
+      vtpGetPedestalFilename(vtpConf.mpdro.pedestal_filename);
+
       vtpRocGetTcpCfg(vtpConf.mpdro.eb.ipaddr,
 		      vtpConf.mpdro.eb.subnet,
 		      vtpConf.mpdro.eb.gateway,

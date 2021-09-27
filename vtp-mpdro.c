@@ -19,7 +19,13 @@
 
 #include <pthread.h>
 #include <stdio.h>
+#include <string.h>
 #include "vtpLib.h"
+
+#ifndef FNLEN
+#define FNLEN     250       /* length of config. file name - careful, sscanf
+                               format needs to be updated when this changes */
+#endif
 
 extern volatile ZYNC_REGS *vtp;
 extern int VTP_FW_Version;
@@ -677,3 +683,34 @@ vtpPrintEbStatus(int id)
   return(0);
 }
 #endif
+
+char vtpMpdCommonModeFilename[FNLEN];
+char vtpMpdPedestalFilename[FNLEN];
+
+int
+vtpSetCommonModeFilename(char *filename)
+{
+  strncpy(vtpMpdCommonModeFilename, filename, FNLEN);
+  return 0;
+}
+
+int
+vtpGetCommonModeFilename(char *filename)
+{
+  strncpy(filename, vtpMpdCommonModeFilename, FNLEN);
+  return 0;
+}
+
+int
+vtpSetPedestalFilename(char *filename)
+{
+  strncpy(vtpMpdPedestalFilename, filename, FNLEN);
+  return 0;
+}
+
+int
+vtpGetPedestalFilename(char *filename)
+{
+  strncpy(filename, vtpMpdPedestalFilename, FNLEN);
+  return 0;
+}
