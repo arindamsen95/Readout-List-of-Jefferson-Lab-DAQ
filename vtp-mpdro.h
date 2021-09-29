@@ -55,8 +55,13 @@ int  vtpGetEbStatus(unsigned int *blockcnt, unsigned int *wordcnt, unsigned int 
 int  vtpPrintEbStatus(int id);
 #endif /* MPD_EB_NOT_SUPPORTED */
 
-int  vtpSetCommonModeFilename(char *filename);
-int  vtpGetCommonModeFilename(char *filename);
-int  vtpSetPedestalFilename(char *filename);
-int  vtpGetPedestalFilename(char *filename);
+int  vtpMpdSetCommonModeFilename(char *filename);
+int  vtpMpdGetCommonModeFilename(char *filename);
+int  vtpMpdSetPedestalFilename(char *filename);
+int  vtpMpdGetPedestalFilename(char *filename);
+
+int  vtpMpdSetPedestalFactor(float factor);
+int  vtpMpdGetPedestalFactor(float *factor);
+
+
 #endif /* __VTP_MPDRO_H */

@@ -126,6 +126,7 @@ typedef struct {
   {
     char pedestal_filename[FNLEN];
     char common_mode_filename[FNLEN];
+    float pedestal_factor;
     int build_all_samples;
     int build_debug_headers;
     int enable_cm;

@@ -500,6 +500,7 @@ vtpInitGlobals()
   memset(vtpConf.mpdro.common_mode_filename, 0,
 	 sizeof(vtpConf.mpdro.common_mode_filename));
 
+  vtpConf.mpdro.pedestal_factor = 1.;
   vtpConf.mpdro.build_all_samples = 1;
   vtpConf.mpdro.build_debug_headers = 0;
   vtpConf.mpdro.enable_cm = 0;
@@ -2059,6 +2060,15 @@ vtpReadConfigFile(char *filename_in)
 			 vtpConf.mpdro.pedestal_filename);
 #endif
 		}
+	      else if(!strcmp(keyword, "VTP_MPDRO_PEDESTAL_FACTOR"))
+		{
+		  sscanf(str_tmp, "%*s %f", &argf[0]);
+#ifdef DEBUG_MPDRO_CONFIG
+		  printf("%s = %f\n",
+			 keyword, argf[0]);
+#endif
+		  vtpConf.mpdro.pedestal_factor = argf[0];
+		}
 	      else if(!strcmp(keyword, "VTP_MPDRO_BUILD_ALL_SAMPLES"))
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
@@ -2674,8 +2684,11 @@ vtpDownloadAll()
   // MPDRO Configuration
   if((vtpConf.fw_type[0] == VTP_FW_TYPE_MPDRO))
     {
-      vtpSetCommonModeFilename(vtpConf.mpdro.common_mode_filename);
-      vtpSetPedestalFilename(vtpConf.mpdro.pedestal_filename);
+      vtpMpdSetCommonModeFilename(vtpConf.mpdro.common_mode_filename);
+      vtpMpdSetPedestalFilename(vtpConf.mpdro.pedestal_filename);
+
+      vtpMpdSetPedestalFactor(vtpConf.mpdro.pedestal_factor);
+
       vtpRocSetTcpCfg(vtpConf.mpdro.eb.ipaddr,
 		      vtpConf.mpdro.eb.subnet,
 		      vtpConf.mpdro.eb.gateway,
@@ -3069,8 +3082,10 @@ vtpUploadAll(char *string, int length)
 
   if(vtpConf.fw_type[0] == VTP_FW_TYPE_MPDRO)
     {
-      vtpGetCommonModeFilename(vtpConf.mpdro.common_mode_filename);
-      vtpGetPedestalFilename(vtpConf.mpdro.pedestal_filename);
+      vtpMpdGetCommonModeFilename(vtpConf.mpdro.common_mode_filename);
+      vtpMpdGetPedestalFilename(vtpConf.mpdro.pedestal_filename);
+
+      vtpMpdGetPedestalFactor(&vtpConf.mpdro.pedestal_factor);
 
       vtpRocGetTcpCfg(vtpConf.mpdro.eb.ipaddr,
 		      vtpConf.mpdro.eb.subnet,
@@ -3816,6 +3831,10 @@ vtpUploadAll(char *string, int length)
 
 	  sprintf(sss, "VTP_MPDRO_PEDESTAL_FILENAME %s\n",
 		  vtpConf.mpdro.pedestal_filename);
+	  ADD_TO_STRING;
+
+	  sprintf(sss, "VTP_MPDRO_PEDESTAL_FACTOR %f\n",
+		  vtpConf.mpdro.pedestal_factor);
 	  ADD_TO_STRING;
 
 	  sprintf(sss, "VTP_MPDRO_BUILD_ALL_SAMPLES %d\n",

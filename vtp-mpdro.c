@@ -31,6 +31,10 @@ extern volatile ZYNC_REGS *vtp;
 extern int VTP_FW_Version;
 extern int VTP_FW_Type[2];
 
+char vtpMpdCommonModeFilename[FNLEN];
+char vtpMpdPedestalFilename[FNLEN];
+float vtpMpdPedestalFactor = 1.;
+
 /* Mutex to guard VTP read/writes */
 extern pthread_mutex_t   vtpMutex;
 #define VLOCK     if(pthread_mutex_lock(&vtpMutex)<0) perror("pthread_mutex_lock");
@@ -559,12 +563,13 @@ vtpMpdPrintStatus(uint32_t pmask, int upOnly)
 
       printf("\n");
     }
+  printf("\n");
 
 
-  printf("                     Decoder  Avgb     EvWriter Words         Input Buffer Prescale AvgMin Flags\n");
-  printf("MPD  MAX_RX_LEN      State    State    State    Received      Busy         Proc     Strips\n");
-  printf("------------------------------------------------------------------------------------------------\n");
-  /*      31   0x12345678      0x7      0x7      0x7      0x123456      1            0        0*/
+  printf("                     Decoder  Avgb     EvWriter Words         Input\n");
+  printf("MPD  MAX_RX_LEN      State    State    State    Received      Busy\n");
+  printf("--------------------------------------------------------------------------------\n");
+  /*      31   0x12345678      0x7      0x7      0x7      0x123456      1 */
 
   for(impd=0; impd<32; impd++)
     {
@@ -585,13 +590,46 @@ vtpMpdPrintStatus(uint32_t pmask, int upOnly)
 
       printf("%d        ", (mr[impd].max_rx_len & MPD_MRL_VTP_INPUT_BUFFER_BUSY) ? 1 : 0);
 
-      printf("%5d       ", (mr[impd].eb_ctrl & MPD_EBCTRL_NOPROCESSING_PRESCALE_MASK)>>16);
-
-      printf("%3d    ", (mr[impd].eb_ctrl & MPD_EBCTRL_AVGNSTRIPS_MIN_MASK)>>8);
-
-      printf("%01X ", (mr[impd].eb_ctrl & (MPD_EBCTRL_BUILD_ALL_SAMPLES|MPD_EBCTRL_BUILD_DEBUG_HEADERS|MPD_EBCTRL_ENABLE_CM|MPD_EBCTRL_ALLOW_PEAK_ANY_TIME))>>1);
       printf("\n");
     }
+
+  printf("          \n");
+  printf("           BuildAll  BuildDbg    Enable    NoProc AllowPeak    MinAvg\n");
+  printf("MPD         Samples   Headers        CM  Prescale   Anytime   Samples\n");
+  printf("--------------------------------------------------------------------------------\n");
+
+  for(impd=0; impd<32; impd++)
+    {
+      if (( ((1 << impd) & pmask) == 0)  ||
+	  ( ((1 << impd) & upMask) == 0))
+	continue;
+      printf(" %-8d ",impd);
+
+      printf("%9d ", (mr[impd].eb_ctrl & MPD_EBCTRL_BUILD_ALL_SAMPLES) ? 1 : 0);
+
+      printf("%9d ", (mr[impd].eb_ctrl & MPD_EBCTRL_BUILD_DEBUG_HEADERS) ? 1 : 0);
+
+      printf("%9d ", (mr[impd].eb_ctrl & MPD_EBCTRL_ENABLE_CM) ? 1 : 0);
+
+      printf("%9d ", (mr[impd].eb_ctrl & MPD_EBCTRL_NOPROCESSING_PRESCALE_MASK)>>16);
+
+      printf("%9d ", (mr[impd].eb_ctrl & MPD_EBCTRL_ALLOW_PEAK_ANY_TIME) ? 1 : 0);
+
+      printf("%9d ", (mr[impd].eb_ctrl & MPD_EBCTRL_AVGNSTRIPS_MIN_MASK)>>8);
+
+
+      printf("\n");
+    }
+
+  printf("\n");
+  printf("  Pedestal Factor: %f\n",
+	 vtpMpdPedestalFactor);
+
+  printf("  Common Mode Filename: %s\n",
+	 vtpMpdCommonModeFilename);
+
+  printf("  Pedestal Filename: %s\n",
+	 vtpMpdPedestalFilename);
 
   printf("--------------------------------------------------------------------------------\n");
   printf("\n");
@@ -684,33 +722,44 @@ vtpPrintEbStatus(int id)
 }
 #endif
 
-char vtpMpdCommonModeFilename[FNLEN];
-char vtpMpdPedestalFilename[FNLEN];
-
 int
-vtpSetCommonModeFilename(char *filename)
+vtpMpdSetCommonModeFilename(char *filename)
 {
   strncpy(vtpMpdCommonModeFilename, filename, FNLEN);
   return 0;
 }
 
 int
-vtpGetCommonModeFilename(char *filename)
+vtpMpdGetCommonModeFilename(char *filename)
 {
   strncpy(filename, vtpMpdCommonModeFilename, FNLEN);
   return 0;
 }
 
 int
-vtpSetPedestalFilename(char *filename)
+vtpMpdSetPedestalFilename(char *filename)
 {
   strncpy(vtpMpdPedestalFilename, filename, FNLEN);
   return 0;
 }
 
 int
-vtpGetPedestalFilename(char *filename)
+vtpMpdGetPedestalFilename(char *filename)
 {
   strncpy(filename, vtpMpdPedestalFilename, FNLEN);
+  return 0;
+}
+
+int
+vtpMpdSetPedestalFactor(float factor)
+{
+  vtpMpdPedestalFactor = factor;
+  return 0;
+}
+
+int
+vtpMpdGetPedestalFactor(float *factor)
+{
+  *factor = vtpMpdPedestalFactor;
   return 0;
 }
