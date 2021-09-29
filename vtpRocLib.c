@@ -58,7 +58,7 @@ vtpRocStatus(int flag)
   roc[3]        = vtp->roc.CpuSyncEventLenStatus;
   roc[4]        = vtp->roc.CpuAsyncEventStatus;
   roc[5]        = vtp->roc.CpuAsyncEventLenStatus;
-  roc[6]        = vtp->roc.MaxRecordSize;
+  roc[6]        = (vtp->roc.MaxRecordSize)<<2;     /* Convert to bytes */
   roc[7]        = vtp->roc.MaxBlocks;
   roc[8]        = vtp->roc.RecordTimeout;
 
@@ -116,7 +116,7 @@ vtpRocStatus(int flag)
   printf("    TI (EB Status)  = %08x\n",ti[3]);
   printf("    Trigger Cnt  = %d\n",tiTrigCnt);
   printf("    Bytes Sent   = 0x%08x%08x\n",totalBytes[1],totalBytes[0]);
-  printf("    Record Config: Size = %d, Max Blocks = %d, Timeout = %d\n",roc[6],roc[7],roc[8]);
+  printf("    EVIO Record: Size = %d Bytes, Max Event Blocks = %d, Timeout = %d (12.5 ns ticks)\n",roc[6],roc[7],roc[8]);
   printf("\n");
 
   printf("    ROC_EB   Ctrl   = %08x\n",eb_ctrl);
@@ -160,9 +160,9 @@ vtpRocStatus(int flag)
 
      roc_id        : valid IDs are numbers from 0-255
      max_rec_size  : Record buffer size in bytes.
-                     0 will use default  4194304 (4MB)
+                     0 will use default  1048351 (32bit words or ~4MB)
      max_blocks    : max number of blocks allowed before sending a Record (1-128)
-                     0 will use default  32
+                     0 will use default  64
      rec_timeout   : clock timeout before sending a record in seconds (1-25)
                      0 will use default 1
 */
@@ -179,14 +179,14 @@ vtpRocConfig(int roc_id, int max_rec_size, int max_blocks, int rec_timeout)
 
   vtp->roc.rocID = roc_id;
 
-  if(max_rec_size == 0) {
-    vtp->roc.MaxRecordSize = 4193404;
+  if(max_rec_size <= 0) {
+    vtp->roc.MaxRecordSize = 1048351;       /* Size in 32 bit words */
   }else{
     vtp->roc.MaxRecordSize = max_rec_size;
   }
 
-  if(max_blocks == 0) {
-    vtp->roc.MaxBlocks = 32;
+  if(max_blocks <= 0) {
+    vtp->roc.MaxBlocks = 64;
   }else{
     if(max_blocks > 128)
       vtp->roc.MaxBlocks = 128;
@@ -194,7 +194,7 @@ vtpRocConfig(int roc_id, int max_rec_size, int max_blocks, int rec_timeout)
       vtp->roc.MaxBlocks = max_blocks;
   }
 
-  if(rec_timeout == 0) {
+  if(rec_timeout <= 0) {
     vtp->roc.RecordTimeout = VTP_ROC_TICKS_PER_SEC;
   }else{
     if(rec_timeout > 25)
@@ -320,22 +320,21 @@ vtpRocPoll()
 
 
 /* Rotuine to Write a Data Bank to the ROC Synchonous Event Fifo. This Bank MUST
-   be properly formated with the correct Bank length or it will hang the ROC. */
+   be properly formated EVIO Bank with the correct length or it will hang the ROC. */
 void
-vtpRocWriteBank( unsigned int *bank, int blen)
+vtpRocWriteBank(unsigned int *bank)
 {
-  int ii;
+  int ii, blen=0;
 
   VLOCK;
-  if(blen == 0) {  /* Just write 0 to the Len fifo to Acknowledge the trigger */
-    VTP_ROC_ACK;
+  if(bank == NULL) {  /* Just write 0 to the Len fifo to Acknowledge the trigger */
+    vtp->roc.CpuSyncEventLen = 0;
   }else{
-    if(bank != NULL) {
-      for(ii=0;ii<blen;ii++) {                 // Write data into FIFO
+    blen = bank[0] + 1;   /* get the total bank length in words */
+    for(ii=0;ii<blen;ii++) {                 // Write data into FIFO
 	vtp->roc.CpuSyncEventData = bank[ii];
       }
-      vtp->roc.CpuSyncEventLen = blen;         // Write the Length to acknowledge
-    }
+      vtp->roc.CpuSyncEventLen = blen;       // Write the Length to acknowledge
   }
 
   VUNLOCK;
@@ -353,7 +352,7 @@ vtpRocGetTriggerCnt()
   if(vtp==NULL)
     return(0);
 
-  /* for some reason vtp!=NULL after a library load and unload so this //CHECKTYPE
+  /* for some reason vtp!=NULL after a library load and unload so this CHECKTYPE
      generates an error message we do not want to care about */
   //  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
@@ -378,13 +377,41 @@ vtpRocGetNlongs()
   bytes[1] = vtp->roc.BytesSent[1];
   VUNLOCK;
 
-  total = bytes[1];
-  total = (total<<32) + bytes[0] ;
+  total =  (bytes[1])&0x00000000FFFFFFFF;
+  total = (total<<(32ll))&0xFFFFFFFF00000000;
+  total += bytes[0];
+
   /* convert to longs */
   total = total>>2;
 
   return(total);
+}
 
+/* Return the number of Bytes sent. Pass a pointer to a 64 bit counter */
+void
+vtpRocGetNBytes(unsigned long long *nbytes)
+{
+  unsigned int bytes[2];
+  unsigned long long total;
+
+  if(vtp==NULL)
+    return;
+
+  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+
+  VLOCK;
+  bytes[0] = vtp->roc.BytesSent[0];
+  bytes[1] = vtp->roc.BytesSent[1];
+  VUNLOCK;
+
+  total =  (bytes[1])&0x00000000FFFFFFFF;
+  total = (total<<(32ll))&0xFFFFFFFF00000000;
+  total += bytes[0];
+
+  /* write value to the memory location */
+  *nbytes = total;
+
+  return;
 }
 
 
@@ -458,6 +485,35 @@ vtpRocSetTcpCfg(
   vtp->tcpClient[inst].IP4_GatewayAddr  = (   gateway[0]<<24) | (   gateway[1]<<16) | (   gateway[2]<<8) | (   gateway[3]<<0);
   vtp->tcpClient[inst].MAC_ADDR[1]      =                                             (       mac[0]<<8) | (       mac[1]<<0);
   vtp->tcpClient[inst].MAC_ADDR[0]      = (       mac[2]<<24) | (       mac[3]<<16) | (       mac[4]<<8) | (       mac[5]<<0);
+
+  vtp->tcpClient[inst].TCP_DEST_ADDR[link] = destipaddr;
+  printf("%s: TCP_DEST_ADDR = 0x%08X (link=%d)\n", __func__, vtp->tcpClient[inst].TCP_DEST_ADDR[link], link);
+  vtp->tcpClient[inst].TCP_PORT[link]      = (10001<<16) | destipport;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpRocSetTcpCfg2(int inst, unsigned int destipaddr, unsigned int destipport)
+{
+  int link=0; /* Only one link per network interface */
+  CHECKINIT;
+  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+
+  /* Check for valid port range (16 bits) */
+  if(destipport > 0xffff) {
+    printf("%s: ERROR: Destination Port out of range (%d)\n",__func__,destipport);
+    return ERROR;
+  }
+
+  VLOCK;
+  vtp->tcpClient[inst].IP4_StateRequest = 0;
+  vtp->tcpClient[inst].IP4_Addr         = VTP_NET_OUT.ip[inst];
+  vtp->tcpClient[inst].IP4_SubnetMask   = VTP_NET_OUT.sm[inst];
+  vtp->tcpClient[inst].IP4_GatewayAddr  = VTP_NET_OUT.gw[inst];
+  vtp->tcpClient[inst].MAC_ADDR[1]      = VTP_NET_OUT.mac[0][inst];
+  vtp->tcpClient[inst].MAC_ADDR[0]      = VTP_NET_OUT.mac[1][inst];
   vtp->tcpClient[inst].TCP_DEST_ADDR[link] = destipaddr;
   printf("%s: TCP_DEST_ADDR = 0x%08X (link=%d)\n", __func__, vtp->tcpClient[inst].TCP_DEST_ADDR[link], link);
   vtp->tcpClient[inst].TCP_PORT[link]      = (10001<<16) | destipport;
@@ -518,11 +574,9 @@ vtpRoc_inet_addr(const char *ip4)
 {
   unsigned int addr=0;
 
-  CHECKINIT;
-
   addr = inet_addr(ip4);
   if (addr == 0xffffffff) {
-    printf("ERROR: No valid IP4 address provided (%s) \n",ip4);
+    printf("%s: ERROR: No valid IP4 address provided (%s) \n",__func__,ip4);
     return 0;
   }
 
@@ -530,6 +584,39 @@ vtpRoc_inet_addr(const char *ip4)
   addr = LSWAP(addr);
 
   return addr;
+}
+
+/* Convert a standard MAC address string (eg ce:ba:f0:03:12:34) into 2 unsigned integers
+   that can be used for the VTP TCP stack registers */
+int
+vtpRoc_mac_addr(char *mac_str, unsigned int mm[])
+{
+  int ii;
+  unsigned int mac[6] = {0,0,0,0,0,0};
+  char *hx;
+
+  /* This functions assumes the form  XX:XX:XX:XX:XX:XX */
+
+  if(mac_str != NULL) {
+    /* get first byte */
+    hx = strtok(mac_str,":");
+    mac[0] = strtol(hx, (char **)NULL, 16);
+    /* and then the rest... */
+    for (ii=1;ii<6;ii++) {
+      hx = strtok(NULL,":");
+      mac[ii] = strtol(hx, (char **)NULL, 16);
+    }
+    printf("mac[] = %02x %02x %02x %02x %02x %02x\n",mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+  }else{
+    printf("%s: ERROR: NULL string passed to function\n",__func__);
+    return ERROR;
+  }
+
+  /* create the 2 VTP register entries */
+  mm[0] = (mac[0])<<8 | mac[1];
+  mm[1] = (mac[2])<<24 | (mac[3]<<16) | (mac[4])<<8 | mac[5];
+
+  return OK;
 }
 
 
@@ -577,6 +664,157 @@ vtpRocEvioWriteControl(unsigned int type, unsigned int val0, unsigned int val1)
 
   return OK;
 }
+
+
+int
+vtpRocEvioWriteUserEvent(unsigned int *buf)
+{
+
+  int ii;
+  unsigned int blen, tag, dt, num, totalLen;
+  unsigned int rocid=0;
+
+  CHECKINIT;
+  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+
+  /* First check that the User's buffer contains EVIO Bank data */
+  blen = buf[0] + 1;  // total length of buffer
+  tag = (buf[1]&0xffff0000)>>16;
+  dt  = (buf[1]&0xff00)>>8;
+  num =  buf[1]&0xff;
+
+  if(blen>1048576) {
+    printf("%s: ERROR: buffer length (%d words) is too long for User Event\n",__func__,blen);
+    return ERROR;
+  }
+  if(tag>=0xff00) {
+    printf("%s: ERROR: Illegal User Bank Tag (0x%04x)\n",__func__,tag);
+    return ERROR;
+  }
+  if(((dt&0x3f)>0x10)&&((dt&0x3f)!=0x20)) {
+    printf("%s: ERROR: Illegal Bank Data Type (%d) for User Event\n",__func__,dt);
+    return ERROR;
+  }
+  if(num>0) {
+    printf("%s: ERROR: Num field must be zero for User Events (num=%d)\n",__func__,num);
+    return ERROR;
+  }
+
+  VLOCK;
+
+  totalLen = blen + 8;
+  rocid = vtp->roc.rocID;
+
+  /* Write the total length to the Length FiFo so that the VTP
+     knows how much data is coming */
+  vtp->roc.CpuAsyncEventLen = totalLen + 2;
+
+
+  /* cMsg Header */
+  vtp->roc.CpuAsyncEventData = 1;
+  vtp->roc.CpuAsyncEventData = (totalLen<<2);  // Length in Bytes
+
+  /* EVIO Block header */
+  vtp->roc.CpuAsyncEventData = totalLen;
+  vtp->roc.CpuAsyncEventData = 0xffffffff;
+  vtp->roc.CpuAsyncEventData = 8;
+  vtp->roc.CpuAsyncEventData = 1;
+  vtp->roc.CpuAsyncEventData = rocid;
+  vtp->roc.CpuAsyncEventData = (0x1000|0x200|4); /* User Event, Last block, evio version */
+  vtp->roc.CpuAsyncEventData = 0;
+  vtp->roc.CpuAsyncEventData = 0xc0da0100;
+
+  /* Write User Event buffer */
+  vtp->roc.CpuAsyncEventData = (blen - 1);
+  for(ii=1;ii<blen;ii++) {
+    vtp->roc.CpuAsyncEventData = buf[ii];
+  }
+  VUNLOCK;
+
+  return OK;
+}
+
+
+
+/* Routine to read in a file (as text) and create a User Event in a buffer that
+   can be sent by the VTP into the Data Stream using the function vtpRocEvioWriteUserEvent() */
+
+int
+vtpRocFile2Event(const char *fname, unsigned char *buf, int utag, int maxbytes)
+{
+
+  int ii, c, ilen, rem;
+  FILE *fid;
+  int maxb = 1024*1024*4; /* max VTP output buffer size */
+  unsigned int ev_header[2];
+
+
+  if (fname == NULL) {
+    printf("%s: ERROR: No filename was specified\n",__func__);
+    return ERROR;
+  }
+
+
+  if((utag == 0)||(utag>=0xff00)) {
+    printf("%s: ERROR: Invalid User Event tag specified (0x%04x)\n",__func__,utag);
+    return ERROR;
+  }
+
+  if((maxbytes==0) || (maxbytes>maxb))
+    maxbytes = maxb;  /* Default to 4 MB */
+
+
+  fid = fopen(fname,"r");
+  if(fid==NULL) {
+    printf("%s: ERROR: The file %s does not exist \n",__func__,fname);
+    return ERROR;
+  }else{
+    printf("%s: INFO: Opened file %s for reading into User Event \n",__func__,fname);
+  }
+  /* Read in the file to the buffer */
+  ilen = 8; /* leave the header words */
+  while((ilen<maxbytes) && ((c = getc(fid))!=EOF)) {
+    buf[ilen++] = c;
+  }
+  fclose(fid);
+  printf("%s: INFO: Read %d bytes into buffer\n",__func__,ilen);
+
+  /* Make sure we null terminate the buffer and pad it out to an integal number of words */
+  rem = 4 - (ilen&0x3);
+  if(rem<4) {
+    for(ii=0;ii<rem;ii++)
+      buf[(ilen+ii)] = 0;
+    ilen+=ii;
+  }else{
+    rem=0;  /* no padding necessary just NULL terminate*/
+    buf[ilen] = 0;
+  }
+
+  /* Write the header info in the buffer */
+  ev_header[0] = (ilen>>2) - 1; /* divide by 4  and subtract 1 */
+  ev_header[1] = (utag<<16)|(rem<<14)|(3<<8)|0;
+  memcpy(&buf[0],&ev_header[0],8);
+  //  printf("%s: INFO: Copied Event Header = 0x%08x 0x%08x \n",__func__,ev_header[0],ev_header[1]);
+
+  /*Swap the bytes going to the Async Event 32 bit Fifo */
+  {
+    unsigned char aa, bb;
+    for (ii=8; ii<=(ev_header[0]<<2); ii+=4) {
+      aa=buf[ii]; bb=buf[ii+1];
+      buf[ii] = buf[ii+3];
+      buf[ii+1] = buf[ii+2];
+      buf[ii+2] = bb;
+      buf[ii+3] = aa;
+    }
+  }
+
+
+  return (ev_header[0]);
+
+}
+
+
+
 
 int
 vtpRocEbReset()
@@ -859,7 +1097,7 @@ vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen)
   CHECKINIT;
   //CHECKTYPE(VTP_FW_TYPE_VCODAROC,0);
 
-  printf("%s(%d,%d)\n", __func__, inst, connect);
+  printf("%s(%d,cdata,%d)\n", __func__, connect, dlen);
 
 
   VLOCK;
@@ -882,11 +1120,11 @@ vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen)
     {
       volatile unsigned int done=0;
       int wait=1000000;
-      while(!done) {
+      while(wait>0) {
 	done = (vtp->tcpClient[inst].IP4_TCPStatus)&0xff;
+	if(done>0) break;
 	wait--;
-	printf("done = %d\n",done);
-	if(wait==0) break;
+	printf("wait = %d  done=%d\n",wait, done);
       }
 
       }*/
@@ -952,4 +1190,89 @@ vtpRocTcpConnected()
 
   return status;
 
+}
+
+/* Read the Network information for the VTP ROC output. There can be up to
+   4 seperate network interfaces available
+
+   The default input file for the VTP should be found on the VTP SD card mounted
+   under the the directory  /mnt/boot
+   The filename should default to  <hostname>_net.txt
+
+*/
+
+int
+vtpRocReadNetFile(char *filename_in)
+{
+  FILE   *fd;
+  char   filename[128];
+  int    jj, ch;
+  char   str_tmp[256], keyword[64];
+  char   host[32], value[64];
+  unsigned int mm[2] = {0,0};
+
+
+  gethostname(host,32);  /* obtain our hostname - and drop any domain extension */
+  for(jj=0; jj<strlen(host); jj++)
+    {
+      if(host[jj] == '.')
+	{
+	  host[jj] = '\0';
+	  break;
+	}
+    }
+
+
+  if(filename_in == NULL) {  /* Use default file */
+    sprintf(filename,"/mnt/boot/%s_net.txt",host);
+  }else{
+    strcpy(filename,filename_in); /* copy filename from parameter list to local string */
+  }
+  printf("%s: Opening Network file %s \n",__func__,filename);
+
+  if((fd=fopen(filename,"r")) == NULL)
+    {
+      printf("%s: Can't open file >%s<\n",__func__,filename);
+      return(-1);
+    }
+
+  /* Parse the file */
+
+  while ((ch = getc(fd)) != EOF)
+    {
+      /* Skip comments and whitespace */
+      if ( ch == '#' || ch == ' ' || ch == '\t' )
+	{
+	  while ( getc(fd)!='\n' /*&& getc(fd)!=!= EOF*/ ) {} /*ERROR !!!*/
+	}
+      else if( ch == '\n' ) {}
+      else
+	{ /* Backup and read the whole line into memory */
+	  ungetc(ch,fd);
+	  fgets(str_tmp, 256, fd);
+	  sscanf (str_tmp, "%s %s", keyword, value);
+
+	  printf("\nfgets returns %s so keyword=%s  val=%s\n",str_tmp,keyword,value);
+
+	  if(strcmp(keyword,"ipaddr1")==0)
+	    VTP_NET_OUT.ip[0] = vtpRoc_inet_addr(value);
+
+	  if(strcmp(keyword,"gateway1")==0)
+	    VTP_NET_OUT.gw[0] = vtpRoc_inet_addr(value);
+
+	  if(strcmp(keyword,"subnet1")==0)
+	    VTP_NET_OUT.sm[0] = vtpRoc_inet_addr(value);
+
+	  if(strcmp(keyword,"mac1")==0) {
+	    vtpRoc_mac_addr(value,mm);
+	    VTP_NET_OUT.mac[0][0] = mm[0];
+	    VTP_NET_OUT.mac[1][0] = mm[1];
+	  }
+
+	}
+    }
+
+  fclose(fd);
+
+  return(0);
 }

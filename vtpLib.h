@@ -49,6 +49,14 @@
 #define VTP_DBG(format, ...) {if(vtpPrintMask&1) {printf("%s: DEBUG: ",__FUNCTION__); printf(format, ## __VA_ARGS__);fflush(stdout);} }
 #define VTP_DBGN(x,format, ...) {if(vtpDebugMask&x) {printf("%s: DEBUG%d: ",__FUNCTION__, x); printf(format, ## __VA_ARGS__);fflush(stdout);} }
 
+/* Structure to hold the VTP Network Output interface information */
+struct vtp_net_struct {
+  int nlinks;
+  unsigned int ip[4];
+  unsigned int gw[4];
+  unsigned int sm[4];
+  unsigned int mac[2][4];
+} VTP_NET_OUT;
 
 /* Define a Payload Port Config Structure */
 typedef struct Payload_Port_Config
@@ -1360,14 +1368,20 @@ int vtpRocReset(int enflag);
 int vtpRocSetID(int roc_id);
 unsigned int vtpRocGetTriggerCnt();
 unsigned long long vtpRocGetNlongs();
+void vtpRocGetNBytes(unsigned long long *nbytes);
 int vtpRocEnable(int en_mask);
+int vtpRocPoll();
+void vtpRocWriteBank(unsigned int *bank);
 int vtpRocGetCfg(int *roc_id, int *en_mask);
 int vtpRocGetTcpCfg(unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short *destipport);
 int vtpRocSetTcpCfg(unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned int destipaddr, unsigned int destipport);
+int vtpRocSetTcpCfg2(int inst, unsigned int destipaddr, unsigned int destipport);
 unsigned int vtpRoc_inet_addr(const char *ip4);
 int vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen);
 int vtpRocTcpConnected();
 int vtpRocEvioWriteControl(unsigned int type, unsigned int val0, unsigned int val1);
+int vtpRocEvioWriteUserEvent(unsigned int *buf);
+int vtpRocFile2Event(const char *fname, unsigned char *buf, int utag, int maxbytes);
 int vtpRocEbReset();
 int vtpRocEbStart();
 int vtpRocEbStop();
@@ -1376,6 +1390,7 @@ int vtpRocEbConfig(PP_CONF *ppInfo, int blocklevel);
 int vtpRocEbSetBlockLevel(int blocklevel);
 int vtpRocEbioReset();
 int vtpRocMigReset();
+int vtpRocReadNetFile(char *filename_in);
 
 #define VTP_DMA_TI  0
 #define VTP_DMA_VTP 1
