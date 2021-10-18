@@ -746,7 +746,8 @@ typedef struct ROC_Struct
   /** 0x0030 */ BLANK[(0x040-0x030)/4];
   /** 0x0040 */ volatile uint32_t TiTriggerCnt;
   /** 0x0044 */ volatile uint32_t BytesSent[2];
-  /** 0x004c */ BLANK[(0x060-0x04c)/4];
+  /** 0x004c */ volatile uint32_t TiTriggerAck;
+  /** 0x0050 */ BLANK[(0x060-0x050)/4];
   /** 0x0060 */ volatile uint32_t DDRRecordsUsed;
   /** 0x0064 */ volatile uint32_t DDRBytesUsed;
   /** 0x0068 */ volatile uint32_t DDRStart;

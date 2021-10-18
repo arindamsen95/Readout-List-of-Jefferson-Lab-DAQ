@@ -10,9 +10,10 @@ int
 vtpRocStatus(int flag)
 {
 
-  int  ii, jj, status, fw_version, fw_type, timestamp;
+  int  ii, jj, status, fw_version, fw_type, timestamp, tcpFull=0;
   unsigned int ctrl, tcp_ctrl, tcp_state, tcp_status, ti[4], rocid, roc[12], totalBytes[2],
-    tiTrigCnt, eb_ctrl, eb_status,  ebiotx[2], ebiorx[2], evioBank[3], port[16], slot[16], ppState[16];
+    tiTrigCnt, tiTrigAck, eb_ctrl, eb_status,  ebiotx[2], ebiorx[2], evioBank[3],
+    port[16], slot[16], ppState[16];
 
   CHECKINIT;
   //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
@@ -49,11 +50,13 @@ vtpRocStatus(int flag)
   }
 
   rocid         = vtp->roc.rocID;
+  tiTrigAck     = vtp->roc.TiTriggerAck;
   tiTrigCnt     = vtp->roc.TiTriggerCnt;
   totalBytes[0] = vtp->roc.BytesSent[0];
   totalBytes[1] = vtp->roc.BytesSent[1];
   roc[0]        = vtp->roc.Ctrl;
   roc[1]        = vtp->roc.State;
+  tcpFull = (roc[1])&VTP_ROC_STATE_TCPFULL;
   roc[2]        = vtp->roc.CpuSyncEventStatus;
   roc[3]        = vtp->roc.CpuSyncEventLenStatus;
   roc[4]        = vtp->roc.CpuAsyncEventStatus;
@@ -115,6 +118,7 @@ vtpRocStatus(int flag)
   printf("    TI Status       = %08x\n",ti[2]);
   printf("    TI (EB Status)  = %08x\n",ti[3]);
   printf("    Trigger Cnt  = %d\n",tiTrigCnt);
+  printf("    Trigger Acks = %d\n",tiTrigAck);
   printf("    Bytes Sent   = 0x%08x%08x\n",totalBytes[1],totalBytes[0]);
   printf("    EVIO Record: Size = %d Bytes, Max Event Blocks = %d, Timeout = %d (12.5 ns ticks)\n",roc[6],roc[7],roc[8]);
   printf("\n");
@@ -139,12 +143,21 @@ vtpRocStatus(int flag)
   printf("\n\n");
 
   printf("    ROC             Ctrl   = %08x\n",roc[0]);
-  printf("    ROC             State  = %d  %02x %02x %02x %02x\n",
+  if(tcpFull) {
+    printf("    ROC             State  = %d  %02x %02x %02x %02x  (TCPFULL)\n",
 	 (roc[1]&0x10000)>>16,
 	 (roc[1]&0xF000)>>12,
 	 (roc[1]&0xF00)>>8,
 	 (roc[1]&0xF0)>>4,
 	 (roc[1]&0xF));
+  }else{
+    printf("    ROC             State  = %d  %02x %02x %02x %02x\n",
+	 (roc[1]&0x10000)>>16,
+	 (roc[1]&0xF000)>>12,
+	 (roc[1]&0xF00)>>8,
+	 (roc[1]&0xF0)>>4,
+	 (roc[1]&0xF));
+  }
   printf("    ROC SyncEvt     Status = %08x\n",roc[2]);
   printf("    ROC SynEvtLen   Status = %08x\n",roc[3]);
   printf("    ROC AsyncEvt    Status = %08x\n",roc[4]);
@@ -1116,18 +1129,22 @@ vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen)
     vtp->tcpClient[inst].IP4_StateRequest = 1;    // tcp: connect socket
     usleep(250000);
 
-    /* Make sure we are connected before we send any data
+    /* Make sure we are connected before we send any data */
     {
       volatile unsigned int done=0;
-      int wait=1000000;
+      int wait=100;
       while(wait>0) {
 	done = (vtp->tcpClient[inst].IP4_TCPStatus)&0xff;
-	if(done>0) break;
+	if(done>0) {
+	  printf("%s: TCP Connection - Complete! (%d)\n",__func__,wait);
+	  break;
+        }
 	wait--;
-	printf("wait = %d  done=%d\n",wait, done);
+	sleep(1);
       }
 
-      }*/
+      if (wait<=0) printf("%s: **WARNING**: TCP Connection - May have failed!\n",__func__);
+    }
 
 
     /* Send optional Data required to complete connection to the CODA EMU (EB) */
