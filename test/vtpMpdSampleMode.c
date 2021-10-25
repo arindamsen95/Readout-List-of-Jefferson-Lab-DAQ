@@ -1,9 +1,10 @@
+
 /*
  * File:
- *    vtpMpdInit.c
+ *    vtpMpdSampleMode.c
  *
  * Description:
- *    Initialize VTP and their attached MPDs
+ *    Sample mode data taking for fish / goalpost plots
  *
  *   if a filename is provided, only initialize those MPD defined
  *
@@ -12,7 +13,7 @@
  *
  *
  * Usage:
- *      vtpMpdInit <optional filename>
+ *      vtpMpdSampleMode
  *
  */
 
@@ -24,6 +25,7 @@
 #include "vtpLib.h"
 #include "vtpConfig.h"
 #include "vtpMpdConfig.h"
+#define VTP
 #include "mpdLib.h"
 char *apvbuffer;
 char *errorbuffer;
@@ -31,12 +33,15 @@ char *bufp;
 
 int fnMPD=0;
 
-extern int I2C_SendStop(int id);
-
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 250
 #endif
 int getShortHostname(char *shortHostname);
+
+
+extern int I2C_SendStop(int id);
+/* routine prototype */
+void mpdSampleTest();
 
 int main(int argc, char *argv[])
 {
@@ -368,10 +373,121 @@ int main(int argc, char *argv[])
       printf("ERROR: MPD initialization errors\n");
     }
 
+  mpdSampleTest();
+
+
   vtpUnlock();
 
 
   return 0;
+}
+
+void
+mpdSampleTest()
+{
+  /**********************************
+   * SAMPLES TEST
+   * sample APV output at 40 MHz
+   * only for testing not for normal daq
+   **********************************/
+  int acq_mode = 0x2;
+  FILE *fout;
+  char *outfile = "outfile.txt";
+  int clp_clock0 = 0;
+  int clp_clock1 = 50;
+  int clp_clockd = 2;
+  int k,h,i,j,kk, error_count;
+  int scount, sfreq;
+  int sch0, sch1;
+  int rdone, rtout;
+  int fnMPD = mpdGetNumberMPD();
+  uint16_t mfull, mempty;
+#define MAX_HDATA 4096
+#define MAX_SDATA 1024
+  uint32_t hdata[MAX_HDATA]; // histogram data buffer
+  uint32_t sdata[MAX_SDATA]; // samples data buffer
+
+  if (acq_mode & 0x2) {
+
+    fout = fopen(outfile,"w");
+    if (fout == NULL) { fout = stdout; }
+
+    fprintf(fout,"# SAMPLE MODE OUTPUT\n");
+    fprintf(fout,"# CLOCK_RANGE: %d %d %d\n",clp_clock0, clp_clock1, clp_clockd);
+
+    for (k=0;k<fnMPD;k++) { // only active mpd set
+      i = mpdSlot(k);
+
+      mpdSetAcqMode(i, "sample");
+      mpdSetEventBuilding(i, 0);
+
+      // load pedestal and thr default values
+      mpdPEDTHR_Write(i);
+
+      mpdSetApvEnableMask(i, 0x7fff);
+      for (kk=clp_clock0;kk<clp_clock1;kk+=clp_clockd) { // loop on clock phases
+	// set clock phase
+	mpdDELAY25_Set(i, kk, kk);
+
+	// enable acq
+	mpdDAQ_Enable(i);
+
+	// wait for FIFOs to get full
+	mfull=0;
+	mempty=1;
+	printf("MPD / Clock : %d %d\n",i, kk);
+
+	rtout = 2;
+	do {
+	  mpdFIFO_GetAllFlags(i,&mfull,&mempty);
+	  printf("SAMPLE test wait fifo full: %x (%x) %x\n",
+		 mfull,mpdGetApvEnableMask(i),mempty);
+	  sleep(1);
+	  rtout--;
+	} while ((mfull!=mpdGetApvEnableMask(i)) && (rtout>0));
+
+	// read data from FIFOs and estimate synch pulse period
+	for (j=0;j<16;j++) { // 16 = number of ADC channel in one MPD
+	  if (mpdGetApvEnableMask(i) & (1<<j)) { // apv is enabled
+	    mpdFIFO_Samples(i,j, sdata, &scount, MAX_SDATA, &error_count);
+
+	    printf("i: %d",i);
+	    if (error_count != 0) {
+	      printf("ERROR returned from FIFO_Samples %d\n",error_count);
+	      continue;
+	    }
+
+	    fprintf(fout,"# MPD_ADC_COUNT_CLOCK_TOUT: %d %d %d %d %d\n",i, j, scount, kk, rtout);
+	    printf("MPD/APV : %d / %d, peaks around: ",i,j);
+	    sch0=-1;
+	    sch1=-1;
+	    sfreq=0;
+	    for (h=0;h<scount;h++) { // detects synch peaks
+	      //    printf("%04d ", sdata[h]); // output data
+	      fprintf(fout,"%d ",sdata[h]);
+	      if (sdata[h]>2500) { // threshold could be lower
+	     	if (sch0<0) { sch0=h; sch1=sch0;} else {
+		  if (h==(sch1+1)) { sch1=h; } else {
+		    printf("%d-%d (v %d) ",sch0,sch1, sdata[h]);
+		    sch0=h;
+		    sch1=sch0;
+		    sfreq++;
+		  }
+		}
+	      }
+	    }
+	    fprintf(fout,"\n");
+	    printf("\n Estimated synch period = %f (us) ,expected (20MHz:1.8, 40MHz:0.9)\n",((float) scount)/sfreq/40.0);
+	  }
+	}
+
+      } // end loop on clock phases
+
+    } // end loop on mpds
+
+    if (fout != stdout)  fclose(fout);
+
+  } // sample check mode
 }
 
 int
@@ -405,6 +521,6 @@ getShortHostname(char *shortHostname)
 
 /*
   Local Variables:
-  compile-command: "make -k -B vtpMpdInit"
+  compile-command: "make -k -B vtpMpdSampleMode"
   End:
  */

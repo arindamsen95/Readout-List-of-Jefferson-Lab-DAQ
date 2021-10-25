@@ -1,20 +1,12 @@
 /*
  * File:
- *    vtpMpdStatus.c
+ *    vtpFiberStatus.c
  *
  * Description:
- *    Show status of VTP and their attached MPDs
- *
- *   This first looks at the connections between VTP <---> MPD.
- *
- *   If a channel is up (good fiber+serial connections), it will be
- *    added to the list to be initialized.
- *
- *   Final status shown is for the MPDs discovered just from the
- *    connection up status
+ *    Show fiber status of VTP
  *
  * Usage:
- *      vtpMpdStatus
+ *      vtpFiberStatus
  *
  */
 
@@ -24,7 +16,6 @@
 #include "vtp.h"
 #include "vtpLib.h"
 #include "vtpConfig.h"
-#include "mpdLib.h"
 
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 250
@@ -58,14 +49,10 @@ int main(int argc, char *argv[])
   vtpMpdDisable(0xffffffff);
   vtpMpdEnable(0xffffffff);
 
+  usleep(10);
   vtpStatus(0);
   vtpMpdPrintStatus(0,0);
-  vtpMpdPrintStatus(0,1);
 
-  unsigned int chanmask = vtpMpdGetChanUpMask();
-  mpdInitVTP(chanmask, MPD_INIT_FIBER_MODE | MPD_INIT_NO_CONFIG_FILE_CHECK);
-
-  mpdGStatus(1);
 
  CLOSE:
   vtpClose(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
@@ -102,9 +89,8 @@ getShortHostname(char *shortHostname)
   return rval;
 }
 
-
 /*
   Local Variables:
-  compile-command: "make -k -B vtpMpdStatus"
+  compile-command: "make -k vtpMpdFiberStatus"
   End:
  */
