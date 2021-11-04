@@ -1558,6 +1558,15 @@ vtpV7SetResetSoft(int val)
   return OK;
 }
 
+/* Make an easier Soft Reset for the User in the Readout list */
+void
+vtpV7SoftReset()
+{
+  vtpV7SetResetSoft(1);
+  vtpV7SetResetSoft(0);
+}
+
+
 int
 vtpV7GetDone()
 {

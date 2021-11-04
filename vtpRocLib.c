@@ -1,8 +1,16 @@
+/* Routines associated with the CODA ROC firmware relsease for the VTP */
+
+
+/* VTP ROC Data FIFOs - both Synchronous and Asynchrous - have a max depth
+    One can write more than this into the FIFOs as long we keep track of how full
+    The fifos are before writing data. */
+#define VTP_ROC_DATA_FIFO_DEPTH    512   // total 32 bit words
+#define VTP_ROC_DATA_FIFO_FULL     0x80000000
 #ifndef LSWAP
 #include <byteswap.h>
 #define LSWAP(x) bswap_32(x)
 #endif
-/* Simple Acknowledge of Trigger with CPU Synchonous Events are enabled */
+/* Simple Acknowledge of Trigger when CPU Synchonous Events are enabled */
 #define VTP_ROC_ACK   vtp->roc.CpuSyncEventLen = 0
 
 
@@ -683,9 +691,10 @@ int
 vtpRocEvioWriteUserEvent(unsigned int *buf)
 {
 
-  int ii;
-  unsigned int blen, tag, dt, num, totalLen;
+  int ii, jj, full, flow_cntl = 0;
+  unsigned int blen, avail, rem, tag, dt, num, totalLen;
   unsigned int rocid=0;
+  static unsigned int maxwds = 1024*1024;
 
   CHECKINIT;
   CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
@@ -696,8 +705,8 @@ vtpRocEvioWriteUserEvent(unsigned int *buf)
   dt  = (buf[1]&0xff00)>>8;
   num =  buf[1]&0xff;
 
-  if(blen>1048576) {
-    printf("%s: ERROR: buffer length (%d words) is too long for User Event\n",__func__,blen);
+  if(blen>maxwds) {  /* 4MB is the Max EVIO ROC record size */
+    printf("%s: ERROR: buffer length (%d words) is too long for a User Event\n",__func__,blen);
     return ERROR;
   }
   if(tag>=0xff00) {
@@ -716,11 +725,24 @@ vtpRocEvioWriteUserEvent(unsigned int *buf)
   VLOCK;
 
   totalLen = blen + 8;
-  rocid = vtp->roc.rocID;
+  if(((totalLen+2) > VTP_ROC_DATA_FIFO_DEPTH)) {
+    flow_cntl = 1;  /* We need to be careful overfilling the FIFO */
+    full =  (vtp->roc.CpuAsyncEventStatus&0x2ff); /* how many words currently in fifo? */
+    if (full > (VTP_ROC_DATA_FIFO_DEPTH-12)) {
+      printf("%s: ERROR: DATA FIFO too Full (%d words) - try again later\n",__func__,full);
+      VUNLOCK;
+      return ERROR;
+    }else{
+      printf("%s: WARN: Flow Control Enabled (current fifo level = %d)\n",__func__,full);
+    }
+  }
+  rocid = vtp->roc.rocID;  // get rocid for EVIO header
+
 
   /* Write the total length to the Length FiFo so that the VTP
-     knows how much data is coming */
+     knows how much data is coming and starts reading into its send buffer*/
   vtp->roc.CpuAsyncEventLen = totalLen + 2;
+  rem = totalLen+2;
 
 
   /* cMsg Header */
@@ -737,10 +759,34 @@ vtpRocEvioWriteUserEvent(unsigned int *buf)
   vtp->roc.CpuAsyncEventData = 0;
   vtp->roc.CpuAsyncEventData = 0xc0da0100;
 
+  rem = rem - 10;
+
   /* Write User Event buffer */
-  vtp->roc.CpuAsyncEventData = (blen - 1);
-  for(ii=1;ii<blen;ii++) {
-    vtp->roc.CpuAsyncEventData = buf[ii];
+  if(flow_cntl) {
+    vtp->roc.CpuAsyncEventData = (blen - 1);
+    jj=1; rem = rem-1;
+    do {
+      if(vtp->roc.CpuAsyncEventStatus&VTP_ROC_DATA_FIFO_FULL) {
+	printf("%s: ERROR: ASYNC DATA FIFO is FULL!!\n",__func__);
+	VUNLOCK;
+	return ERROR;
+      }else{
+	avail = VTP_ROC_DATA_FIFO_DEPTH - (vtp->roc.CpuAsyncEventStatus&0x2ff);
+	if(avail>rem) avail=rem;
+      }
+      for(ii=0;ii<avail;ii++) {
+	vtp->roc.CpuAsyncEventData = buf[jj+ii];
+      }
+      rem = rem - avail;
+      jj += avail;
+
+    }while (rem > 0);
+
+  }else{ /* just blast it in */
+    vtp->roc.CpuAsyncEventData = (blen - 1);
+    for(ii=1;ii<blen;ii++) {
+      vtp->roc.CpuAsyncEventData = buf[ii];
+    }
   }
   VUNLOCK;
 
@@ -753,13 +799,13 @@ vtpRocEvioWriteUserEvent(unsigned int *buf)
    can be sent by the VTP into the Data Stream using the function vtpRocEvioWriteUserEvent() */
 
 int
-vtpRocFile2Event(const char *fname, unsigned char *buf, int utag, int maxbytes)
+vtpRocFile2Event(const char *fname, unsigned char *buf, int utag, int rocid, int maxbytes)
 {
 
   int ii, c, ilen, rem;
   FILE *fid;
   int maxb = 1024*1024*4; /* max VTP output buffer size */
-  unsigned int ev_header[2];
+  unsigned int ev_header[4];
 
 
   if (fname == NULL) {
@@ -785,7 +831,7 @@ vtpRocFile2Event(const char *fname, unsigned char *buf, int utag, int maxbytes)
     printf("%s: INFO: Opened file %s for reading into User Event \n",__func__,fname);
   }
   /* Read in the file to the buffer */
-  ilen = 8; /* leave the header words */
+  ilen = 16; /* leave the header words - 4 words * 4 bytes each*/
   while((ilen<maxbytes) && ((c = getc(fid))!=EOF)) {
     buf[ilen++] = c;
   }
@@ -805,14 +851,16 @@ vtpRocFile2Event(const char *fname, unsigned char *buf, int utag, int maxbytes)
 
   /* Write the header info in the buffer */
   ev_header[0] = (ilen>>2) - 1; /* divide by 4  and subtract 1 */
-  ev_header[1] = (utag<<16)|(rem<<14)|(3<<8)|0;
-  memcpy(&buf[0],&ev_header[0],8);
-  //  printf("%s: INFO: Copied Event Header = 0x%08x 0x%08x \n",__func__,ev_header[0],ev_header[1]);
+  ev_header[1] = (rocid<<16)|(0x10<<8)|0;
+  ev_header[2] = (ilen>>2) - 3;
+  ev_header[3] = (utag<<16)|(rem<<14)|(3<<8)|0;
+  memcpy(&buf[0],&ev_header[0],16);
+  //  printf("%s: INFO: Copied Event Header = 0x%08x 0x%08x \n",__func__,ev_header[0],ev_header[1], ev_header[2], ev_header[3]);
 
   /*Swap the bytes going to the Async Event 32 bit Fifo */
   {
     unsigned char aa, bb;
-    for (ii=8; ii<=(ev_header[0]<<2); ii+=4) {
+    for (ii=16; ii<=(ev_header[0]<<2); ii+=4) {
       aa=buf[ii]; bb=buf[ii+1];
       buf[ii] = buf[ii+3];
       buf[ii+1] = buf[ii+2];
@@ -943,14 +991,22 @@ vtpRocEbConfig(PP_CONF *ppInfo, int blocklevel)
       ppmask |= (1<<ii);
     }
   }
+  VUNLOCK;
 
-  /* If Block level is > 0 then set that info as well for each Bank Config register*/
+
+  /* Make sure the VTP serdes link mask is setup correctly as well */
+  vtpEnableTriggerPayloadMask(ppmask);
+
+
+  /* If Block level is > 0 then set that info as well for each Bank Config register
+     but make sure we save the Bank tag info */
+  VLOCK;
   if((blocklevel>0)&&(blocklevel<255)) {
-    reg =  vtp->v7.rocEB.evio_cfg[0];
+    reg =  (vtp->v7.rocEB.evio_cfg[0])&0x0000ffff;
     vtp->v7.rocEB.evio_cfg[0] = (blocklevel<<16)|reg;
-    reg =  vtp->v7.rocEB.evio_cfg[1];
+    reg =  (vtp->v7.rocEB.evio_cfg[1])&0x0000ffff;
     vtp->v7.rocEB.evio_cfg[1] = (blocklevel<<16)|reg;
-    reg =  vtp->v7.rocEB.evio_cfg[2];
+    reg =  (vtp->v7.rocEB.evio_cfg[2])&0x0000ffff;
     vtp->v7.rocEB.evio_cfg[2] = (blocklevel<<16)|reg;
   }
 
@@ -968,15 +1024,16 @@ vtpRocEbSetBlockLevel(int blocklevel)
 
   unsigned int reg=0;
 
-  /* If Block level is > 0 then set that info as well for each Bank Config register*/
+  /* If Block level is > 0 then set that info in each Config register*/
   if((blocklevel>0)&&(blocklevel<255)) {
-    reg =  vtp->v7.rocEB.evio_cfg[0];
+    reg =  (vtp->v7.rocEB.evio_cfg[0])&0x0000ffff;
     vtp->v7.rocEB.evio_cfg[0] = (blocklevel<<16)|reg;
-    reg =  vtp->v7.rocEB.evio_cfg[1];
+    reg =  (vtp->v7.rocEB.evio_cfg[1])&0x0000ffff;
     vtp->v7.rocEB.evio_cfg[1] = (blocklevel<<16)|reg;
-    reg =  vtp->v7.rocEB.evio_cfg[2];
+    reg =  (vtp->v7.rocEB.evio_cfg[2])&0x0000ffff;
     vtp->v7.rocEB.evio_cfg[2] = (blocklevel<<16)|reg;
   }else{
+    printf("%s: ERROR: Invalid block level (%d)\n",__func__,blocklevel);
     return ERROR;
   }
 
@@ -1114,7 +1171,7 @@ vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen)
 
 
   VLOCK;
-  if(connect)
+  if(connect>0)
   {
     vtp->tcpClient[inst].IP4_StateRequest = 0;    // tcp: disconnect socket
     vtp->tcpClient[inst].Ctrl = 0x03C5;           // tcp: reset: phy, qsfp, tcp
@@ -1133,10 +1190,11 @@ vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen)
     {
       volatile unsigned int done=0;
       int wait=100;
+      printf("%s: Connecting to Server...\n",__func__);
       while(wait>0) {
 	done = (vtp->tcpClient[inst].IP4_TCPStatus)&0xff;
 	if(done>0) {
-	  printf("%s: TCP Connection - Complete! (%d)\n",__func__,wait);
+	  printf("%s: TCP Connection - Complete! (%d)\n",__func__,(100-wait));
 	  break;
         }
 	wait--;
@@ -1160,23 +1218,32 @@ vtpRocTcpConnect(int connect, unsigned int *cdata, int dlen)
 
 
   }
-  else  /* disconnect the socket */
-  {
+  else if(connect == -1) {   /* force disconnect */
+    printf("%s: Reset any TCP Connections\n",__func__);
+    vtp->tcpClient[inst].IP4_StateRequest = 0;
+    usleep(500000);
+
+  } else {
     /*Before disconnecting the socket we should make sure all data has been sent by checking the
-      TCP buffer full bit in the ROC State register
-    int max=10000, tcpfull=VTP_ROC_STATE_TCPFULL;
+      TCP buffer full bit in the ROC State register */
+    int max=1000, tcpfull=VTP_ROC_STATE_TCPFULL;
     while(tcpfull) {
       max--;
       tcpfull = (vtp->roc.State)&VTP_ROC_STATE_TCPFULL;
-      if(max==0) break;
+      if(max==0) {
+	printf("%s: ERROR: Data still present in TCP Buffer - NOT closing socket yet!\n",__func__);
+	VUNLOCK;
+	return ERROR;
+      };
     }
-    */
+
+    printf("%s: Closing TCP Socket... (max = %d)\n",__func__,max);
     vtp->tcpClient[inst].IP4_StateRequest = 0;
     usleep(500000);        // We can't reset hardware too soon, or the socket on the EB side might not close cleanly
     //    vtp->tcpClient[inst].Ctrl = 0x03C5;           // tcp: reset: phy, qsfp, tcp   maybe we dont need to do this
   }
-  VUNLOCK;
 
+  VUNLOCK;
 
   return OK;
 }
