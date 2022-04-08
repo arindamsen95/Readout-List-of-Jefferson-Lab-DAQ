@@ -1358,6 +1358,7 @@ int  vtpStats();
 // VTP Streaming functions
 int vtpStreamingTcpConnect(int inst, int connect);
 int vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_id, int nframe_buf);
+int vtpStreamingSetEbRocid(int roc_id);
 int vtpStreamingGetEbCfg(int inst, int *mask, int *source_id, int *frame_len, int *roc_id, int *nframe_buf);
 int vtpStreamingGetTcpCfg(int inst, unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short *destipport);
 int vtpStreamingSetTcpCfg(int inst, unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short destipport);

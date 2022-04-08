@@ -646,11 +646,19 @@ int
 vtpRocEvioWriteControl(unsigned int type, unsigned int val0, unsigned int val1)
 {
 
+  int full;
   unsigned int rocid=0;
 
   CHECKINIT;
   //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
+  /* Check that the fifo does not already have data in it */
+  full =  (vtp->roc.CpuAsyncEventStatus&0x2ff); /* how many words currently in fifo? */
+
+  if(full>0) {
+    printf("%s: ERROR: Data in fifo (%d words). Cannot send Control event\n",__func__,full);
+    return ERROR;
+  }
 
   VLOCK;
 

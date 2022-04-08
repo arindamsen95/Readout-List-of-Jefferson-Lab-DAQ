@@ -604,6 +604,7 @@ vtpStats()
   int status, fw_version, fw_type, timestamp, temp, mig[2][2], i, inst, rtime;
   unsigned long long nwords[2][9], drops[2], rambusy[2], ebfull[2];
   float t;
+  unsigned int tcp_ctrl[2],tcp_state[2], tcp_status[2];
   int ebctrl[2], fadcstr[2];
   int mig_cnts[2][4];
 
@@ -620,6 +621,11 @@ vtpStats()
 
   for(inst=0; inst<2; inst++)
     {
+
+      tcp_ctrl[inst]   = vtp->tcpClient[inst].Ctrl;
+      tcp_state[inst]  = vtp->tcpClient[inst].IP4_TCPStateStatus;
+      tcp_status[inst] = vtp->tcpClient[inst].IP4_TCPStatus;
+
       mig[inst][0]        = vtp->v7.mig[inst].Ctrl;
       mig[inst][1]        = vtp->v7.mig[inst].Status;
       mig_cnts[inst][0]   = vtp->v7.mig[inst].WriteCnt;
@@ -686,6 +692,23 @@ vtpStats()
         ((rtime>>17)&0x3f)+2000, ((rtime>>23)&0xf), ((rtime>>27)&0x1f),
         ((rtime>>12)&0x1f), ((rtime>>6)&0x3f), ((rtime>>0)&0x3f)
       );
+
+    printf("\n");
+    printf("TCP LINK 0 Status:\n");
+    printf("    Ctrl            = %08x\n",tcp_ctrl[0]);
+    printf("    State           = %08x\n",tcp_state[0]);
+    if(tcp_status[0])
+      printf("    Status          = %08x  (Connected)\n",tcp_status[0]);
+    else
+      printf("    Status          = %08x  (No connection)\n",tcp_status[0]);
+    printf("TCP LINK 1 Status:\n");
+    printf("    Ctrl            = %08x\n",tcp_ctrl[1]);
+    printf("    State           = %08x\n",tcp_state[1]);
+    if(tcp_status[1])
+      printf("    Status          = %08x  (Connected)\n",tcp_status[1]);
+    else
+      printf("    Status          = %08x  (No connection)\n",tcp_status[1]);
+
     printf("\n");
     printf("Event Building:\n");
     printf("  EB Controller 0:\n");
@@ -1171,7 +1194,8 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
     case VTP_FW_TYPE_FTCAL:
       ctrl = vtp->v7.ftcalDec.Ctrl;
       break;
-    case VTP_FW_TYPE_VCODAROC:
+    case VTP_FW_TYPE_VCODAROC:   /* Check all 16 payload ports */
+    case VTP_FW_TYPE_FADCSTREAM:
       ctrl = 0xffff;
     }
   VUNLOCK;
@@ -2310,6 +2334,29 @@ vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_i
 
   return OK;
 }
+
+/* Hack to replace the EB Ctrl2 register with the correct ROCID for new streaming firmware */
+int
+vtpStreamingSetEbRocid(int roc_id)
+{
+  int inst;
+  unsigned int temp;
+
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_FADCSTREAM,0);
+
+  VLOCK;
+  for (inst=0; inst<2; inst++) {
+    temp = vtp->v7.streamingEb[inst].Ctrl2;
+    vtp->v7.streamingEb[inst].Ctrl2 = (temp&0xffff0000) | (roc_id&0xffff);
+  }
+  VUNLOCK;
+
+  return OK;
+}
+
+
+
 
 int
 vtpStreamingGetEbCfg(int inst, int *mask, int *source_id, int *frame_len, int *roc_id, int *nframe_buf)
