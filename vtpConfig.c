@@ -1910,6 +1910,64 @@ vtpReadConfigFile(char *filename_in)
 		  vtpConf.vtp_roc.destipport = argi[0];
 		}
 
+	      else if(!strcmp(keyword, "VTP_ROC_IPADDR"))
+		{
+		  sscanf(str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1],
+			 &argi[2], &argi[3]);
+#ifdef DEBUG_ROC_CONFIG
+		  printf("%s = %d.%d.%d.%d\n",
+			 keyword, argi[0], argi[1], argi[2], argi[3]);
+#endif
+		  vtpConf.vtp_roc.eb.ipaddr = (argi[0] << 24);
+		  vtpConf.vtp_roc.eb.ipaddr |= (argi[1] << 16);
+		  vtpConf.vtp_roc.eb.ipaddr |= (argi[2] << 8);
+		  vtpConf.vtp_roc.eb.ipaddr |= argi[3];
+		}
+	      else if(!strcmp(keyword, "VTP_ROC_SUBNET"))
+		{
+		  sscanf(str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1],
+			 &argi[2], &argi[3]);
+#ifdef DEBUG_ROC_CONFIG
+		  printf("%s = %d.%d.%d.%d\n",
+			 keyword, argi[0], argi[1], argi[2], argi[3]);
+#endif
+		  vtpConf.vtp_roc.eb.subnet = (argi[0] << 24);
+		  vtpConf.vtp_roc.eb.subnet |= (argi[1] << 16);
+		  vtpConf.vtp_roc.eb.subnet |= (argi[2] << 8);
+		  vtpConf.vtp_roc.eb.subnet |= argi[3];
+		}
+	      else if(!strcmp(keyword, "VTP_ROC_GATEWAY"))
+		{
+		  sscanf(str_tmp, "%*s %d %d %d %d", &argi[0], &argi[1],
+			 &argi[2], &argi[3]);
+#ifdef DEBUG_ROC_CONFIG
+		  printf("%s = %d.%d.%d.%d\n",
+			 keyword, argi[0], argi[1], argi[2], argi[3]);
+#endif
+		  vtpConf.vtp_roc.eb.gateway = (argi[0] << 24);
+		  vtpConf.vtp_roc.eb.gateway |= (argi[1] << 16);
+		  vtpConf.vtp_roc.eb.gateway |= (argi[2] << 8);
+		  vtpConf.vtp_roc.eb.gateway |= argi[3];
+		}
+	      else if(!strcmp(keyword, "VTP_ROC_MAC"))
+		{
+		  sscanf(str_tmp, "%*s 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X",
+			 &argi[0], &argi[1], &argi[2], &argi[3], &argi[4],
+			 &argi[5]);
+#ifdef DEBUG_ROC_CONFIG
+		  printf("%s = %02x:%02x:%02x:%02x:%02x:%02x\n",
+			 keyword,
+			 argi[0], argi[1], argi[2],
+			 argi[3], argi[4], argi[5]);
+#endif
+		  vtpConf.vtp_roc.eb.mac[0] = argi[0];
+		  vtpConf.vtp_roc.eb.mac[1] = argi[1];
+		  vtpConf.vtp_roc.eb.mac[2] = argi[2];
+		  vtpConf.vtp_roc.eb.mac[3] = argi[3];
+		  vtpConf.vtp_roc.eb.mac[4] = argi[4];
+		  vtpConf.vtp_roc.eb.mac[5] = argi[5];
+		}
+
 
 	      // COMPTON CONFIG PARAMETERS
 	      else if(!strcmp(keyword, "VTP_COMPTON_VETROC_WIDTH"))
@@ -2679,6 +2737,37 @@ vtpDownloadAll()
 	 vtpConf.vtp_roc.destipport);
       printf("vtpDownloadAll: Payload port enable mask = 0x%04x\n",
 	     vtpConf.payload_en);
+
+      // this is stupid.  I'm sorry
+      unsigned char _ipaddr[4] =
+	{
+	 (vtpConf.vtp_roc.eb.ipaddr >> 24) & 0xFF,
+	 (vtpConf.vtp_roc.eb.ipaddr >> 16) & 0xFF,
+	 (vtpConf.vtp_roc.eb.ipaddr >> 8) & 0xFF,
+	 (vtpConf.vtp_roc.eb.ipaddr) & 0xFF
+	},
+	_subnet[4] =
+	{
+	 (vtpConf.vtp_roc.eb.subnet >> 24) & 0xFF,
+	 (vtpConf.vtp_roc.eb.subnet >> 16) & 0xFF,
+	 (vtpConf.vtp_roc.eb.subnet >> 8) & 0xFF,
+	 (vtpConf.vtp_roc.eb.subnet) & 0xFF
+	},
+	_gateway[4] =
+	{
+	 (vtpConf.vtp_roc.eb.gateway >> 24) & 0xFF,
+	 (vtpConf.vtp_roc.eb.gateway >> 16) & 0xFF,
+	 (vtpConf.vtp_roc.eb.gateway >> 8) & 0xFF,
+	 (vtpConf.vtp_roc.eb.gateway) & 0xFF
+	};
+
+      vtpRocSetTcpCfg(_ipaddr,
+		      _subnet,
+		      _gateway,
+		      vtpConf.vtp_roc.eb.mac,
+		      vtpConf.vtp_roc.destip,
+		      vtpConf.vtp_roc.destipport);
+
     }
 
   // MPDRO Configuration
