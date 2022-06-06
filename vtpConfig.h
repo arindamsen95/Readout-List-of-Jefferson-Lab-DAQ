@@ -1,7 +1,6 @@
 #ifndef VTPCONFIG_H
 #define VTPCONFIG_H
 
-#include "vtpLib.h"
 
 /****************************************************************************
  *

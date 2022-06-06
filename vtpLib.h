@@ -24,6 +24,7 @@
 #include "vtp-spi.h"
 #include "vtp-ltm.h"
 #include "si5341_cfg.h"
+#include "vtpConfig.h"
 
 /* Environment variable specifying where to find parameter/configuration files */
 #ifndef VTP_CONFIG_GET_ENV
@@ -1412,6 +1413,8 @@ int  vtpTryLock();
 int  vtpTimedLock(int time_seconds);
 int  vtpUnlock();
 int  vtpCheckMutexHealth(int time_seconds);
+
+VTP_CONF* vtpShmGetVTP_CONF();
 
 int  vtpDmaMemOpen(int nbuffers, int size);
 int  vtpDmaMemClose();

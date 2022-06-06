@@ -55,6 +55,7 @@ struct shared_memory_struct
   pthread_mutex_t mutex;
   pthread_mutexattr_t m_attr;
   VTPSHMDATA vtp;
+  VTP_CONF conf;
   uint32_t shmSize;
 };
 struct shared_memory_struct *p_sync=NULL;
@@ -8261,6 +8262,13 @@ vtpCheckMutexHealth(int time_seconds)
     }
 
   return rval;
+}
+
+/* Return a pointer to the VTP_CONF data in shared memory */
+VTP_CONF*
+vtpShmGetVTP_CONF()
+{
+  return &p_sync->conf;
 }
 
 #define MEMALLOC_BUFFER_MAX_NUMBER 16
