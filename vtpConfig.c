@@ -2738,6 +2738,8 @@ vtpDownloadAll()
       printf("vtpDownloadAll: Payload port enable mask = 0x%04x\n",
 	     vtpConf.payload_en);
 
+      vtpRocSetPPEnableMask(vtpConf.payload_en);
+
       // this is stupid.  I'm sorry
       unsigned char _ipaddr[4] =
 	{
@@ -3189,6 +3191,12 @@ vtpUploadAll(char *string, int length)
 		       &vtpConf.mpdro.noprocessing_prescale,
 		       &vtpConf.mpdro.allow_peak_any_time,
 		       &vtpConf.mpdro.min_avg_samples);
+    }
+
+  if((vtpConf.fw_type[0] == VTP_FW_TYPE_VCODAROC)
+     && (vtpConf.fw_type[1] == ZYNC_FW_TYPE_ZCODAROC))
+    {
+      vtpConf.payload_en = vtpRocGetPPEnableMask();
     }
 
   if(length)

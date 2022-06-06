@@ -1388,6 +1388,8 @@ int vtpRocFile2Event(const char *fname, unsigned char *buf, int utag, int rocid,
 int vtpRocEbReset();
 int vtpRocEbStart();
 int vtpRocEbStop();
+void vtpRocSetPPEnableMask(uint16_t ppenable);
+uint16_t vtpRocGetPPEnableMask();
 int vtpRocEbInit(unsigned int bank0, unsigned int bank1, unsigned int bank2);
 int vtpRocEbConfig(PP_CONF *ppInfo, int blocklevel);
 int vtpRocEbSetBlockLevel(int blocklevel);

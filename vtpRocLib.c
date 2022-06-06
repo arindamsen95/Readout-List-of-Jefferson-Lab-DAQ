@@ -58,8 +58,8 @@ vtpRocStatus(int flag)
   }
 
   rocid         = vtp->roc.rocID;
-  tiTrigAck     = vtp->roc.TiTriggerAck;
   tiTrigCnt     = vtp->roc.TiTriggerCnt;
+  tiTrigAck     = vtp->roc.TiTriggerAck;
   totalBytes[0] = vtp->roc.BytesSent[0];
   totalBytes[1] = vtp->roc.BytesSent[1];
   roc[0]        = vtp->roc.Ctrl;
@@ -924,6 +924,10 @@ vtpRocEbStop()
 
   return OK;
 }
+
+static uint16_t vtpRocPPEnableMask = 0;
+void vtpRocSetPPEnableMask(uint16_t ppenable) {vtpRocPPEnableMask = ppenable;}
+uint16_t vtpRocGetPPEnableMask() {return vtpRocPPEnableMask;}
 
 
 /* Initialize the ROC Eventbuilder Bank Tags and Block Level and clear all the

@@ -1994,6 +1994,9 @@ vtpEnableTriggerPayloadMask(int pp_mask)
   int i;
   CHECKINIT;
 
+  printf("%s: VTP_FW_Type[0] = %d  pp_mask = 0x%x\n",
+	 __func__, VTP_FW_Type[0], pp_mask);
+
   VLOCK;
   switch(VTP_FW_Type[0])
   {
