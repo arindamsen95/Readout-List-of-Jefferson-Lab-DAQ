@@ -15,6 +15,7 @@
  *      vtpMpdInit <optional filename>
  *
  */
+#define VTP
 
 #include <stdlib.h>
 #include <string.h>
@@ -25,33 +26,26 @@
 #include "vtpConfig.h"
 #include "vtpMpdConfig.h"
 #include "mpdLib.h"
-char *apvbuffer;
-char *errorbuffer;
-char *bufp;
-
 extern int I2C_SendStop(int id);
 
-int main(int argc, char *argv[])
+int32_t apvRejectMode = 1;
+void vtp_mpd_setup();
+
+#define daLogMsg(__x, __y) printf(__x);printf(": ");printf(__y);printf("\n");
+#define DALMAGO
+#define DALMASTOP
+
+int
+main(int argc, char *argv[])
 {
-  int stat;
-  apvbuffer = (char *)malloc(1024*50*sizeof(char));
-  errorbuffer = (char *)malloc(1024*50*sizeof(char));
-  int useConfigFile = 0;
-  char filename[100];
+  char *filename = NULL;
 
   if(argc > 1)
     {
       /* assume the only argument is the path to the config file */
-      strncpy(filename, argv[1], sizeof(filename));
-      useConfigFile = 1;
+      filename = malloc(128*sizeof(char));
 
-      if(vtpMpdConfigInit(filename) == ERROR)
-	{
-	  printf("ERROR: Error in configuration file\n\t%s", filename);
-	  return -1;
-	}
-
-      vtpMpdConfigLoad();
+      strncpy(filename, argv[1], 128*sizeof(char));
     }
 
   char *rol_usrConfig = "/home/sbs-onl/vtp/cfg/sbsvtp3.config";
@@ -66,23 +60,98 @@ int main(int argc, char *argv[])
   vtpCheckMutexHealth(1);
   vtpLock();
 
+  /* just make a call to vtp_mpd_setup() */
+  vtp_mpd_setup(filename);
+
+  vtpUnlock();
+  vtpClose(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
+
+  if(filename)
+    free(filename);
+
+  return 0;
+}
+
+/*
+  This is copy-pasted from the vtp_mpdro readout list.
+  I've modified this to handle command-line arguments
+ */
+
+/* Filenames obtained from the platform or other config files */
+char APV_CONFIG_FILENAME[250];
+
+/* default config filenames, if they are not defined in COOL */
+#define DEFAULT_APV_CONFIG "/home/sbs-onl/cfg/vtp_config_TS.cfg"
+
+char *apvbuffer;
+char *bufp;
+
+void
+vtp_mpd_setup(char *filename)
+{
+  int useConfigFile = 0;
+
+  if(filename != NULL)
+    useConfigFile = 1;
+
+  /*****************
+   *   VTP SETUP
+   *****************/
+  int iFlag = 0;
+  int vtpFiberBit = 0;
   uint32_t vtpFiberMaskToInit;
+
+
+  if(filename != NULL)
+    {
+      if(vtpMpdConfigInit(filename) == ERROR)
+	{
+	  printf("%s: Error using filename %s.\n",
+		 __func__, filename);
+
+	  printf("  trying %s\n",
+		 DEFAULT_APV_CONFIG);
+
+	  if(vtpMpdConfigInit(DEFAULT_APV_CONFIG) == ERROR)
+	    {
+	      daLogMsg("ERROR","Error loading APV configuration file");
+
+	      return;
+	    }
+	  else
+	    {
+	      strncpy(APV_CONFIG_FILENAME, DEFAULT_APV_CONFIG, 250);
+	    }
+	}
+      else
+	{
+	  strncpy(APV_CONFIG_FILENAME, filename, 250);
+	}
+    }
+
+  vtpMpdConfigLoad();
 
   vtpMpdFiberReset();
   vtpMpdFiberLinkReset(0xffffffff);
 
+  /* ... the VTP holds all the MPD event build stuff in reset... */
   vtpMpdDisable(0xffffffff);
-  vtpMpdEnable(0xffffffff);
 
-  vtpStatus(0);
-  vtpMpdPrintStatus(0,0);
-  vtpMpdPrintStatus(0,1);
+  /* setups up the MPD (so they clear their buffers) ... */
 
   /*****************
    *   MPD SETUP
    *****************/
   int rval = OK;
   unsigned int errSlotMask = 0;
+  /* Index is the mpd / fiber... value mask if ADCs with APV config errors */
+  uint32_t apvConfigErrorMask[32];
+  uint32_t apvErrorTypeMask[32]; /* 0 : mpd init, 1: apv not found , 2: config */
+
+  memset(apvConfigErrorMask, 0 , sizeof(apvConfigErrorMask));
+  memset(apvErrorTypeMask, 0 , sizeof(apvErrorTypeMask));
+
+  mpdSetPrintDebug(0);
 
   // discover MPDs and initialize memory mapping
 
@@ -101,19 +170,14 @@ int main(int argc, char *argv[])
       mpdSetVTPFiberMap_preInit(chanmask);
       initFlag |= MPD_INIT_NO_CONFIG_FILE_CHECK;
     }
-
-  mpdSetPrintDebug(0xffffffff);
   mpdInitVTP(chanmask, initFlag);
-  mpdSetPrintDebug(0);
-
   int fnMPD = mpdGetNumberMPD();
 
 
   //fnMPD = 1;
   if (fnMPD<=0) { // test all possible vme slot ?
     printf("ERR: no MPD discovered, cannot continue\n");
-    vtpUnlock();
-    return -1;
+    return;
   }
 
   printf(" MPD discovered = %d\n",fnMPD);
@@ -127,6 +191,7 @@ int main(int argc, char *argv[])
     int try_cnt = 0;
 
   retry:
+    error_status = OK;
 
     printf(" Try initialize I2C mpd in slot %d\n",i);
     if (mpdI2C_Init(i) != OK) {
@@ -137,8 +202,6 @@ int main(int argc, char *argv[])
     if (mpdAPV_Scan(i)<=0 && try_cnt < 3 ) { // no apd found, skip next
       try_cnt++;
       printf("failing retrying\n");
-
-
       goto retry;
     }
 
@@ -148,6 +211,7 @@ int main(int argc, char *argv[])
       {
 	printf("APV blind scan failed for %d TIMES !!!!\n\n", try_cnt);
 	errSlotMask |= (1 << i);
+	continue;
       }
 
     printf(" - APV Reset\n");
@@ -202,7 +266,13 @@ int main(int argc, char *argv[])
 		  printf(" - - ");
 		fflush(stdout);
 		error_status = ERROR;
+		apvConfigErrorMask[i] |= (1 << mpdApvGetAdc(i,iapv));
+		apvErrorTypeMask[i] |= (1 << 2);
 		badTry = 1;
+	      }
+	    else
+	      {
+		apvConfigErrorMask[i] &= ~(1 << mpdApvGetAdc(i,iapv));
 	      }
 	  }
 	printf("\n");
@@ -218,6 +288,9 @@ int main(int argc, char *argv[])
 	    if(itry > 0)
 	      {
 		printf(" ****** SUCCESS!!!! ******\n");
+		error_status = OK;
+		apvConfigErrorMask[i] = 0;
+		apvErrorTypeMask[i] &= ~(1 << 2);
 		fflush(stdout);
 	      }
 	    break;
@@ -242,7 +315,7 @@ int main(int argc, char *argv[])
     mpdAPV_Reset101(i);
 
     // <- MPD+APV initialization ends here
-
+    sleep(1);
   } // end loop on mpds
   //END of MPD configure
 
@@ -252,17 +325,36 @@ int main(int argc, char *argv[])
   rval = sprintf(bufp, "\n");
   if(rval > 0)
     bufp += rval;
-  rval = sprintf(bufp, "Configured APVs (ADC 15 ... 0)\n");
+  rval = sprintf(bufp, "Configured APVs (ADC 15 ... 0)            --------------------ERRORS------------------\n");
   if(rval > 0)
     bufp += rval;
 
   int ibit;
-  int impd, id, iapv;
-  for (impd = 0; impd < fnMPD; impd++)
+  int ifiber, id, iapv;
+  for (ifiber = 0; ifiber < 32; ifiber++)
     {
-      id = mpdSlot(impd);
 
-      if (mpdGetApvEnableMask(id) != 0)
+      id = ifiber;
+
+      if( ((1 << id) & mpdGetVTPFiberMask()) == 0)
+	continue;
+
+
+      /* Build the ADCmask of those in the config file */
+      uint32_t configAdcMask = 0;
+      for (iapv = 0; iapv < mpdGetNumberAPV(id); iapv++)
+	{
+	  if(mpdApvGetAdc(id,iapv) > -1)
+	    {
+	      configAdcMask |= (1 << mpdApvGetAdc(id,iapv));
+	      apvErrorTypeMask[ifiber] |= (1 << 1);
+	    }
+	}
+
+      if(mpdGetFpgaRevision(ifiber) == 0)
+	apvErrorTypeMask[ifiber] = (1 << 0);
+
+      /* if (mpdGetApvEnableMask(id) != 0) */
 	{
 	  rval = sprintf(bufp, "  MPD %2d : ", id);
 	  if(rval > 0)
@@ -278,10 +370,24 @@ int main(int argc, char *argv[])
 		}
 	      if (mpdGetApvEnableMask(id) & (1 << ibit))
 		{
-		  rval = sprintf(bufp, "1");
+		  if(apvConfigErrorMask[id] & (1 << ibit))
+		    {
+		      rval = sprintf(bufp, "C");
+		    }
+		  else
+		    {
+		      rval = sprintf(bufp, "1");
+		    }
 		  if(rval > 0)
 		    bufp += rval;
 		  iapv++;
+		}
+	      else if(configAdcMask & (1 << ibit))
+		{
+		  rval = sprintf(bufp, "E");
+		  errSlotMask |= (1 << id);
+		  if(rval > 0)
+		    bufp += rval;
 		}
 	      else
 		{
@@ -290,12 +396,18 @@ int main(int argc, char *argv[])
 		    bufp += rval;
 		}
 	    }
-	  rval = sprintf(bufp, " (#APV %d)", iapv);
+	  rval = sprintf(bufp, " (#APV %2d)", iapv);
 	  if(rval > 0)
 	    bufp += rval;
 	  if(errSlotMask & (1 << id))
 	    {
-	      rval = sprintf(bufp, " INIT ERRORS\n");
+	      rval = sprintf(bufp, " %s  %s  %s\n",
+			     (apvErrorTypeMask[id] & 0x1) ? "*MPD NotFound*" :
+			     "              ",
+			     (apvErrorTypeMask[id] & 0x2) ? "*APV NotFound*" :
+			     "              ",
+			     (apvErrorTypeMask[id] & 0x4) ? "*APV Config*" :
+			     "");
 	      if(rval > 0)
 		bufp += rval;
 	    }
@@ -306,28 +418,63 @@ int main(int argc, char *argv[])
 		bufp += rval;
 	    }
 	}
-      else
-	{
-	  rval = sprintf(bufp,
-			 "  MPD %2d :                                INIT ERRORS\n", id);
-	  if(rval > 0)
-	    bufp += rval;
-	}
     }
   rval = sprintf(bufp, "\n");
   if(rval > 0)
     bufp += rval;
 
+  DALMAGO;
   printf("%s",apvbuffer);
+  DALMASTOP;
 
+  if ((errSlotMask != 0) || (error_status != OK))
+    {
+      daLogMsg("ERROR", "MPD initialization errors");
+    }
 
+  mpdGStatus(1);
 
-  vtpUnlock();
+  if(apvRejectMode == 1)
+    {
+      /* For each MPD, disable those APV that returned error during
+	 configuration */
 
+      printf("Reject Mode enabled\n");
 
-  return 0;
+      for(id = 0; id < 32; id++)
+	{
+	  /* Skip ones we're not using */
+	  if( ((1 << id) & mpdGetVTPFiberMask()) == 0)
+	    continue;
+
+	  /* Skip the MPD with unbroken APV */
+	  if(apvConfigErrorMask[id] == 0)
+	    continue;
+
+	  /* Get the current APV Enabled mask */
+	  uint32_t current_mask = ((uint32_t) mpdGetApvEnableMask(id)) & 0xFFFF;
+
+	  /* Remove the broken bits */
+	  uint32_t updated_mask = current_mask & ~apvConfigErrorMask[id];
+
+	  printf("Fiber %2d: \n", id);
+	  printf("  apvConfigErrorMask = 0x%04x  current_mask = 0x%04x  "
+		 "updated_mask = 0x%04x \n\n",
+		 apvConfigErrorMask[id], current_mask, updated_mask);
+
+	  /* Clear the apv enabled mask */
+	  mpdResetApvEnableMask(id);
+
+	  /* Write the updated mask */
+	  mpdSetApvEnableMask(id, updated_mask);
+
+	}
+
+    }
+
+  mpdGStatus(1);
+
 }
-
 
 /*
   Local Variables:
