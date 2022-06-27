@@ -34,21 +34,36 @@ void vtp_mpd_setup();
 #define daLogMsg(__x, __y) printf(__x);printf(": ");printf(__y);printf("\n");
 #define DALMAGO
 #define DALMASTOP
+char *apvbuffer;
+char *bufp;
+
+
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 250
+#endif
+int getShortHostname(char *shortHostname);
 
 int
 main(int argc, char *argv[])
 {
-  char *filename = NULL;
+  int stat;
+  apvbuffer = (char *)malloc(1024*50*sizeof(char));
+  int useConfigFile = 1;
+  char filename[250];
+  char rol_usrConfig[250] = "/home/sbs-onl/vtp/cfg/sbsvtp2.config";
+  char shortHostname[HOST_NAME_MAX];
 
   if(argc > 1)
     {
       /* assume the only argument is the path to the config file */
-      filename = malloc(128*sizeof(char));
-
-      strncpy(filename, argv[1], 128*sizeof(char));
+      strncpy(filename, argv[1], sizeof(filename));
     }
-
-  char *rol_usrConfig = "/home/sbs-onl/vtp/cfg/sbsvtp3.config";
+  else
+    {
+      stat = getShortHostname(shortHostname);
+      sprintf(filename, "/home/sbs-onl/cfg/%s_apv.cfg",shortHostname);
+      sprintf(rol_usrConfig, "/home/sbs-onl/vtp/cfg/%s.config",shortHostname);
+    }
 
   vtpOpen(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
   vtpInit(VTP_INIT_CLK_VXS_250);
@@ -66,8 +81,8 @@ main(int argc, char *argv[])
   vtpUnlock();
   vtpClose(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
 
-  if(filename)
-    free(filename);
+  if(apvbuffer)
+    free(apvbuffer);
 
   return 0;
 }
@@ -82,9 +97,6 @@ char APV_CONFIG_FILENAME[250];
 
 /* default config filenames, if they are not defined in COOL */
 #define DEFAULT_APV_CONFIG "/home/sbs-onl/cfg/vtp_config_TS.cfg"
-
-char *apvbuffer;
-char *bufp;
 
 void
 vtp_mpd_setup(char *filename)
@@ -474,6 +486,34 @@ vtp_mpd_setup(char *filename)
 
   mpdGStatus(1);
 
+}
+
+int
+getShortHostname(char *shortHostname)
+{
+  char longHostname[HOST_NAME_MAX];
+  char *tempShort;
+  int rval;
+
+  rval = gethostname(longHostname, HOST_NAME_MAX);
+  if(rval < 0)
+    {
+      perror("gethostname");
+      return rval;
+    }
+
+  printf("long Hostname : %s\n", longHostname);
+
+  tempShort = strtok((char *)&longHostname,".");
+  if(tempShort != NULL)
+    {
+      printf("short Hostname : >%s<\n", tempShort);
+      strcpy(shortHostname,tempShort);
+    }
+  else
+    printf("null\n");
+
+  return rval;
 }
 
 /*

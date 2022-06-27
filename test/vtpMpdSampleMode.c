@@ -29,11 +29,15 @@
 #define VTP
 #include "mpdLib.h"
 char *apvbuffer;
-char *errorbuffer;
 char *bufp;
 
 char cfgFilename[255];
 char progName[255];
+
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 250
+#endif
+int getShortHostname(char *shortHostname);
 
 extern int I2C_SendStop(int id);
 void mpdSampleTest(char *outfile, int32_t clp_clock0, int32_t clp_clock1, int32_t clp_clockd);
@@ -91,11 +95,14 @@ main(int argc, char *argv[])
   signal(SIGTSTP, sig_handler);
 
   apvbuffer = (char *)malloc(1024*50*sizeof(char));
-  errorbuffer = (char *)malloc(1024*50*sizeof(char));
 
   vtpMpdConfigLoad();
 
   char *rol_usrConfig = "/home/sbs-onl/vtp/cfg/sbsvtp3.config";
+  char shortHostname[HOST_NAME_MAX];
+
+  stat = getShortHostname(shortHostname);
+  sprintf(rol_usrConfig, "/home/sbs-onl/vtp/cfg/%s.config",shortHostname);
 
   printf("VTP - MPD SAMPLE check\n");
   printf("----------------------------\n");
@@ -128,6 +135,12 @@ main(int argc, char *argv[])
    *****************/
   int rval = OK;
   unsigned int errSlotMask = 0;
+  /* Index is the mpd / fiber... value mask if ADCs with APV config errors */
+  uint32_t apvConfigErrorMask[32];
+  uint32_t apvErrorTypeMask[32]; /* 0 : mpd init, 1: apv not found , 2: config */
+
+  memset(apvConfigErrorMask, 0 , sizeof(apvConfigErrorMask));
+  memset(apvErrorTypeMask, 0 , sizeof(apvErrorTypeMask));
 
   mpdSetPrintDebug(0);
 
@@ -135,14 +148,12 @@ main(int argc, char *argv[])
 
   // In VTP mode, par1(fiber mask) and par3(number of mpds) are not used in mpdInit(par1, par2, par3, par4)
   // Instead, they come from the configuration file
-  int initFlag = MPD_INIT_FIBER_MODE;
-  unsigned int chanmask;
+  unsigned int chanmask = vtpMpdGetChanUpMask();
 
   chanmask = mpdGetVTPFiberMask();
-
-  mpdInit(chanmask, 0, 32, initFlag);
-
+  mpdInitVTP(chanmask, MPD_INIT_FIBER_MODE | MPD_INIT_NO_CONFIG_FILE_CHECK);
   int fnMPD = mpdGetNumberMPD();
+
 
 
   //fnMPD = 1;
@@ -161,9 +172,8 @@ main(int argc, char *argv[])
 
     int try_cnt = 0;
 
-    mpdHISTO_MemTest(i);
-
   retry:
+    error_status = OK;
 
     printf(" Try initialize I2C mpd in slot %d\n",i);
     if (mpdI2C_Init(i) != OK) {
@@ -174,8 +184,6 @@ main(int argc, char *argv[])
     if (mpdAPV_Scan(i)<=0 && try_cnt < 3 ) { // no apd found, skip next
       try_cnt++;
       printf("failing retrying\n");
-
-
       goto retry;
     }
 
@@ -185,6 +193,7 @@ main(int argc, char *argv[])
       {
 	printf("APV blind scan failed for %d TIMES !!!!\n\n", try_cnt);
 	errSlotMask |= (1 << i);
+	continue;
       }
 
     printf(" - APV Reset\n");
@@ -239,7 +248,13 @@ main(int argc, char *argv[])
 		  printf(" - - ");
 		fflush(stdout);
 		error_status = ERROR;
+		apvConfigErrorMask[i] |= (1 << mpdApvGetAdc(i,iapv));
+		apvErrorTypeMask[i] |= (1 << 2);
 		badTry = 1;
+	      }
+	    else
+	      {
+		apvConfigErrorMask[i] &= ~(1 << mpdApvGetAdc(i,iapv));
 	      }
 	  }
 	printf("\n");
@@ -255,6 +270,9 @@ main(int argc, char *argv[])
 	    if(itry > 0)
 	      {
 		printf(" ****** SUCCESS!!!! ******\n");
+		error_status = OK;
+		apvConfigErrorMask[i] = 0;
+		apvErrorTypeMask[i] &= ~(1 << 2);
 		fflush(stdout);
 	      }
 	    break;
@@ -279,7 +297,7 @@ main(int argc, char *argv[])
     mpdAPV_Reset101(i);
 
     // <- MPD+APV initialization ends here
-
+    sleep(1);
   } // end loop on mpds
   //END of MPD configure
 
@@ -289,20 +307,39 @@ main(int argc, char *argv[])
   rval = sprintf(bufp, "\n");
   if(rval > 0)
     bufp += rval;
-  rval = sprintf(bufp, "Configured APVs (ADC 15 ... 0)\n");
+  rval = sprintf(bufp, "Configured APVs (ADC 15 ... 0)            --------------------ERRORS------------------\n");
   if(rval > 0)
     bufp += rval;
 
   int ibit;
-  int impd, id, iapv;
-  for (impd = 0; impd < fnMPD; impd++)
+  int ifiber, id, iapv;
+  for (ifiber = 0; ifiber < 32; ifiber++)
     {
-      id = mpdSlot(impd);
 
-      if (mpdGetApvEnableMask(id) != 0)
+      id = ifiber;
+
+      if( ((1 << id) & mpdGetVTPFiberMask()) == 0)
+	continue;
+
+
+      /* Build the ADCmask of those in the config file */
+      uint32_t configAdcMask = 0;
+      for (iapv = 0; iapv < mpdGetNumberAPV(id); iapv++)
 	{
-	  rval = sprintf(bufp, "  MPD %2d : ", id);
-	  if(rval > 0)
+	  if(mpdApvGetAdc(id,iapv) > -1)
+	    {
+	      configAdcMask |= (1 << mpdApvGetAdc(id,iapv));
+	      apvErrorTypeMask[ifiber] |= (1 << 1);
+	    }
+	}
+
+      if(mpdGetFpgaRevision(ifiber) == 0)
+	apvErrorTypeMask[ifiber] = (1 << 0);
+
+      /* if (mpdGetApvEnableMask(id) != 0) */
+      {
+	rval = sprintf(bufp, "  MPD %2d : ", id);
+	if(rval > 0)
 	    bufp += rval;
 	  iapv = 0;
 	  for (ibit = 15; ibit >= 0; ibit--)
@@ -315,10 +352,24 @@ main(int argc, char *argv[])
 		}
 	      if (mpdGetApvEnableMask(id) & (1 << ibit))
 		{
-		  rval = sprintf(bufp, "1");
+		  if(apvConfigErrorMask[id] & (1 << ibit))
+		    {
+		      rval = sprintf(bufp, "C");
+		    }
+		  else
+		    {
+		      rval = sprintf(bufp, "1");
+		    }
 		  if(rval > 0)
 		    bufp += rval;
 		  iapv++;
+		}
+	      else if(configAdcMask & (1 << ibit))
+		{
+		  rval = sprintf(bufp, "E");
+		  errSlotMask |= (1 << id);
+		  if(rval > 0)
+		    bufp += rval;
 		}
 	      else
 		{
@@ -327,12 +378,18 @@ main(int argc, char *argv[])
 		    bufp += rval;
 		}
 	    }
-	  rval = sprintf(bufp, " (#APV %d)", iapv);
+	  rval = sprintf(bufp, " (#APV %2d)", iapv);
 	  if(rval > 0)
 	    bufp += rval;
 	  if(errSlotMask & (1 << id))
 	    {
-	      rval = sprintf(bufp, " INIT ERRORS\n");
+	      rval = sprintf(bufp, " %s  %s  %s\n",
+			     (apvErrorTypeMask[id] & 0x1) ? "*MPD NotFound*" :
+			     "              ",
+			     (apvErrorTypeMask[id] & 0x2) ? "*APV NotFound*" :
+			     "              ",
+			     (apvErrorTypeMask[id] & 0x4) ? "*APV Config*" :
+			     "");
 	      if(rval > 0)
 		bufp += rval;
 	    }
@@ -343,13 +400,6 @@ main(int argc, char *argv[])
 		bufp += rval;
 	    }
 	}
-      else
-	{
-	  rval = sprintf(bufp,
-			 "  MPD %2d :                                INIT ERRORS\n", id);
-	  if(rval > 0)
-	    bufp += rval;
-	}
     }
   rval = sprintf(bufp, "\n");
   if(rval > 0)
@@ -357,7 +407,10 @@ main(int argc, char *argv[])
 
   printf("%s",apvbuffer);
 
-  mpdGStatus(0);
+  if ((errSlotMask != 0) || (error_status != OK))
+    {
+      printf("ERROR: MPD initialization errors\n");
+    }
 
   mpdSampleTest(outfile, clp_clock0, clp_clock1, clp_clockd);
 
@@ -366,9 +419,6 @@ main(int argc, char *argv[])
 
   if(apvbuffer)
     free(apvbuffer);
-
-  if(errorbuffer)
-    free(errorbuffer);
 
   return 0;
 }
@@ -508,6 +558,34 @@ void sig_handler(int signo)
 
   }
   return;
+}
+
+int
+getShortHostname(char *shortHostname)
+{
+  char longHostname[HOST_NAME_MAX];
+  char *tempShort;
+  int rval;
+
+  rval = gethostname(longHostname, HOST_NAME_MAX);
+  if(rval < 0)
+    {
+      perror("gethostname");
+      return rval;
+    }
+
+  printf("long Hostname : %s\n", longHostname);
+
+  tempShort = strtok((char *)&longHostname,".");
+  if(tempShort != NULL)
+    {
+      printf("short Hostname : >%s<\n", tempShort);
+      strcpy(shortHostname,tempShort);
+    }
+  else
+    printf("null\n");
+
+  return rval;
 }
 
 /*
