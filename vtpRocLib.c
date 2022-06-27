@@ -21,7 +21,7 @@ vtpRocStatus(int flag)
   int  ii, jj, status, fw_version, fw_type, timestamp, tcpFull=0;
   unsigned int ctrl, tcp_ctrl, tcp_state, tcp_status, ti[4], rocid, roc[12], totalBytes[2],
     tiTrigCnt, tiTrigAck, eb_ctrl, eb_status,  ebiotx[2], ebiorx[2], evioBank[3],
-    port[16], slot[16], ppState[16];
+    port[16], slot[16], ppState[16], mac_status[4], pcs_status, phy_status;
 
   CHECKINIT;
   //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
@@ -36,6 +36,12 @@ vtpRocStatus(int flag)
   tcp_ctrl   = vtp->tcpClient[0].Ctrl;
   tcp_state  = vtp->tcpClient[0].IP4_TCPStateStatus;
   tcp_status = vtp->tcpClient[0].IP4_TCPStatus;
+  mac_status[0] = vtp->tcpClient[0].MAC_STATUS[0];
+  mac_status[1] = vtp->tcpClient[0].MAC_STATUS[1];
+  mac_status[2] = vtp->tcpClient[0].MAC_STATUS[2];
+  mac_status[3] = vtp->tcpClient[0].MAC_STATUS[3];
+  pcs_status = vtp->tcpClient[0].PCS_STATUS;
+  phy_status = vtp->tcpClient[0].PHY_STATUS;
 
   ti[0]      = vtp->tiLink.Ctrl;
   ti[1]      = vtp->tiLink.LinkStatus;
@@ -111,6 +117,13 @@ vtpRocStatus(int flag)
     printf("    Status          = %08x  (Connected)\n",tcp_status);
   else
     printf("    Status          = %08x  (No connection)\n",tcp_status);
+
+  printf("    MAC Status %08X %08X %08X %08X\n", 
+    mac_status[0],mac_status[1],
+    mac_status[2], mac_status[3]);
+
+  printf("    PCS Status %08X\n", pcs_status);
+  printf("    PHY Status %08X\n", phy_status);
 
   printf("\nEBIO (EB->ROC) Link:\n");
   printf("  TX Control : Status: 0x%08X | 0x%08X\n", ebiotx[0],ebiotx[1]);

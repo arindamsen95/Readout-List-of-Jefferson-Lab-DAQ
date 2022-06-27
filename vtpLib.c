@@ -243,6 +243,7 @@ vtpInit(int iFlag)
   si5341_Init(clkSrc);
 
   vtpV7SetReset(1);
+  usleep(250000);
   vtpV7SetReset(0);
   usleep(10000);
 
@@ -1531,9 +1532,15 @@ vtpV7SetReset(int val)
 
   VLOCK;
   if(val)
+  {
+    printf("VTP Reset asserted.\n");
     CfgCtrl_Shadow |= VTP_V7BRIDGE_CTRL_RESET;
+  }
   else
+  {
+    printf("VTP Reset de-asserted.\n");
     CfgCtrl_Shadow &= ~VTP_V7BRIDGE_CTRL_RESET;
+  }
 
   vtp->v7.Ctrl = CfgCtrl_Shadow;
   VUNLOCK;

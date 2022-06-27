@@ -29,7 +29,7 @@ int  vtpMpdSetAvg(int fiber, int apv, int min, int max);
 int  vtpMpdSetApvOffset(int fiber, int apv, int strip, int offset);
 int  vtpMpdSetApvThreshold(int fiber, int apv, int strip, int threshold);
 int  vtpMpdFiberReset();
-int  vtpMpdFiberLinkReset(unsigned int mpdmask);
+int  vtpMpdFiberLinkReset(uint64_t mpdmask);
 
 int  vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers,
 		      int enable_cm, int noprocessing_prescale,
@@ -38,15 +38,15 @@ int  vtpMpdEbGetFlags(int *build_all_samples, int *build_debug_headers,
 		      int *enable_cm, int *noprocessing_prescale,
 		      int *allow_peak_any_time, int *min_avg_samples);
 
-int  vtpMpdEnable(unsigned int mpdmask);
-int  vtpMpdDisable(unsigned int mpdmask);
+int  vtpMpdEnable(uint64_t mpdmask);
+int  vtpMpdDisable(uint64_t mpdmask);
 
 int  vtpMpdReadRegs(int impd);
 unsigned int vtpMpdReadReg(int impd, unsigned int reg);
 int  vtpMpdWriteReg(int impd, unsigned int reg, unsigned int value);
 int  vtpMpdGetSoftErrorCount(int fiber);
-int  vtpMpdPrintStatus(uint32_t pmask, int upOnly);
-unsigned int vtpMpdGetChanUpMask();
+int  vtpMpdPrintStatus(uint64_t pmask, int upOnly);
+uint64_t vtpMpdGetChanUpMask();
 int  vtpGetMpdMaxRxLen(int impd);
 
 #ifdef MPD_EB_NOT_SUPPORTED
