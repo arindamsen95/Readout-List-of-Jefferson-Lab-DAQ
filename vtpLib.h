@@ -775,6 +775,8 @@ typedef struct ROC_EB_Struct
 
 
 /* MPD Interface */
+#define VTP_MPD_MAX   40
+
 #define MPD_GTX_CTRL_FIBER_GT_RESET	(1 << 0)	/* Analog reset fiber - asserted all channels and release 1 time on SSP init and don't do again */
 #define MPD_GTX_CTRL_FIBER_RESET	(1 << 1)	/* Fiber link reset the MPD */
 #define MPD_GTX_CTRL_FIBER_POWERDOWN    (1 << 2)
@@ -942,9 +944,9 @@ typedef struct v7_bridge_struct
 
   /** 0x43C19300 */ BLANK[(0xA000 - 0x9300)/4];
 
-  /** 0x43C1A000 */ MPDFIBER_REGS mpdFiber[32];
+  /** 0x43C1A000 */ MPDFIBER_REGS mpdFiber[VTP_MPD_MAX];
 
-  /** 0x43C1A800 */ BLANK[(0xFFF4 - 0xA800)/4];
+  /** 0x43C1AA00 */ BLANK[(0xFFF4 - 0xA000-sizeof(MPDFIBER_REGS)*VTP_MPD_MAX)/4];
 
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;

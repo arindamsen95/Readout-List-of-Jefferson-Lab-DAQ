@@ -22,6 +22,7 @@
 #include <string.h>
 #include "vtpLib.h"
 
+
 #ifndef FNLEN
 #define FNLEN     250       /* length of config. file name - careful, sscanf
                                format needs to be updated when this changes */
@@ -66,7 +67,7 @@ vtpMpdMonEnable(int fiber)
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
-  if((fiber<0) || (fiber>31))
+  if((fiber<0) || (fiber>=VTP_MPD_MAX))
   {
     printf("%s: ERROR: invalid fiber %d\n",__func__,fiber);
     return ERROR;
@@ -86,7 +87,7 @@ vtpMpdMonDump(int fiber)
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
-  if((fiber<0) || (fiber>31))
+  if((fiber<0) || (fiber>=VTP_MPD_MAX))
   {
     printf("%s: ERROR: invalid fiber %d\n",__func__,fiber);
     return ERROR;
@@ -127,7 +128,7 @@ vtpMpdSetAvg(int fiber, int apv, int min, int max)
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
-  if((fiber<0) || (fiber>31))
+  if((fiber<0) || (fiber>=VTP_MPD_MAX))
     {
       printf("%s: ERROR: invalid fiber %d\n",__func__,fiber);
       return ERROR;
@@ -179,7 +180,7 @@ vtpMpdSetApvOffset(int fiber, int apv, int strip, int offset)
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
-  if((fiber<0) || (fiber>31))
+  if((fiber<0) || (fiber>=VTP_MPD_MAX))
     {
       printf("%s: ERROR: invalid fiber %d\n",__func__,fiber);
       return ERROR;
@@ -220,7 +221,7 @@ vtpMpdSetApvThreshold(int fiber, int apv, int strip, int threshold)
   int val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
-  if((fiber<0) || (fiber>31))
+  if((fiber<0) || (fiber>=VTP_MPD_MAX))
     {
       printf("%s: ERROR: invalid fiber %d\n",__func__,fiber);
       return ERROR;
@@ -263,12 +264,12 @@ vtpMpdFiberReset()
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
       vtp->v7.mpdFiber[impd].gtx_ctrl = MPD_GTX_CTRL_FIBER_GT_RESET;
     }
   usleep(60000);
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
       vtp->v7.mpdFiber[impd].gtx_ctrl = 0;
     }
@@ -277,22 +278,22 @@ vtpMpdFiberReset()
 }
 
 int
-vtpMpdFiberLinkReset(unsigned int mpdmask)
+vtpMpdFiberLinkReset(uint64_t mpdmask)
 {
-  int impd=0;
+  uint64_t impd=0;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
-      if(mpdmask & (1<<impd))
+      if(mpdmask & (1ull<<impd))
 	vtp->v7.mpdFiber[impd].gtx_ctrl = MPD_GTX_CTRL_FIBER_RESET;
     }
   usleep(60000);
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
-      if(mpdmask & (1<<impd))
+      if(mpdmask & (1ull<<impd))
 	vtp->v7.mpdFiber[impd].gtx_ctrl = 0;
     }
   VUNLOCK;
@@ -312,7 +313,7 @@ vtpMpdEbSetFlags(int build_all_samples, int build_debug_headers,
     __func__, build_all_samples, build_debug_headers, enable_cm, noprocessing_prescale, allow_peak_any_time, min_avg_samples);
 
   VLOCK;
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
       val = vtp->v7.mpdFiber[impd].eb_ctrl & 0xFFFFFFF1;
 
@@ -370,9 +371,9 @@ vtpMpdEbGetFlags(int *build_all_samples, int *build_debug_headers,
   return OK;
 }
 int
-vtpMpdEnable(unsigned int mpdmask)
+vtpMpdEnable(uint64_t mpdmask)
 {
-  int impd=0;
+  uint64_t impd=0;
   unsigned int rval = 0;
   int printFlag = 0;
 
@@ -380,9 +381,9 @@ vtpMpdEnable(unsigned int mpdmask)
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
-      if(mpdmask & (1<<impd))
+      if(mpdmask & (1ull<<impd))
 	{
 	  vtp->v7.mpdFiber[impd].eb_ctrl = MPD_EBCTRL_ENABLE;
 
@@ -401,16 +402,17 @@ vtpMpdEnable(unsigned int mpdmask)
 }
 
 int
-vtpMpdDisable(unsigned int mpdmask)
+vtpMpdDisable(uint64_t mpdmask)
 {
-  int impd=0, val;
+  uint64_t impd=0;
+  int val;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
-      if(mpdmask & (1<<impd))
+      if(mpdmask & (1ull<<impd))
 	{
 	  val = vtp->v7.mpdFiber[impd].eb_ctrl & ~MPD_EBCTRL_ENABLE;
 	  vtp->v7.mpdFiber[impd].eb_ctrl = val;
@@ -495,22 +497,22 @@ vtpMpdGetSoftErrorCount(int fiber)
 }
 
 int
-vtpMpdPrintStatus(uint32_t pmask, int upOnly)
+vtpMpdPrintStatus(uint64_t pmask, int upOnly)
 {
-  MPDFIBER_REGS mr[32];
-  uint32_t upMask = 0;
-  int impd=0;
+  MPDFIBER_REGS mr[VTP_MPD_MAX];
+  uint64_t upMask = 0;
+  uint64_t impd=0;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   if(pmask == 0)
-    pmask = 0xFFFFFFFF;
+    pmask = (1ull<<VTP_MPD_MAX)-1;
 
   if(!upOnly)
-    upMask = 0xFFFFFFFF;
+    upMask = (1ull<<VTP_MPD_MAX)-1;
 
   VLOCK;
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
       mr[impd].gtx_ctrl   = vtp->v7.mpdFiber[impd].gtx_ctrl;
       mr[impd].gtx_status = vtp->v7.mpdFiber[impd].gtx_status;
@@ -518,7 +520,7 @@ vtpMpdPrintStatus(uint32_t pmask, int upOnly)
       mr[impd].max_rx_len = vtp->v7.mpdFiber[impd].max_rx_len;
 
       if(mr[impd].gtx_status & MPD_GTX_STATUS_FIBER_CHANNEL_UP)
-	upMask |= 1<<impd;
+	upMask |= 1ull<<impd;
     }
   VUNLOCK;
 
@@ -529,12 +531,12 @@ vtpMpdPrintStatus(uint32_t pmask, int upOnly)
   printf("--------------------------------------------------------------------------------\n");
   /*      31   0000   0038   DOWN     1     1   1      ---     ---    ---     ENABLED  */
 
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
-      if (( ((1 << impd) & pmask) == 0)  ||
-	  ( ((1 << impd) & upMask) == 0))
+      if (( ((1ull << impd) & pmask) == 0)  ||
+	  ( ((1ull << impd) & upMask) == 0))
 	continue;
-      printf("%2d   ",impd);
+      printf("%2d   ",(int)impd);
 
       printf("%04x   ",mr[impd].gtx_ctrl);
 
@@ -571,12 +573,12 @@ vtpMpdPrintStatus(uint32_t pmask, int upOnly)
   printf("--------------------------------------------------------------------------------\n");
   /*      31   0x12345678      0x7      0x7      0x7      0x123456      1 */
 
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
-      if (( ((1 << impd) & pmask) == 0)  ||
-	  ( ((1 << impd) & upMask) == 0))
+      if (( ((1ull << impd) & pmask) == 0)  ||
+	  ( ((1ull << impd) & upMask) == 0))
 	continue;
-      printf("%2d   ", impd);
+      printf("%2d   ", (int)impd);
 
       printf("0x%08x      ", mr[impd].max_rx_len);
 
@@ -598,12 +600,12 @@ vtpMpdPrintStatus(uint32_t pmask, int upOnly)
   printf("MPD         Samples   Headers        CM  Prescale   Anytime   Samples\n");
   printf("--------------------------------------------------------------------------------\n");
 
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
-      if (( ((1 << impd) & pmask) == 0)  ||
-	  ( ((1 << impd) & upMask) == 0))
+      if (( ((1ull << impd) & pmask) == 0)  ||
+	  ( ((1ull << impd) & upMask) == 0))
 	continue;
-      printf(" %-8d ",impd);
+      printf(" %-8d ",(int)impd);
 
       printf("%9d ", (mr[impd].eb_ctrl & MPD_EBCTRL_BUILD_ALL_SAMPLES) ? 1 : 0);
 
@@ -638,21 +640,21 @@ vtpMpdPrintStatus(uint32_t pmask, int upOnly)
   return OK;
 }
 
-unsigned int
+uint64_t
 vtpMpdGetChanUpMask()
 {
   unsigned int status = 0, rval = 0;
-  int impd=0;
+  uint64_t impd=0;
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_MPDRO,0);
 
   VLOCK;
-  for(impd=0; impd<32; impd++)
+  for(impd=0; impd<VTP_MPD_MAX; impd++)
     {
       status = vtp->v7.mpdFiber[impd].gtx_status;
       status &= MPD_GTX_STATUS_FIBER_CHANNEL_UP;
       if(status)
-	rval |= (1 << impd);
+	rval |= (1ull << impd);
     }
   VUNLOCK;
 
