@@ -28,14 +28,17 @@
 #include "vtpMpdConfig.h"
 #define VTP
 #include "mpdLib.h"
-char *apvbuffer;
-char *errorbuffer;
-char *bufp;
+#include "vtp_mpd_setup.c"
+
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 250
+#endif
+int getShortHostname(char *shortHostname);
+
 
 char cfgFilename[255];
 char progName[255];
 
-extern int I2C_SendStop(int id);
 void mpdHisto(char *outfile, int h_gain);
 
 int sig_ctrl = 0; // 0 = force quit, 1 = soft quit ... when CTRL-C is pressed
@@ -60,6 +63,8 @@ main(int argc, char *argv[])
 {
   int stat;
   char outfile[255];
+  char rol_usrConfig[250];
+  char shortHostname[HOST_NAME_MAX];
   int useConfigFile = 0;
   int h_gain=5;
   int mask_mpd = 0x0; // if bit set, corresponding MPD is masked; first bit is MPD with lower slot ID
@@ -78,25 +83,16 @@ main(int argc, char *argv[])
       mask_mpd = strtoll(argv[4],NULL,16);  /* par1 = MPD mask, if bit set corresponding MPD configuration disabled  */
     }
 
-  if(vtpMpdConfigInit(cfgFilename) == ERROR)
-    {
-      printf("ERROR: Error in configuration file\n\t%s", cfgFilename);
-      return -1;
-    }
-
   signal(SIGINT, sig_handler);
   signal(SIGTSTP, sig_handler);
 
-  apvbuffer = (char *)malloc(1024*50*sizeof(char));
-  errorbuffer = (char *)malloc(1024*50*sizeof(char));
-
-  vtpMpdConfigLoad();
-
-  char *rol_usrConfig = "/home/sbs-onl/vtp/cfg/sbsvtp3.config";
 
   printf("VTP - MPD SAMPLE check\n");
   printf("----------------------------\n");
   printf(" outfile = %s\n",outfile);
+
+  stat = getShortHostname(shortHostname);
+  sprintf(rol_usrConfig, "/home/sbs-onl/vtp/cfg/%s.config",shortHostname);
 
   vtpOpen(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
   vtpInit(VTP_INIT_CLK_VXS_250);
@@ -108,275 +104,14 @@ main(int argc, char *argv[])
   vtpCheckMutexHealth(1);
   vtpLock();
 
-  uint32_t vtpFiberMaskToInit;
+  /* just make a call to vtp_mpd_setup() */
+  vtp_mpd_setup(cfgFilename);
 
-  vtpMpdFiberReset();
-  vtpMpdFiberLinkReset(0xffffffff);
-
-  vtpMpdDisable(0xffffffff);
-  vtpMpdEnable(0xffffffff);
-
-  vtpStatus(0);
-  vtpMpdPrintStatus(0,0);
-  vtpMpdPrintStatus(0,1);
-
-  /*****************
-   *   MPD SETUP
-   *****************/
-  int rval = OK;
-  unsigned int errSlotMask = 0;
-
-  mpdSetPrintDebug(0);
-
-  // discover MPDs and initialize memory mapping
-
-  // In VTP mode, par1(fiber mask) and par3(number of mpds) are not used in mpdInit(par1, par2, par3, par4)
-  // Instead, they come from the configuration file
-  int initFlag = MPD_INIT_FIBER_MODE;
-  unsigned int chanmask;
-
-  chanmask = mpdGetVTPFiberMask();
-
-  mpdInit(chanmask, 0, 32, initFlag);
-
-  int fnMPD = mpdGetNumberMPD();
-
-
-  //fnMPD = 1;
-  if (fnMPD<=0) { // test all possible vme slot ?
-    printf("ERR: no MPD discovered, cannot continue\n");
-    return -1;
-  }
-
-  int k,i;
-  for (k=0;k<fnMPD;k++) { // get lowest slot
-    i = mpdSlot(k);
-    mpd_slot0 = (i<mpd_slot0) ? i : mpd_slot0;
-  }
-
-  printf(" MPD discovered = %d starting from slot %d (MPD mask 0x%x)\n",fnMPD, mpd_slot0, mask_mpd);
-
-  // APV configuration on all active MPDs
-  int error_status = OK;
-
-  for (k=0;k<fnMPD;k++) { // only active mpd set
-    i = mpdSlot(k);
-
-    if (mask_mpd & (1<<(i-mpd_slot0))) {
-      printf(" MPD in slot %d disabled \n", i);
-      mpdSetApvEnableMask(i,0);
-      continue;
-    }
-
-    int try_cnt = 0;
-
-    mpdHISTO_MemTest(i);
-
-  retry:
-
-    printf(" Try initialize I2C mpd in slot %d\n",i);
-    if (mpdI2C_Init(i) != OK) {
-      printf("WRN: I2C fails on MPD %d\n",i);
-    }
-
-    printf("Try APV discovery and init on MPD slot %d\n",i);
-    if (mpdAPV_Scan(i)<=0 && try_cnt < 3 ) { // no apd found, skip next
-      try_cnt++;
-      printf("failing retrying\n");
-
-
-      goto retry;
-    }
-
-
-
-    if( try_cnt == 3 )
-      {
-	printf("APV blind scan failed for %d TIMES !!!!\n\n", try_cnt);
-	errSlotMask |= (1 << i);
-      }
-
-    printf(" - APV Reset\n");
-    fflush(stdout);
-    if (mpdI2C_ApvReset(i) != OK)
-      {
-	printf(" * * FAILED\n");
-	error_status = ERROR;
-	errSlotMask |= (1 << i);
-      }
-
-    usleep(10);
-    I2C_SendStop(i);
-
-
-    // board configuration (APV-ADC clocks phase)
-    printf("Do DELAY setting on MPD slot %d\n",i);
-    mpdDELAY25_Set(i, mpdGetAdcClockPhase(i,0), mpdGetAdcClockPhase(i,1));
-
-
-
-    // apv configuration
-    printf("Configure %d APVs on MPD slot %d\n",mpdGetNumberAPV(i),i);
-
-
-    // apv configuration
-    mpdSetPrintDebug(0);
-    printf(" - Configure Individual APVs\n");
-    printf(" - - ");
-    fflush(stdout);
-    int itry, badTry = 0, iapv, saveError = error_status;
-    error_status = OK;
-    for (itry = 0; itry < 3; itry++)
-      {
-	if(badTry)
-	  {
-	    printf(" ******** RETRY ********\n");
-	    printf(" - - ");
-	    fflush(stdout);
-	    error_status = OK;
-	  }
-	badTry = 0;
-	for (iapv = 0; iapv < mpdGetNumberAPV(i); iapv++)
-	  {
-	    printf("%2d ", iapv);
-	    fflush(stdout);
-
-	    if (mpdAPV_Config(i, iapv) != OK)
-	      {
-		printf(" * * FAILED for APV %2d\n", iapv);
-		if(iapv < (mpdGetNumberAPV(i) - 1))
-		  printf(" - - ");
-		fflush(stdout);
-		error_status = ERROR;
-		badTry = 1;
-	      }
-	  }
-	printf("\n");
-	fflush(stdout);
-	if(badTry)
-	  {
-	    printf(" ***** APV RESET *****\n");
-	    fflush(stdout);
-	    mpdI2C_ApvReset(i);
-	  }
-	else
-	  {
-	    if(itry > 0)
-	      {
-		printf(" ****** SUCCESS!!!! ******\n");
-		fflush(stdout);
-	      }
-	    break;
-	  }
-
-      }
-
-    error_status |= saveError;
-
-    if(error_status == ERROR)
-      errSlotMask |= (1 << i);
-
-    // configure adc on MPD
-    printf("Configure ADC on MPD slot %d\n",i);
-    mpdADS5281_Config(i);
-
-    // configure fir
-    // not implemented yet
-
-    // 101 reset on the APV
-    printf("Do 101 Reset on MPD slot %d\n",i);
-    mpdAPV_Reset101(i);
-
-    // <- MPD+APV initialization ends here
-
-  } // end loop on mpds
-  //END of MPD configure
-
-  // summary report
-  bufp = (char *) &(apvbuffer[0]);
-
-  rval = sprintf(bufp, "\n");
-  if(rval > 0)
-    bufp += rval;
-  rval = sprintf(bufp, "Configured APVs (ADC 15 ... 0)\n");
-  if(rval > 0)
-    bufp += rval;
-
-  int ibit;
-  int impd, id, iapv;
-  for (impd = 0; impd < fnMPD; impd++)
-    {
-      id = mpdSlot(impd);
-
-      if (mpdGetApvEnableMask(id) != 0)
-	{
-	  rval = sprintf(bufp, "  MPD %2d : ", id);
-	  if(rval > 0)
-	    bufp += rval;
-	  iapv = 0;
-	  for (ibit = 15; ibit >= 0; ibit--)
-	    {
-	      if (((ibit + 1) % 4) == 0)
-		{
-		  rval = sprintf(bufp, " ");
-		  if(rval > 0)
-		    bufp += rval;
-		}
-	      if (mpdGetApvEnableMask(id) & (1 << ibit))
-		{
-		  rval = sprintf(bufp, "1");
-		  if(rval > 0)
-		    bufp += rval;
-		  iapv++;
-		}
-	      else
-		{
-		  rval = sprintf(bufp, ".");
-		  if(rval > 0)
-		    bufp += rval;
-		}
-	    }
-	  rval = sprintf(bufp, " (#APV %d)", iapv);
-	  if(rval > 0)
-	    bufp += rval;
-	  if(errSlotMask & (1 << id))
-	    {
-	      rval = sprintf(bufp, " INIT ERRORS\n");
-	      if(rval > 0)
-		bufp += rval;
-	    }
-	  else
-	    {
-	      rval = sprintf(bufp, "\n");
-	      if(rval > 0)
-		bufp += rval;
-	    }
-	}
-      else
-	{
-	  rval = sprintf(bufp,
-			 "  MPD %2d :                                INIT ERRORS\n", id);
-	  if(rval > 0)
-	    bufp += rval;
-	}
-    }
-  rval = sprintf(bufp, "\n");
-  if(rval > 0)
-    bufp += rval;
-
-  printf("%s",apvbuffer);
-
-  mpdGStatus(0);
+  //mpdGStatus(0);
 
   mpdHisto(outfile, h_gain);
 
   vtpUnlock();
-
-  if(apvbuffer)
-    free(apvbuffer);
-
-  if(errorbuffer)
-    free(errorbuffer);
 
   return 0;
 }
@@ -533,6 +268,34 @@ void sig_handler(int signo)
 
   }
   return;
+}
+
+int
+getShortHostname(char *shortHostname)
+{
+  char longHostname[HOST_NAME_MAX];
+  char *tempShort;
+  int rval;
+
+  rval = gethostname(longHostname, HOST_NAME_MAX);
+  if(rval < 0)
+    {
+      perror("gethostname");
+      return rval;
+    }
+
+  printf("long Hostname : %s\n", longHostname);
+
+  tempShort = strtok((char *)&longHostname,".");
+  if(tempShort != NULL)
+    {
+      printf("short Hostname : >%s<\n", tempShort);
+      strcpy(shortHostname,tempShort);
+    }
+  else
+    printf("null\n");
+
+  return rval;
 }
 
 /*

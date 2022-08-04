@@ -38,7 +38,6 @@ int
 main(int argc, char *argv[])
 {
   int stat;
-  apvbuffer = (char *)malloc(1024*50*sizeof(char));
   int useConfigFile = 1;
   char filename[250];
   char rol_usrConfig[250] = "/home/sbs-onl/vtp/cfg/sbsvtp2.config";
@@ -74,12 +73,6 @@ main(int argc, char *argv[])
 
   return 0;
 }
-
-/*
-  This is copy-pasted from the vtp_mpdro readout list.
-  I've modified this to handle command-line arguments
- */
-
 
 int
 getShortHostname(char *shortHostname)

@@ -53,10 +53,10 @@ int main(int argc, char *argv[])
   vtpStatus(1);
 
   vtpMpdFiberReset();
-  vtpMpdFiberLinkReset(0xffffffff);
+  vtpMpdFiberLinkReset(0xffffffffffffffff);
 
-  vtpMpdDisable(0xffffffff);
-  vtpMpdEnable(0xffffffff);
+  vtpMpdDisable(0xffffffffffffffff);
+  vtpMpdEnable(0xffffffffffffffff);
 
   vtpStatus(0);
   vtpMpdPrintStatus(0,0);
