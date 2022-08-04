@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "vtpLib.h"
+#include "vtpConfig.h"
 
 extern int nfadc;
 
