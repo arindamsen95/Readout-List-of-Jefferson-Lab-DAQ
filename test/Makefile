@@ -43,10 +43,9 @@ endif
 #LIBNAMES	+= /usr/local/lib/libactivemq-cpp.so
 LIBNAMES	+= -lvtp
 
-PROGS 	= i2cvtpmon i2cvtpsetup vtpConfigTest vtpI2Ctest vtpLibTest vtpMpdFiberStatus
-PROGS	+= vtpMpdHistoMode vtpMpdInit vtpMpdStatus vtpMpdSampleMode vtpSPItest vtpStatus vtpTcpBlastTest
-SRC	= $(PROGS:%=%.c)
+SRC	= $(wildcard *.c)
 DEPS	= $(SRC:%.c=%.d)
+PROGS	= $(SRC:%.c=%)
 
 all: $(PROGS)
 
