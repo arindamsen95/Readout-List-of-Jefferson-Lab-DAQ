@@ -24,6 +24,7 @@
 #include "vtp-spi.h"
 #include "vtp-ltm.h"
 #include "si5341_cfg.h"
+#include "vtpConfig.h"
 
 /* Environment variable specifying where to find parameter/configuration files */
 #ifndef VTP_CONFIG_GET_ENV
@@ -1360,6 +1361,7 @@ int  vtpStats();
 // VTP Streaming functions
 int vtpStreamingTcpConnect(int inst, int connect);
 int vtpStreamingSetEbCfg(int inst, int mask, int source_id, int frame_len, int roc_id, int nframe_buf);
+int vtpStreamingSetEbRocid(int roc_id);
 int vtpStreamingGetEbCfg(int inst, int *mask, int *source_id, int *frame_len, int *roc_id, int *nframe_buf);
 int vtpStreamingGetTcpCfg(int inst, unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short *destipport);
 int vtpStreamingSetTcpCfg(int inst, unsigned char ipaddr[4], unsigned char subnet[4], unsigned char gateway[4], unsigned char mac[6], unsigned char destipaddr[4], unsigned short destipport);
@@ -1389,6 +1391,8 @@ int vtpRocFile2Event(const char *fname, unsigned char *buf, int utag, int rocid,
 int vtpRocEbReset();
 int vtpRocEbStart();
 int vtpRocEbStop();
+void vtpRocSetPPEnableMask(uint16_t ppenable);
+uint16_t vtpRocGetPPEnableMask();
 int vtpRocEbInit(unsigned int bank0, unsigned int bank1, unsigned int bank2);
 int vtpRocEbConfig(PP_CONF *ppInfo, int blocklevel);
 int vtpRocEbSetBlockLevel(int blocklevel);
@@ -1411,6 +1415,8 @@ int  vtpTryLock();
 int  vtpTimedLock(int time_seconds);
 int  vtpUnlock();
 int  vtpCheckMutexHealth(int time_seconds);
+
+VTP_CONF* vtpShmGetVTP_CONF();
 
 int  vtpDmaMemOpen(int nbuffers, int size);
 int  vtpDmaMemClose();

@@ -64,8 +64,8 @@ vtpRocStatus(int flag)
   }
 
   rocid         = vtp->roc.rocID;
-  tiTrigAck     = vtp->roc.TiTriggerAck;
   tiTrigCnt     = vtp->roc.TiTriggerCnt;
+  tiTrigAck     = vtp->roc.TiTriggerAck;
   totalBytes[0] = vtp->roc.BytesSent[0];
   totalBytes[1] = vtp->roc.BytesSent[1];
   roc[0]        = vtp->roc.Ctrl;
@@ -659,11 +659,19 @@ int
 vtpRocEvioWriteControl(unsigned int type, unsigned int val0, unsigned int val1)
 {
 
+  int full;
   unsigned int rocid=0;
 
   CHECKINIT;
   //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
+  /* Check that the fifo does not already have data in it */
+  full =  (vtp->roc.CpuAsyncEventStatus&0x2ff); /* how many words currently in fifo? */
+
+  if(full>0) {
+    printf("%s: ERROR: Data in fifo (%d words). Cannot send Control event\n",__func__,full);
+    return ERROR;
+  }
 
   VLOCK;
 
@@ -929,6 +937,10 @@ vtpRocEbStop()
 
   return OK;
 }
+
+static uint16_t vtpRocPPEnableMask = 0;
+void vtpRocSetPPEnableMask(uint16_t ppenable) {vtpRocPPEnableMask = ppenable;}
+uint16_t vtpRocGetPPEnableMask() {return vtpRocPPEnableMask;}
 
 
 /* Initialize the ROC Eventbuilder Bank Tags and Block Level and clear all the
