@@ -44,10 +44,11 @@ int main(int argc, char *argv[])
   vtpStatus(1);
 
   vtpMpdFiberReset();
-  vtpMpdFiberLinkReset(0xffffffffffffffff);
+  vtpMpdFiberLinkReset(0xffffffffffffffffULL);
 
-  vtpMpdDisable(0xffffffffffffffff);
-  vtpMpdEnable(0xffffffffffffffff);
+  vtpMpdDisable(0xffffffffffffffffULL);
+
+  vtpMpdEnable(0xffffffffffffffffULL);
 
   usleep(10);
   vtpStatus(0);
