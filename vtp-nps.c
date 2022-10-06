@@ -85,7 +85,7 @@ vtpNPSSetEcalCluster(uint16_t seed_thr, uint16_t hit_dt, uint16_t cluster_thr)
     }
 
   VLOCK;
-  vtp->v7.npsEcalCluster.ctrl = (seed_thr << 16) | (hit_dt << 12) | (cluster_thr);
+  vtp->v7.npsEcalCluster.ctrl = (seed_thr << 16) | (hit_dt << 13) | (cluster_thr);
   VUNLOCK;
 
   return OK;
@@ -111,7 +111,7 @@ vtpNPSGetEcalCluster(uint16_t *seed_thr, uint16_t *hit_dt, uint16_t *cluster_thr
   VUNLOCK;
 
   *seed_thr = (regval & NPS_ECALCLUSTER_CTRL_SEED_THR_MASK) >> 16;
-  *hit_dt = (regval & NPS_ECALCLUSTER_CTRL_HIT_DT_MASK) >> 12;
+  *hit_dt = (regval & NPS_ECALCLUSTER_CTRL_HIT_DT_MASK) >> 13;
   *cluster_thr = regval & NPS_ECALCLUSTER_CTRL_CLUSTER_THR_MASK;
 
   return OK;
