@@ -55,7 +55,7 @@ extern pthread_mutex_t   vtpMutex;
  * @return OK if successful, otherwise ERROR:
  */
 int32_t
-vtpNPSSetEcalCluster(uint16_t seed_thr, uint16_t hit_dt, uint16_t cluster_thr)
+vtpNPSSetEcalCluster(uint32_t seed_thr, uint32_t hit_dt, uint32_t cluster_thr)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_NPS,0);
@@ -99,7 +99,7 @@ vtpNPSSetEcalCluster(uint16_t seed_thr, uint16_t hit_dt, uint16_t cluster_thr)
  * @return OK if successful, otherwise ERROR
  */
 int32_t
-vtpNPSGetEcalCluster(uint16_t *seed_thr, uint16_t *hit_dt, uint16_t *cluster_thr)
+vtpNPSGetEcalCluster(uint32_t *seed_thr, uint32_t *hit_dt, uint32_t *cluster_thr)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_NPS,0);
@@ -123,7 +123,7 @@ vtpNPSGetEcalCluster(uint16_t *seed_thr, uint16_t *hit_dt, uint16_t *cluster_thr
  * @return OK if successfull, otherwise ERROR
  */
 int32_t
-vtpNPSSetCrateID(uint8_t crate_id)
+vtpNPSSetCrateID(uint32_t crate_id)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_NPS,0);
@@ -149,7 +149,7 @@ vtpNPSSetCrateID(uint8_t crate_id)
  * @return OK if successful, otherwise ERROR
  */
 int32_t
-vtpNPSGetCrateID(uint8_t *crate_id)
+vtpNPSGetCrateID(uint32_t *crate_id)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_NPS,0);

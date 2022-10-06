@@ -123,6 +123,14 @@ typedef struct {
 
   struct
   {
+    unsigned int seed_thr;
+    unsigned int hit_dt;
+    unsigned int cluster_thr;
+    unsigned int crate_id;
+  } nps;
+
+  struct
+  {
     char pedestal_filename[FNLEN];
     char common_mode_filename[FNLEN];
     float pedestal_factor;

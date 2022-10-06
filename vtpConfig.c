@@ -11,6 +11,7 @@
 
 #include "vtpConfig.h"
 #include "vtpLib.h"
+#include "vtp-nps.h"
 //#include "xxxConfig.h"
 
 #undef DEBUG
@@ -526,6 +527,12 @@ vtpInitGlobals()
   vtpConf.mpdro.eb.mac[3] = 0;
   vtpConf.mpdro.eb.mac[4] = 0;
   vtpConf.mpdro.eb.mac[5] = 0;
+
+  // NPS Configuration
+  vtpConf.nps.seed_thr = 0;
+  vtpConf.nps.hit_dt = 0;
+  vtpConf.nps.cluster_thr = 0;
+  vtpConf.nps.crate_id = 0;
 
 }
 
@@ -2276,6 +2283,42 @@ vtpReadConfigFile(char *filename_in)
 #endif
 		  vtpConf.mpdro.eb.destipport = argi[0];
 		}
+	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_SEED_THR"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_NPS_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.nps.seed_thr = argi[0];
+		}
+	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_HIT_DT"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_NPS_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.nps.hit_dt = argi[0];
+		}
+	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_CLUSTER_THR"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_NPS_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.nps.cluster_thr = argi[0];
+		}
+	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_CRATE_ID"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_NPS_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.nps.crate_id = argi[0];
+		}
 	      else
 		{
 		  printf
@@ -2798,6 +2841,13 @@ vtpDownloadAll()
 		       vtpConf.mpdro.min_avg_samples);
     }
 
+  // NPS Configuration
+  if((vtpConf.fw_type[0] == VTP_FW_TYPE_NPS))
+    {
+      vtpNPSSetEcalCluster(vtpConf.nps.seed_thr, vtpConf.nps.hit_dt, vtpConf.nps.cluster_thr);
+      vtpNPSSetCrateID(vtpConf.nps.crate_id);
+    }
+
   vtpUploadAllPrint();
 
   return (0);
@@ -3197,6 +3247,12 @@ vtpUploadAll(char *string, int length)
      && (vtpConf.fw_type[1] == ZYNC_FW_TYPE_ZCODAROC))
     {
       vtpConf.payload_en = vtpRocGetPPEnableMask();
+    }
+
+  if(vtpConf.fw_type[0] == VTP_FW_TYPE_NPS)
+    {
+      vtpNPSGetEcalCluster(&vtpConf.nps.seed_thr, &vtpConf.nps.hit_dt, &vtpConf.nps.cluster_thr);
+      vtpNPSGetCrateID(&vtpConf.nps.crate_id);
     }
 
   if(length)
@@ -4002,6 +4058,18 @@ vtpUploadAll(char *string, int length)
 	  sprintf(sss, "VTP_MPDRO_DESTIPPORT %d\n",
 		  vtpConf.mpdro.eb.destipport);
 	  ADD_TO_STRING;
+	}
+
+      if((vtpConf.fw_type[0] == VTP_FW_TYPE_NPS))
+	{
+	  sprintf(sss, "VTP_NPS_ECALCLUSTER_SEED_THR %d\n",
+		  vtpConf.nps.seed_thr);
+	  sprintf(sss, "VTP_NPS_ECALCLUSTER_HIT_DT %d\n",
+		  vtpConf.nps.hit_dt);
+	  sprintf(sss, "VTP_NPS_ECALCLUSTER_CLUSTER_THR %d\n",
+		  vtpConf.nps.cluster_thr);
+	  sprintf(sss, "VTP_NPS_ECALCLUSTER_CRATE_ID %d\n",
+		  vtpConf.nps.crate_id);
 	}
 
       sprintf(sss, "\n");
