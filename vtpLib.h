@@ -829,6 +829,19 @@ typedef struct MpdRegs_Struct
   /** 0x0040 */ BLANK[(0x100-0x40)/4];
 } MPD_REGS;
 
+#define NPS_ECALCLUSTER_CTRL_SEED_THR_MASK     0x3FFF0000
+#define NPS_ECALCLUSTER_CTRL_HIT_DT_MASK       0x0000E000
+#define NPS_ECALCLUSTER_CTRL_CLUSTER_THR_MASK  0x00001FFF
+
+#define NPS_ECALCLUSTER_CRATE_ID_MASK          0x00000007
+
+typedef struct NpsEcalClusterRegs_Struct
+{
+  /** 0x0000 */ volatile uint32_t ctrl;
+  /** 0x0004 */ volatile uint32_t crate_id;
+  /** 0x0008 */ BLANK[(0x80-0x08)/4];
+} NPS_ECALCLUSTER_REGS;
+
 typedef struct v7_bridge_struct
 {
   /** 0x43C10000 */ BLANK[0x100/4];
@@ -947,7 +960,11 @@ typedef struct v7_bridge_struct
 
   /** 0x43C1A000 */ MPDFIBER_REGS mpdFiber[VTP_MPD_MAX];
 
-  /** 0x43C1AA00 */ BLANK[(0xFFF4 - 0xA000-sizeof(MPDFIBER_REGS)*VTP_MPD_MAX)/4];
+  /** 0x43C1Axxx */ BLANK[(0xB080 - 0xA000-sizeof(MPDFIBER_REGS)*VTP_MPD_MAX)/4];
+
+  /** 0x43C1B080 */ NPS_ECALCLUSTER_REGS npsEcalCluster;
+
+  /** 0x43C1Bxxx */ BLANK[(0xFFF4 - 0xB080-sizeof(NPS_ECALCLUSTER_REGS))/4];
 
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
@@ -1076,6 +1093,7 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_FADCCOIN          16
 #define VTP_FW_TYPE_VCODAROC          17
 #define VTP_FW_TYPE_MPDRO             18
+#define VTP_FW_TYPE_NPS               20
 
 /* These are created in the Zync VHDL files */
 #define ZYNC_FW_TYPE_COMMON           0

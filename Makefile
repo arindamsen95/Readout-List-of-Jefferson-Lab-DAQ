@@ -51,7 +51,7 @@ else
 endif
 
 SRC			= vtpLib.c vtpConfig.c vtp-i2c.c vtp-spi.c \
-				 si5341_cfg.c vtp-ltm.c vtp-mpdro.c
+				 si5341_cfg.c vtp-ltm.c vtp-mpdro.c vtp-nps.c
 HDRS			= $(SRC:.c=.h)
 OBJ			= $(SRC:.c=.o)
 DEPS			= $(SRC:.c=.d) vtpserver.d
