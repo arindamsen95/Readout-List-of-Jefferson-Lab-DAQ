@@ -21,6 +21,8 @@
 
 #define NPS_CRATE_ID_MAX      NPS_ECALCLUSTER_CRATE_ID_MASK
 
+#define NPS_N_TRIGGER_BITS    32
+
 int32_t vtpNPSSetEcalCluster(uint32_t seed_thr, uint32_t hit_dt, uint32_t cluster_thr);
 int32_t vtpNPSGetEcalCluster(uint32_t *seed_thr, uint32_t *hit_dt, uint32_t *cluster_thr);
 int32_t vtpNPSSetCrateID(uint32_t crate_id);

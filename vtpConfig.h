@@ -123,10 +123,21 @@ typedef struct {
 
   struct
   {
-    unsigned int seed_thr;
-    unsigned int hit_dt;
-    unsigned int cluster_thr;
-    unsigned int crate_id;
+    struct
+    {
+      int latency;
+      int width;
+      int prescale[32];
+      int delay[32];
+    } trig;
+
+    struct
+    {
+      unsigned int seed_thr;
+      unsigned int hit_dt;
+      unsigned int cluster_thr;
+      unsigned int crate_id;
+    } ecal_cluster;
   } nps;
 
   struct
@@ -363,7 +374,7 @@ typedef struct {
       int latency;
       int width;
       int prescale[32];
-	  int delay[32];
+      int delay[32];
     } trig;
 
   } compton;

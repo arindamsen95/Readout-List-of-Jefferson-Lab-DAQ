@@ -529,10 +529,10 @@ vtpInitGlobals()
   vtpConf.mpdro.eb.mac[5] = 0;
 
   // NPS Configuration
-  vtpConf.nps.seed_thr = 0;
-  vtpConf.nps.hit_dt = 0;
-  vtpConf.nps.cluster_thr = 0;
-  vtpConf.nps.crate_id = 0;
+  vtpConf.nps.ecal_cluster.seed_thr = 0;
+  vtpConf.nps.ecal_cluster.hit_dt = 0;
+  vtpConf.nps.ecal_cluster.cluster_thr = 0;
+  vtpConf.nps.ecal_cluster.crate_id = 0;
 
 }
 
@@ -2283,6 +2283,48 @@ vtpReadConfigFile(char *filename_in)
 #endif
 		  vtpConf.mpdro.eb.destipport = argi[0];
 		}
+	      else if(!strcmp(keyword, "VTP_NPS_TRIG_WIDTH"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_NPS_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.nps.trig.width = argi[0];
+		}
+	      else if(!strcmp(keyword, "VTP_NPS_TRIG_LATENCY"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_NPS_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.nps.trig.latency = argi[0];
+		}
+	      else if(!strcmp(keyword, "VTP_NPS_TRIG_PRESCALE"))
+		{
+		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+		  if(argi[0] < 0 || argi[0] >= 32)
+		    {
+		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
+			     argi[0]);
+		      return (-4);
+		    }
+
+		  vtpConf.nps.trig.prescale[argi[0]] = argi[1];
+		}
+	      else if(!strcmp(keyword, "VTP_NPS_TRIG_DELAY"))
+		{
+		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+		  if(argi[0] < 0 || argi[0] >= 32)
+		    {
+		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
+			     argi[0]);
+		      return (-4);
+		    }
+
+		  vtpConf.nps.trig.delay[argi[0]] = argi[1];
+		}
 	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_SEED_THR"))
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
@@ -2290,7 +2332,7 @@ vtpReadConfigFile(char *filename_in)
 		  printf("%s = %d\n",
 			 keyword, argi[0]);
 #endif
-		  vtpConf.nps.seed_thr = argi[0];
+		  vtpConf.nps.ecal_cluster.seed_thr = argi[0];
 		}
 	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_HIT_DT"))
 		{
@@ -2299,7 +2341,7 @@ vtpReadConfigFile(char *filename_in)
 		  printf("%s = %d\n",
 			 keyword, argi[0]);
 #endif
-		  vtpConf.nps.hit_dt = argi[0];
+		  vtpConf.nps.ecal_cluster.hit_dt = argi[0];
 		}
 	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_CLUSTER_THR"))
 		{
@@ -2308,7 +2350,7 @@ vtpReadConfigFile(char *filename_in)
 		  printf("%s = %d\n",
 			 keyword, argi[0]);
 #endif
-		  vtpConf.nps.cluster_thr = argi[0];
+		  vtpConf.nps.ecal_cluster.cluster_thr = argi[0];
 		}
 	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_CRATE_ID"))
 		{
@@ -2317,7 +2359,7 @@ vtpReadConfigFile(char *filename_in)
 		  printf("%s = %d\n",
 			 keyword, argi[0]);
 #endif
-		  vtpConf.nps.crate_id = argi[0];
+		  vtpConf.nps.ecal_cluster.crate_id = argi[0];
 		}
 	      else
 		{
@@ -2774,8 +2816,7 @@ vtpDownloadAll()
     {
       printf("vtpDownloadAll: Writing VTP ROC Parameters \n");
       //vtpRocSetID(vtpConf.vtp_roc.roc_id);
-      printf
-	("vtpDownloadAll: ROC ID = %d  Dest IP = 0x%08x  Dest port = %d\n",
+      printf("vtpDownloadAll: ROC ID = %d  Dest IP = 0x%08x  Dest port = %d\n",
 	 vtpConf.vtp_roc.roc_id, vtpConf.vtp_roc.destip,
 	 vtpConf.vtp_roc.destipport);
       printf("vtpDownloadAll: Payload port enable mask = 0x%04x\n",
@@ -2844,8 +2885,19 @@ vtpDownloadAll()
   // NPS Configuration
   if((vtpConf.fw_type[0] == VTP_FW_TYPE_NPS))
     {
-      vtpNPSSetEcalCluster(vtpConf.nps.seed_thr, vtpConf.nps.hit_dt, vtpConf.nps.cluster_thr);
-      vtpNPSSetCrateID(vtpConf.nps.crate_id);
+      vtpSetGt_latency(vtpConf.nps.trig.latency);
+      vtpSetGt_width(vtpConf.nps.trig.width);
+
+      for(ii = 0; ii < NPS_N_TRIGGER_BITS; ii++)
+	{
+	  vtpSetTriggerBitPrescaler(ii, vtpConf.nps.trig.prescale[ii]);
+	  vtpSetTriggerBitDelay(ii, vtpConf.nps.trig.delay[ii]);
+	}
+
+      vtpNPSSetEcalCluster(vtpConf.nps.ecal_cluster.seed_thr,
+			   vtpConf.nps.ecal_cluster.hit_dt,
+			   vtpConf.nps.ecal_cluster.cluster_thr);
+      vtpNPSSetCrateID(vtpConf.nps.ecal_cluster.crate_id);
     }
 
   vtpUploadAllPrint();
@@ -3251,8 +3303,21 @@ vtpUploadAll(char *string, int length)
 
   if(vtpConf.fw_type[0] == VTP_FW_TYPE_NPS)
     {
-      vtpNPSGetEcalCluster(&vtpConf.nps.seed_thr, &vtpConf.nps.hit_dt, &vtpConf.nps.cluster_thr);
-      vtpNPSGetCrateID(&vtpConf.nps.crate_id);
+      vtpConf.nps.trig.latency = vtpGetGt_latency();
+      vtpConf.nps.trig.width = vtpGetGt_width();
+
+      int32_t ii;
+      for(ii = 0; ii < NPS_N_TRIGGER_BITS; ii++)
+	{
+	  vtpConf.nps.trig.prescale[ii] = vtpGetTriggerBitPrescaler(ii);
+	  vtpGetTriggerBitDelay(ii, &vtpConf.nps.trig.delay[ii]);
+	}
+
+
+      vtpNPSGetEcalCluster(&vtpConf.nps.ecal_cluster.seed_thr,
+			   &vtpConf.nps.ecal_cluster.hit_dt,
+			   &vtpConf.nps.ecal_cluster.cluster_thr);
+      vtpNPSGetCrateID(&vtpConf.nps.ecal_cluster.crate_id);
     }
 
   if(length)
@@ -4062,14 +4127,39 @@ vtpUploadAll(char *string, int length)
 
       if((vtpConf.fw_type[0] == VTP_FW_TYPE_NPS))
 	{
+	  sprintf(sss, "VTP_NPS_TRIG_WIDTH %d\n",
+		  vtpConf.nps.trig.width);
+	  ADD_TO_STRING;
+
+	  sprintf(sss, "VTP_NPS_TRIG_LATENCY %d\n",
+		  vtpConf.nps.trig.latency);
+	  ADD_TO_STRING;
+
+
+	  for(i = 0; i < NPS_N_TRIGGER_BITS; i++)
+	    {
+	      sprintf(sss, "VTP_NPS_TRIG_PRESCALE %d %d\n",
+		      i, vtpConf.nps.trig.prescale[i]);
+	      ADD_TO_STRING;
+
+	      sprintf(sss, "VTP_NPS_TRIG_DELAY %d %d\n",
+		      i, vtpConf.nps.trig.delay[i]);
+	      ADD_TO_STRING;
+
+	    }
+
 	  sprintf(sss, "VTP_NPS_ECALCLUSTER_SEED_THR %d\n",
-		  vtpConf.nps.seed_thr);
+		  vtpConf.nps.ecal_cluster.seed_thr);
+	  ADD_TO_STRING;
 	  sprintf(sss, "VTP_NPS_ECALCLUSTER_HIT_DT %d\n",
-		  vtpConf.nps.hit_dt);
+		  vtpConf.nps.ecal_cluster.hit_dt);
+	  ADD_TO_STRING;
 	  sprintf(sss, "VTP_NPS_ECALCLUSTER_CLUSTER_THR %d\n",
-		  vtpConf.nps.cluster_thr);
+		  vtpConf.nps.ecal_cluster.cluster_thr);
+	  ADD_TO_STRING;
 	  sprintf(sss, "VTP_NPS_ECALCLUSTER_CRATE_ID %d\n",
-		  vtpConf.nps.crate_id);
+		  vtpConf.nps.ecal_cluster.crate_id);
+	  ADD_TO_STRING;
 	}
 
       sprintf(sss, "\n");
