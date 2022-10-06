@@ -15,11 +15,11 @@
  */
 #include <stdint.h>
 
-#define NPS_SEED_THR_MAX      0x3FFF
-#define NPS_HIT_DT_MAX        0x7
-#define NPS_CLUSTER_THR_MAX   0x1FFFF
+#define NPS_SEED_THR_MAX      (NPS_ECALCLUSTER_CTRL_SEED_THR_MASK >> 16)
+#define NPS_HIT_DT_MAX        (NPS_ECALCLUSTER_CTRL_HIT_DT_MASK >> 13)
+#define NPS_CLUSTER_THR_MAX   NPS_ECALCLUSTER_CTRL_CLUSTER_THR_MASK
 
-#define NPS_CRATE_ID_MAX      0x7
+#define NPS_CRATE_ID_MAX      NPS_ECALCLUSTER_CRATE_ID_MASK
 
 int32_t vtpNPSSetEcalCluster(uint16_t seed_thr, uint16_t hit_dt, uint16_t cluster_thr);
 int32_t vtpNPSGetEcalCluster(uint16_t *seed_thr, uint16_t *hit_dt, uint16_t *cluster_thr);
