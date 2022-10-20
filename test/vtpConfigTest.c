@@ -20,7 +20,10 @@ extern int nfadc;
 int
 main(int argc, char *argv[])
 {
-  char *rol_usrConfig = "none";
+  char rol_usrConfig[256] = "none";
+
+  if(argc==2)
+    strncpy(rol_usrConfig, argv[1], 256);
 
   vtpInitGlobals();
   vtpConfig("");
