@@ -6928,7 +6928,45 @@ vtpDcSendScalers(char *host)
 
 
 /* TI LINK Functions */
+/*
+  march2023 - BM: Ackward version between versions
+   - Re-introduce EB_REGS interface for NPS, and make sure to use it
+   (if revelant) if the newer interface is called
+*/
 
+#define VTP_RO_UPDATE_N_SUPPORTED 3
+#define VTP_RO_UPDATE_SUPPORTED_FW {VTP_FW_TYPE_MPDRO,VTP_FW_TYPE_FADCSTREAM,VTP_FW_TYPE_VCODAROC}
+/* Check it once, and store it here */
+static int32_t vtpRoUpdateSupported=-1;
+
+int32_t
+vtpRoUpdateSupportedCheck()
+{
+  int32_t ifw = 0;
+  int32_t supported[VTP_RO_UPDATE_N_SUPPORTED] = VTP_RO_UPDATE_SUPPORTED_FW;
+
+  /* Just need checked once */
+  if(vtpRoUpdateSupported < 0)
+    {
+      vtpRoUpdateSupported = 0;
+
+      for(ifw = 0; ifw < VTP_RO_UPDATE_N_SUPPORTED; ifw++)
+	if(VTP_FW_Type[0] == supported[ifw])
+	  vtpRoUpdateSupported = 1;
+    }
+
+  return vtpRoUpdateSupported;
+}
+
+#define CHECKRO(_oldroutine) {						\
+    if (vtpRoUpdateSupportedCheck() == 0)	{			\
+      printf("%s: WARN:  Calling %s for compatibility.\n", __func__, #_oldroutine); \
+      return _oldroutine;						\
+    }									\
+  }
+
+int32_t
+vtpEbNotSupported() {return -1;}
 
 /* vtpTiAck() Only used for mode=0 to acknowledge a trigger */
 int
@@ -6952,6 +6990,8 @@ vtpTiAck()
 {
   CHECKINIT;
 
+  CHECKRO(vtpEbTiAck(0));
+
   VLOCK;
   vtp->tiLink.Ctrl = VTP_TI_CTRL_ACK;
   VUNLOCK;
@@ -6969,6 +7009,7 @@ vtpTiLinkSetMode(int mode)
   */
 
   CHECKINIT;
+  CHECKRO(vtpEbNotSupported());
 
   VLOCK;
 
@@ -7010,6 +7051,8 @@ vtpTiLinkGetBlockLevel(int print)
   int val = 0;
   unsigned int reg=0;
   CHECKINIT;
+
+  CHECKRO(vtpEbTiGetBlockLevel(print));
 
   /* Need to do a RMW here t opreserve the Ctrl Register */
   VLOCK;
@@ -7080,6 +7123,8 @@ vtpTiLinkInit()
 {
   int i, val;
   CHECKINIT;
+
+  CHECKRO(vtpEbTiLinkInit());
 
   for(i = 0; i < TI_LINK_INIT_TRIES; i++)
   {
@@ -7152,6 +7197,8 @@ vtpTiLinkStatus()
   int val, rval = OK;
   CHECKINIT;
 
+  CHECKRO(vtpEbTiLinkStatus());
+
   VLOCK;
   val = vtp->tiLink.LinkStatus;
   VUNLOCK;
@@ -7191,6 +7238,8 @@ int
 vtpTiLinkResetFifo(int rx)
 {
   CHECKINIT;
+
+  CHECKRO(vtpEbResetFifo());
 
   VLOCK;
   if(rx) {
@@ -7427,6 +7476,8 @@ vtpTiLinkReadEvent(uint32_t *pBuf, uint32_t maxsize)
 {
   int status, cnt = 0;
   CHECKINIT;
+
+  CHECKRO(vtpEbTiReadEvent(pBuf, maxsize));
 
   if(vtpTiLinkEventReadErrors)
     printf("{vtpTiLinkEventReadErrors=%d}\n", vtpTiLinkEventReadErrors);
