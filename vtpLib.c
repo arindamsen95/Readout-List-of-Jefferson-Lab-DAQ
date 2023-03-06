@@ -126,6 +126,48 @@ pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
     } \
   }
 
+/*
+  march2023 - BM: Ackward version between versions
+   - Re-introduce EB_REGS interface for NPS, and make sure to use it
+   (if revelant) if the newer interface is called
+*/
+
+#define VTP_RO_UPDATE_N_SUPPORTED 3
+#define VTP_RO_UPDATE_SUPPORTED_FW {VTP_FW_TYPE_MPDRO,VTP_FW_TYPE_FADCSTREAM,VTP_FW_TYPE_VCODAROC}
+/* Check it once, and store it here */
+static int32_t vtpRoUpdateSupported=-1;
+
+int32_t
+vtpRoUpdateSupportedCheck()
+{
+  int32_t ifw = 0;
+  int32_t supported[VTP_RO_UPDATE_N_SUPPORTED] = VTP_RO_UPDATE_SUPPORTED_FW;
+
+  /* Just need checked once */
+  if(vtpRoUpdateSupported < 0)
+    {
+      vtpRoUpdateSupported = 0;
+
+      for(ifw = 0; ifw < VTP_RO_UPDATE_N_SUPPORTED; ifw++)
+	if(VTP_FW_Type[0] == supported[ifw])
+	  vtpRoUpdateSupported = 1;
+    }
+
+  return vtpRoUpdateSupported;
+}
+
+#define CHECKRO(_oldroutine) {						\
+    if (vtpRoUpdateSupportedCheck() == 0)	{			\
+      printf("%s: WARN:  Calling %s for compatibility.\n", __func__, #_oldroutine); \
+      return _oldroutine;						\
+    }									\
+  }
+
+int32_t
+vtpEbNotSupported() {return -1;}
+
+
+
 typedef struct
 {
   int serdes_chup[20];
@@ -266,6 +308,7 @@ vtpInit(int iFlag)
     VTP_FW_Type[i] = vtpGetFW_Type(i);
     VTP_FW_Version[i] = vtpGetFW_Version(i);
   }
+
   vtpUnlock();
 
   printf("%s: V7 Chip FW_Version=0x%x, V7 Chip FW_Type=%d\n", __func__, VTP_FW_Version[0], VTP_FW_Type[0]);
@@ -1506,9 +1549,17 @@ vtpGetFW_Version(int chip)
   CHECKINIT;
 
   if (chip == 1) {
-    VLOCK;
-    rval = vtp->clk.FW_Version;
-    VUNLOCK;
+    /* Reg only exists for updated readout */
+    if(vtpRoUpdateSupportedCheck() == 1)
+      {
+	VLOCK;
+	rval = vtp->clk.FW_Version;
+	VUNLOCK;
+      }
+    else
+      {
+	rval = -1;
+      }
   }else{
     VLOCK;
     rval = vtp->v7.clk.FW_Version;
@@ -1525,9 +1576,17 @@ vtpGetFW_Type(int chip)
   CHECKINIT;
 
   if(chip == 1) {
-      VLOCK;
-      rval = vtp->clk.FW_Type;
-      VUNLOCK;
+    /* Reg only exists for updated readout */
+    if(vtpRoUpdateSupportedCheck() == 1)
+      {
+	VLOCK;
+	rval = vtp->clk.FW_Type;
+	VUNLOCK;
+      }
+    else
+      {
+	rval = ZYNC_FW_TYPE_COMMON;
+      }
     }else{
       VLOCK;
       rval = vtp->v7.clk.FW_Type;
@@ -6928,45 +6987,6 @@ vtpDcSendScalers(char *host)
 
 
 /* TI LINK Functions */
-/*
-  march2023 - BM: Ackward version between versions
-   - Re-introduce EB_REGS interface for NPS, and make sure to use it
-   (if revelant) if the newer interface is called
-*/
-
-#define VTP_RO_UPDATE_N_SUPPORTED 3
-#define VTP_RO_UPDATE_SUPPORTED_FW {VTP_FW_TYPE_MPDRO,VTP_FW_TYPE_FADCSTREAM,VTP_FW_TYPE_VCODAROC}
-/* Check it once, and store it here */
-static int32_t vtpRoUpdateSupported=-1;
-
-int32_t
-vtpRoUpdateSupportedCheck()
-{
-  int32_t ifw = 0;
-  int32_t supported[VTP_RO_UPDATE_N_SUPPORTED] = VTP_RO_UPDATE_SUPPORTED_FW;
-
-  /* Just need checked once */
-  if(vtpRoUpdateSupported < 0)
-    {
-      vtpRoUpdateSupported = 0;
-
-      for(ifw = 0; ifw < VTP_RO_UPDATE_N_SUPPORTED; ifw++)
-	if(VTP_FW_Type[0] == supported[ifw])
-	  vtpRoUpdateSupported = 1;
-    }
-
-  return vtpRoUpdateSupported;
-}
-
-#define CHECKRO(_oldroutine) {						\
-    if (vtpRoUpdateSupportedCheck() == 0)	{			\
-      printf("%s: WARN:  Calling %s for compatibility.\n", __func__, #_oldroutine); \
-      return _oldroutine;						\
-    }									\
-  }
-
-int32_t
-vtpEbNotSupported() {return -1;}
 
 /* vtpTiAck() Only used for mode=0 to acknowledge a trigger */
 int

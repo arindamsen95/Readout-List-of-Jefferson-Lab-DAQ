@@ -1093,7 +1093,7 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_FADCCOIN          16
 #define VTP_FW_TYPE_VCODAROC          17
 #define VTP_FW_TYPE_MPDRO             18
-#define VTP_FW_TYPE_NPS               20
+#define VTP_FW_TYPE_NPS               19
 
 /* These are created in the Zync VHDL files */
 #define ZYNC_FW_TYPE_COMMON           0
