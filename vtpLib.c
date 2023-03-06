@@ -71,6 +71,7 @@ int VTP_FW_Type[2];
 
 volatile ZYNC_REGS *vtp = NULL;
 
+static int vtpEbTiEventReadErrors;
 static int vtpTiLinkEventReadErrors;
 static int vtpEbEventReadErrors;
 
@@ -286,6 +287,7 @@ vtpInit(int iFlag)
     case VTP_FW_TYPE_HPS:
     case VTP_FW_TYPE_DC:
     case VTP_FW_TYPE_COMPTON:
+    case VTP_FW_TYPE_NPS:
       vtpSetTrig1Source(trig1Src);
       vtpSetSyncSource(syncSrc);
       vtpTiLinkInit();
@@ -322,6 +324,7 @@ vtpInit(int iFlag)
       return ERROR;
   }
 
+  vtpEbTiEventReadErrors = 0;
   vtpTiLinkEventReadErrors = 0;
   vtpEbEventReadErrors = 0;
 
@@ -6929,6 +6932,22 @@ vtpDcSendScalers(char *host)
 
 /* vtpTiAck() Only used for mode=0 to acknowledge a trigger */
 int
+vtpEbTiAck(int clearsync)
+{
+  int val = VTP_EB_TICTRL_TI_ACK;
+  CHECKINIT;
+
+  if(clearsync)
+    val |= VTP_EB_TICTRL_SYNCEVT_RST;
+
+  VLOCK;
+  vtp->eb.TiCtrl = val;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
 vtpTiAck()
 {
   CHECKINIT;
@@ -6963,6 +6982,27 @@ vtpTiLinkSetMode(int mode)
   return OK;
 }
 
+int
+vtpEbTiGetBlockLevel(int print)
+{
+  int val;
+  CHECKINIT;
+
+  VLOCK;
+  vtp->eb.TiCtrl = VTP_EB_TICTRL_TI_BL_REQ;
+  VUNLOCK;
+
+  usleep(1000);
+
+  VLOCK;
+  val = vtp->eb.TiStatus & 0xFF;
+  VUNLOCK;
+
+  if(print)
+    printf("%s: returned %d\n", __func__, val);
+
+  return val;
+}
 
 int
 vtpTiLinkGetBlockLevel(int print)
@@ -6990,6 +7030,51 @@ vtpTiLinkGetBlockLevel(int print)
 }
 
 #define TI_LINK_INIT_TRIES    3
+int
+vtpEbTiLinkInit()
+{
+  int i, val;
+  CHECKINIT;
+
+  for(i = 0; i < TI_LINK_INIT_TRIES; i++)
+  {
+    VLOCK;
+    vtp->eb.LinkCtrl = VTP_EB_LINKCTRL_RX_RESET | VTP_EB_LINKCTRL_PLL_RST | VTP_EB_LINKCTRL_RX_FIFO_RST;
+    vtp->eb.LinkCtrl = VTP_EB_LINKCTRL_RX_RESET | VTP_EB_LINKCTRL_RX_FIFO_RST;
+    vtp->eb.LinkCtrl = VTP_EB_LINKCTRL_RX_FIFO_RST;
+    vtp->eb.LinkCtrl = 0;
+    VUNLOCK;
+
+    usleep(10000);
+
+    VLOCK;
+    val = vtp->eb.LinkStatus;
+    VUNLOCK;
+
+    if(val & VTP_EB_LINKSTATUS_RX_READY)
+    {
+      printf("%s: VTP <-> TI Link RX Ready (status=0x%08X)\n", __func__, val);
+      break;
+    }
+    else
+      printf("%s: *** Warning *** VTP <-> TI Link NOT Ready (status=0x%08X)...", __func__, val);
+
+    if(i != TI_LINK_INIT_TRIES-1)
+      printf("trying again.\n");
+    else
+    {
+      printf("failed.\n");
+      printf("%s: *** ERROR *** VTP <-> TI Link problem.\n", __func__);
+    }
+  }
+
+  VLOCK;
+  vtp->eb.TiCtrl = VTP_EB_TICTRL_SYNCEVT_RST;
+  VUNLOCK;
+
+  return OK;
+}
+
 int
 vtpTiLinkInit()
 {
@@ -7032,6 +7117,36 @@ vtpTiLinkInit()
 }
 
 int
+vtpEbTiLinkStatus()
+{
+  int val, rval = OK;
+  CHECKINIT;
+
+  VLOCK;
+  val = vtp->eb.LinkStatus;
+  VUNLOCK;
+
+  printf("%s: LinkStatus   = 0x%08X\n"
+	 "      RxReady    = %u\n"
+	 "      RxLocked   = %u\n"
+	 "      PllLocked  = %u\n"
+	 "      RxErrorCnt = %u\n",
+         __func__, val,
+         (val & VTP_EB_LINKSTATUS_RX_READY) ? 1:0,
+         (val & VTP_EB_LINKSTATYS_RX_LOCKED) ? 1:0,
+         (val & VTP_EB_LINKSTATUS_GCLK_PLL_LOCK) ? 1:0,
+         (val & VTP_EB_LINKSTATUS_RX_ERROR_CNT_MASK)
+        );
+
+  if((val & VTP_EB_LINKSTATUS_RX_ERROR_CNT_MASK) > 1000)
+    {
+      rval = ERROR;
+    }
+
+  return rval;
+}
+
+int
 vtpTiLinkStatus()
 {
   int val, rval = OK;
@@ -7057,6 +7172,19 @@ vtpTiLinkStatus()
     }
 
   return rval;
+}
+
+int
+vtpEbResetFifo()
+{
+  CHECKINIT;
+
+  VLOCK;
+  vtp->eb.LinkCtrl |= VTP_EB_LINKCTRL_FIFO_RST;
+  vtp->eb.LinkCtrl &= ~VTP_EB_LINKCTRL_FIFO_RST;
+  VUNLOCK;
+
+  return OK;
 }
 
 int
@@ -7221,6 +7349,78 @@ vtpDmaWaitDone(int id)
   return rval;
 }
 
+int
+vtpEbBuildTestEvent(int len)
+{
+  CHECKINIT;
+
+  VLOCK;
+  vtp->eb.EbCtrl = 0x8 | (len<<8);
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpEbReset()
+{
+  CHECKINIT;
+
+  VLOCK;
+  vtp->eb.EbCtrl = 0x0;
+  vtp->eb.LinkCtrl = 0x8;
+  vtp->eb.LinkCtrl = 0x0;
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize)
+{
+  int status, cnt = 0;
+  CHECKINIT;
+
+  if(vtpEbTiEventReadErrors)
+    printf("{vtpEbTiEventReadErrors=%d}\n", vtpEbTiEventReadErrors);
+
+  int retry=100;
+  while(cnt < maxsize)
+    {
+      VLOCK;
+      status = vtp->eb.EbStatus;
+      VUNLOCK;
+
+      if(status & 0x1)
+	{
+	  if(retry-- > 0)
+	    {
+	      continue;
+	    }
+	  else
+	    {
+	      vtpEbTiEventReadErrors++;
+	      printf("vtpEbTiReadEvent: TIMEOUT ERROR (cnt=%d)\n", vtpEbTiEventReadErrors);
+	      break;
+	    }
+	}
+
+      VLOCK;
+      *pBuf++ = vtp->eb.TiFifo;
+      VUNLOCK;
+
+      if(status & 0x10000)
+	break;
+
+      if(++cnt > maxsize)
+	{
+	  printf("too many event words...exiting\n");
+	  break;
+	}
+    }
+
+  return cnt;
+}
 
 int
 vtpTiLinkReadEvent(uint32_t *pBuf, uint32_t maxsize)
