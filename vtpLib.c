@@ -90,13 +90,16 @@ pthread_mutex_t   vtpMutex = PTHREAD_MUTEX_INITIALIZER;
   }
 
 #define CHECKTYPE(v,c) {					    \
+    static int __once = 0;					    \
     if ((c!=0)&&(c!=1)) {					    \
-       printf("%s: ERROR: VTP wrong Chip ID (%d)\n",__func__,c);    \
-       return ERROR;                                                \
-       }                                                            \
+      if(__once++ == 0)						    \
+	printf("%s: ERROR: VTP wrong Chip ID (%d)\n",__func__,c);   \
+      return ERROR;						    \
+    }								       \
     if( (v != VTP_FW_TYPE_COMMON) && (v != VTP_FW_Type[c]) ) {         \
-      printf("%s: ERROR: VTP wrong firmware type (%d)\n",__func__,v);  \
-      return ERROR;						       \
+      if(__once++ == 0)						    \
+	printf("%s: ERROR: VTP wrong firmware type (%d)\n",__func__,v);	\
+      return ERROR;							\
     }								       \
   }
 
@@ -157,8 +160,10 @@ vtpRoUpdateSupportedCheck()
 }
 
 #define CHECKRO(_oldroutine) {						\
+    static int __once = 0;						\
     if (vtpRoUpdateSupportedCheck() == 0)	{			\
-      printf("%s: WARN:  Calling %s for compatibility.\n", __func__, #_oldroutine); \
+      if(__once++ == 0)							\
+	printf("%s: WARN:  Calling %s for compatibility.\n", __func__, #_oldroutine); \
       return _oldroutine;						\
     }									\
   }
@@ -1228,6 +1233,7 @@ vtpSerdesStatus(int type, uint16_t dev, int pflag, int data[NSERDES])
     case VTP_FW_TYPE_FTHODO:
     case VTP_FW_TYPE_HPS:
     case VTP_FW_TYPE_COMPTON:
+    case VTP_FW_TYPE_NPS:
       ctrl = vtp->v7.fadcDec.Ctrl;
       break;
     case VTP_FW_TYPE_GT:
@@ -2082,6 +2088,7 @@ vtpEnableTriggerPayloadMask(int pp_mask)
     case VTP_FW_TYPE_COMPTON:
     case VTP_FW_TYPE_MPDRO:
     case VTP_FW_TYPE_VCODAROC:
+    case VTP_FW_TYPE_NPS:
       vtp->v7.fadcDec.Ctrl = pp_mask;
       break;
     case VTP_FW_TYPE_GT:
@@ -2126,6 +2133,7 @@ vtpGetTriggerPayloadMask()
     case VTP_FW_TYPE_COMPTON:
     case VTP_FW_TYPE_MPDRO:
     case VTP_FW_TYPE_VCODAROC:
+    case VTP_FW_TYPE_NPS:
       pp_mask = vtp->v7.fadcDec.Ctrl;
       break;
     case VTP_FW_TYPE_GT:

@@ -118,7 +118,7 @@ vtpRocStatus(int flag)
   else
     printf("    Status          = %08x  (No connection)\n",tcp_status);
 
-  printf("    MAC Status %08X %08X %08X %08X\n", 
+  printf("    MAC Status %08X %08X %08X %08X\n",
     mac_status[0],mac_status[1],
     mac_status[2], mac_status[3]);
 
@@ -382,15 +382,19 @@ vtpRocWriteBank(unsigned int *bank)
 unsigned int
 vtpRocGetTriggerCnt()
 {
-
+  unsigned int rval = 0;
   if(vtp==NULL)
     return(0);
 
   /* for some reason vtp!=NULL after a library load and unload so this CHECKTYPE
      generates an error message we do not want to care about */
-  //  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
-  return(vtp->roc.TiTriggerCnt);
+  VLOCK;
+  rval = vtp->roc.TiTriggerCnt;
+  VUNLOCK;
+
+  return(rval);
 
 }
 
@@ -404,7 +408,7 @@ vtpRocGetNlongs()
   if(vtp==NULL)
     return(0);
 
-  //CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
+  CHECKTYPE(ZYNC_FW_TYPE_ZCODAROC,1);
 
   VLOCK;
   bytes[0] = vtp->roc.BytesSent[0];
