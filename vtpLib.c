@@ -2163,6 +2163,10 @@ vtpEnableTriggerFiberMask(int fiber_mask)
   VLOCK;
   switch(VTP_FW_Type[0])
   {
+    case VTP_FW_TYPE_NPS:
+      mask = (vtp->v7.fadcDec.Ctrl & 0xFFFF) | (fiber_mask<<16);
+      vtp->v7.fadcDec.Ctrl = mask;
+      break;
     case VTP_FW_TYPE_FTCAL:
       mask = (vtp->v7.ftcalDec.Ctrl & 0xFFFF) | (fiber_mask<<16);
       vtp->v7.ftcalDec.Ctrl = mask;
@@ -2188,6 +2192,9 @@ vtpGetTriggerFiberMask()
   VLOCK;
   switch(VTP_FW_Type[0])
   {
+    case VTP_FW_TYPE_NPS:
+      val = (vtp->v7.fadcDec.Ctrl>>16) & 0xF;
+      break;
     case VTP_FW_TYPE_FTCAL:
       val = (vtp->v7.ftcalDec.Ctrl>>16) & 0xF;
       break;

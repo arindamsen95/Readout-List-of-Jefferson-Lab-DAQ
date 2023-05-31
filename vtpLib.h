@@ -829,18 +829,48 @@ typedef struct MpdRegs_Struct
   /** 0x0040 */ BLANK[(0x100-0x40)/4];
 } MPD_REGS;
 
-#define NPS_ECALCLUSTER_CTRL_SEED_THR_MASK     0x3FFF0000
-#define NPS_ECALCLUSTER_CTRL_HIT_DT_MASK       0x0000E000
-#define NPS_ECALCLUSTER_CTRL_CLUSTER_THR_MASK  0x00001FFF
+#define NPS_ECALCLUSTER_CTRL_SEED_THR_MASK     0x00001FFF
+#define NPS_ECALCLUSTER_CTRL_HIT_DT_MASK       0x00070000
+#define NPS_ECALCLUSTER_CTRL_HIT_MIN_MASK      0x0F000000
+
+#define NPS_ECALCLUSTER_THRESHOLD_TRIGGER_MASK  0x00003FFF
+#define NPS_ECALCLUSTER_THRESHOLD_READOUT_MASK  0x3FFF0000
 
 #define NPS_ECALCLUSTER_CRATE_ID_MASK          0x00000007
 
 typedef struct NpsEcalClusterRegs_Struct
 {
   /** 0x0000 */ volatile uint32_t ctrl;
-  /** 0x0004 */ volatile uint32_t crate_id;
-  /** 0x0008 */ BLANK[(0x80-0x08)/4];
+  /** 0x0004 */ volatile uint32_t threshold;
+  /** 0x0008 */ volatile uint32_t crate_id;
+  /** 0x000C */ BLANK[(0x80-0x0C)/4];
 } NPS_ECALCLUSTER_REGS;
+
+typedef struct NpsEcalMonRegs_Struct
+{
+  /** 0000 */ BLANK[(0x80-0x00)/4];
+} NPS_ECALMON_REGS;
+
+#define NPS_COSMIC_CTRL_SCINT_DT_MASK		0x00000700
+#define NPS_COSMIC_CTRL_COLUMN_VETOEN_MASK	0x00000080
+#define NPS_COSMIC_CTRL_COLUMN_DT_MASK		0x00000070
+#define NPS_COSMIC_CTRL_COLUMN_MULTMIN_MASK	0x0000000F
+
+typedef struct NpsCosmicRegs_Struct
+{
+  /** 0x0000 */ volatile uint32_t ctrl;
+  /** 0x0004 */ BLANK[(0x80-0x04)/4];
+} NPS_COSMIC_REGS;
+
+#define NPS_FADCMASK_CTRL_MASKOFFSET_MASK	0x000007FF
+#define NPS_FADCMASK_CTRL_MASKWIDTH_MASK	0x07FF0000
+
+typedef struct NpsFadcMaskRegs_Struct
+{
+  /** 0x0000 */ volatile uint32_t ctrl;
+  /** 0x0004 */ BLANK[(0x80-0x04)/4];
+} NPS_FADCMASK_REGS;
+
 
 typedef struct v7_bridge_struct
 {
@@ -964,7 +994,13 @@ typedef struct v7_bridge_struct
 
   /** 0x43C1B080 */ NPS_ECALCLUSTER_REGS npsEcalCluster;
 
-  /** 0x43C1Bxxx */ BLANK[(0xFFF4 - 0xB080-sizeof(NPS_ECALCLUSTER_REGS))/4];
+  /** 0x43C1B100 */ NPS_ECALMON_REGS npsEcalMon;
+
+  /** 0x43C1B180 */ NPS_COSMIC_REGS npsCosmic;
+
+  /** 0x43C1B200 */ NPS_FADCMASK_REGS npsFadcMask;
+
+  /** 0x43C1Bxxx */ BLANK[(0xFFF4 - 0xB200-sizeof(NPS_FADCMASK_REGS))/4];
 
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
@@ -1093,7 +1129,7 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_FADCCOIN          16
 #define VTP_FW_TYPE_VCODAROC          17
 #define VTP_FW_TYPE_MPDRO             18
-#define VTP_FW_TYPE_NPS               19
+#define VTP_FW_TYPE_NPS               20
 
 /* These are created in the Zync VHDL files */
 #define ZYNC_FW_TYPE_COMMON           0

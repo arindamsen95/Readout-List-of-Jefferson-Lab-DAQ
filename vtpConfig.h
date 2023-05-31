@@ -135,7 +135,15 @@ typedef struct {
     {
       unsigned int seed_thr;
       unsigned int hit_dt;
-      unsigned int cluster_thr;
+      unsigned int nhit_min;
+      unsigned int cluster_trigger_thr;
+      unsigned int cluster_readout_thr;
+      unsigned int fadcmask_offset;
+      unsigned int fadcmask_width;
+      unsigned int cosmic_scint_dt;
+      unsigned int cosmic_column_veto_en;
+      unsigned int cosmic_column_dt;
+      unsigned int cosmic_column_multmin;
       unsigned int crate_id;
     } ecal_cluster;
   } nps;
