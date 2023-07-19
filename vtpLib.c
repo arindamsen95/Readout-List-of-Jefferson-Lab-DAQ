@@ -7555,6 +7555,14 @@ vtpTiLinkReadEvent(uint32_t *pBuf, uint32_t maxsize)
   return cnt;
 }
 
+// this is safe to use only in the same thread as the call to vtpTIData2TriggerBank(...)
+static int32_t tiBlockSyncFlag = 0;
+int32_t
+vtpTIGetBlockSyncFlag()
+{
+  return tiBlockSyncFlag;
+}
+
 int
 vtpTIData2TriggerBank(volatile uint32_t *data, int ndata)
 {
@@ -7566,6 +7574,8 @@ vtpTIData2TriggerBank(volatile uint32_t *data, int ndata)
 #define TI_FILLER_WORD_TYPE                0x78000000
 #define TI_BLOCK_HEADER_WORD_TYPE          0x00000000
 #define TI_BLOCK_TRAILER_WORD_TYPE         0x08000000
+#define TI_BLOCK_TRAILER_WORD_COUNT_MASK   0x001FFFFF
+#define TI_BLOCK_TRAILER_SYNCEVENT_FLAG    (1 << 21)
 
   /* Work down to find index of block header */
   while(iword<ndata)
@@ -7628,12 +7638,13 @@ vtpTIData2TriggerBank(volatile uint32_t *data, int ndata)
 
   /* Get the block trailer, and check the number of words contained in it */
   word = data[iblktrl];
+  tiBlockSyncFlag = (word & TI_BLOCK_TRAILER_SYNCEVENT_FLAG) ? 1 : 0;
 
-  if((iblktrl - iblkhead + 1) != (word & 0x3fffff))
+  if((iblktrl - iblkhead + 1) != (word & TI_BLOCK_TRAILER_WORD_COUNT_MASK))
     {
       printf("%s: Number of words inconsistent (index count = %d, block trailer count = %d\n",
 	     __func__,
-	     (iblktrl - iblkhead + 1), word & 0x3fffff);
+	     (iblktrl - iblkhead + 1), word & TI_BLOCK_TRAILER_WORD_COUNT_MASK);
 
       return ERROR;
     }

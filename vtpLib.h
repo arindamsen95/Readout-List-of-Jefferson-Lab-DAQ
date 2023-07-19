@@ -1396,6 +1396,7 @@ int  vtpGetTriggerFiberMask();
 int  vtpEbReadEvent(uint32_t *pBuf, uint32_t maxsize);
 int  vtpEbTiReadEvent(uint32_t *pBuf, uint32_t maxsize);
 int  vtpTiLinkReadEvent(uint32_t *pBuf, uint32_t maxsize);
+int32_t vtpTIGetBlockSyncFlag();
 int  vtpTIData2TriggerBank(volatile uint32_t *data, int ndata);
 int  vtpEbDecodeEvent(uint32_t *pBuf, uint32_t size);
 int  vtpEbReadAndDecodeEvent();
