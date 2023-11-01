@@ -1792,7 +1792,7 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      CFG_ERR("Invalid number of arguments %d\n",
+		      CFG_ERR("Invalid first argument %d\n",
 			      argi[0]);
 		      return (-4);
 		    }
@@ -2078,7 +2078,7 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      CFG_ERR("Invalid number of arguments %d\n",
+		      CFG_ERR("Invalid first argument %d\n",
 			      argi[0]);
 		      return (-4);
 		    }
@@ -2098,7 +2098,7 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      CFG_ERR("Invalid number of arguments %d\n",
+		      CFG_ERR("Invalid first argument %d\n",
 			      argi[0]);
 		      return (-4);
 		    }
@@ -2304,7 +2304,7 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      CFG_ERR("Invalid number of arguments %d\n",
+		      CFG_ERR("Invalid first argument %d\n",
 			      argi[0]);
 		      return (-4);
 		    }
@@ -2316,7 +2316,7 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      CFG_ERR("Invalid number of arguments %d\n",
+		      CFG_ERR("Invalid first argument %d\n",
 			      argi[0]);
 		      return (-4);
 		    }

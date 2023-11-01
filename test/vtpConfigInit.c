@@ -17,7 +17,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "vtp.h"
 #include "vtpLib.h"
 #include "vtpConfig.h"
 

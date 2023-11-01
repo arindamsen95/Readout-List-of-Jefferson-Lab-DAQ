@@ -26,9 +26,14 @@ main(int argc, char *argv[])
     strncpy(rol_usrConfig, argv[1], 256);
 
   vtpInitGlobals();
-  vtpConfig("");
   if(strncasecmp(rol_usrConfig,"none",4))
-    vtpConfig(rol_usrConfig);
+    vtpReadConfigFile(rol_usrConfig);
 
   exit(0);
 }
+
+/*
+  Local Variables:
+  compile-command: "make -k vtpConfigTest "
+  End:
+*/
