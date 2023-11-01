@@ -33,6 +33,14 @@ static VTP_CONF vtpConf;
 
 char *getenv();
 
+/* Macros for error ouput */
+#define CFG_ERR(format, ...) {						\
+    fprintf(stdout, "\n%s: ERROR: ", "ReadConfigFile");			\
+    fprintf(stdout, "%s\n\t", keyword);					\
+    fprintf(stdout, format, ## __VA_ARGS__);				\
+    fprintf(stdout, "\n");						\
+  }
+
 #define SCAN_MSK						\
   args = sscanf (str_tmp, "%*s %d %d %d %d %d %d %d %d   \
                                      %d %d %d %d %d %d %d %d",	\
@@ -51,12 +59,18 @@ char *getenv();
 
 #define GET_READ_MSK							\
   SCAN_MSK;								\
+  if(args != 16)							\
+    {									\
+      CFG_ERR("Invalid number of arguments (%d), should be 16\n", args); \
+      return(-8);							\
+    }									\
   ui1 = 0;								\
   for(jj=0; jj<16; jj++)						\
     {									\
       if((msk[jj] < 0) || (msk[jj] > 1))				\
 	{								\
-	  printf("\nReadConfigFile: Wrong mask bit value, %d\n\n",msk[jj]); return(-6); \
+	  CFG_ERR("Invalid mask bit value, %d\n", msk[jj]);		\
+	  return(-6);							\
 	}								\
       if(strcmp(keyword,"FADC250_ADC_MASK") == 0) msk[jj] = ~(msk[jj])&0x1; \
       ui1 |= (msk[jj]<<jj);						\
@@ -68,28 +82,18 @@ char *getenv();
 
 #define GET_READ_MSK4							\
   SCAN_MSK4;								\
+  if(args != 4)							\
+    {									\
+      CFG_ERR("Invalid number of arguments (%d), should be 4\n", args); \
+      return(-8);							\
+    }									\
   ui1 = 0;								\
   for(jj=0; jj<4; jj++)							\
     {									\
       if((msk[jj] < 0) || (msk[jj] > 1))				\
 	{								\
-	  printf("\nReadConfigFile: Wrong mask bit value, %d\n\n",msk[jj]); return(-6); \
-	}								\
-      ui1 |= (msk[jj]<<jj);						\
-    }
-
-#define SCAN_MSK4						\
-  args = sscanf (str_tmp, "%*s %d %d %d %d",			\
-		 &msk[ 0], &msk[ 1], &msk[ 2], &msk[ 3])
-
-#define GET_READ_MSK4							\
-  SCAN_MSK4;								\
-  ui1 = 0;								\
-  for(jj=0; jj<4; jj++)							\
-    {									\
-      if((msk[jj] < 0) || (msk[jj] > 1))				\
-	{								\
-	  printf("\nReadConfigFile: Wrong mask bit value, %d\n\n",msk[jj]); return(-6); \
+	  CFG_ERR("Invalid mask bit value, %d\n", msk[jj]);		\
+	  return(-6);							\
 	}								\
       ui1 |= (msk[jj]<<jj);						\
     }
@@ -101,12 +105,18 @@ char *getenv();
 
 #define GET_READ_MSK8							\
   SCAN_MSK8;								\
+  if(args != 8)								\
+    {									\
+      CFG_ERR("Invalid number of arguments (%d), should be 8\n", args); \
+      return(-8);							\
+    }									\
   ui1 = 0;								\
   for(jj=0; jj<8; jj++)							\
     {									\
       if((msk[jj] < 0) || (msk[jj] > 1))				\
 	{								\
-	  printf("\nReadConfigFile: Wrong mask bit value, %d\n\n",msk[jj]); return(-6); \
+	  CFG_ERR("Invalid mask bit value, %d\n", msk[jj]);		\
+	  return(-6);							\
 	}								\
       ui1 |= (msk[jj]<<jj);						\
     }
@@ -142,7 +152,7 @@ vtpConfig(char *fname)
   /* download to all boards */
   vtpDownloadAll();
 
-  return (0);
+  return (res);
 }
 
 void
@@ -1128,8 +1138,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d", &trg_bit);
 		  if(trg_bit < 0 || trg_bit >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     trg_bit);
+		      CFG_ERR("Invalid value %d\n",
+			      trg_bit);
 		      return (-4);
 		    }
 		}
@@ -1138,8 +1148,8 @@ vtpReadConfigFile(char *filename_in)
 		  argc = sscanf(str_tmp, "%*s 0x%X 0x%X", &argi[0], &argi[1]);
 		  if(trg_bit < 0 || trg_bit >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     trg_bit);
+		      CFG_ERR("Invalid value %d\n",
+			      trg_bit);
 		      return (-4);
 		    }
 		  vtpConf.gt.trgbits[trg_bit].ssp_strigger_bit_mask[0] =
@@ -1153,8 +1163,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s 0x%X", &argi[0]);
 		  if(trg_bit < 0 || trg_bit >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     trg_bit);
+		      CFG_ERR("Invalid value %d\n",
+			      trg_bit);
 		      return (-4);
 		    }
 		  vtpConf.gt.trgbits[trg_bit].ssp_ctrigger_bit_mask = argi[0];
@@ -1164,8 +1174,8 @@ vtpReadConfigFile(char *filename_in)
 		  argc = sscanf(str_tmp, "%*s 0x%X 0x%X", &argi[0], &argi[1]);
 		  if(trg_bit < 0 || trg_bit >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     trg_bit);
+		      CFG_ERR("Invalid value %d\n",
+			      trg_bit);
 		      return (-4);
 		    }
 		  vtpConf.gt.trgbits[trg_bit].ssp_sector_mask[0] = argi[0];
@@ -1177,8 +1187,8 @@ vtpReadConfigFile(char *filename_in)
 		  argc = sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(trg_bit < 0 || trg_bit >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     trg_bit);
+		      CFG_ERR("Invalid value %d\n",
+			      trg_bit);
 		      return (-4);
 		    }
 		  vtpConf.gt.trgbits[trg_bit].sector_mult_min[0] = argi[0];
@@ -1190,8 +1200,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 		  if(trg_bit < 0 || trg_bit >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     trg_bit);
+		      CFG_ERR("Invalid value %d\n",
+			      trg_bit);
 		      return (-4);
 		    }
 		  vtpConf.gt.trgbits[trg_bit].sector_coin_width = argi[0];
@@ -1201,8 +1211,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %f", &argf[0]);
 		  if(trg_bit < 0 || trg_bit >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     trg_bit);
+		      CFG_ERR("Invalid value %d\n",
+			      trg_bit);
 		      return (-4);
 		    }
 		  vtpConf.gt.trgbits[trg_bit].pulser_freq = argf[0];
@@ -1212,8 +1222,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 		  if(trg_bit < 0 || trg_bit >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     trg_bit);
+		      CFG_ERR("Invalid value %d\n",
+			      trg_bit);
 		      return (-4);
 		    }
 		  vtpConf.gt.trgbits[trg_bit].delay = argi[0];
@@ -1223,8 +1233,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 		  if(trg_bit < 0 || trg_bit >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     trg_bit);
+		      CFG_ERR("Invalid value %d\n",
+			      trg_bit);
 		      return (-4);
 		    }
 		  vtpConf.gt.trgbits[trg_bit].prescale = argi[0];
@@ -1237,8 +1247,8 @@ vtpReadConfigFile(char *filename_in)
 			   &argi[6], &argi[7]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 		  vtpConf.gt.trgbits[argi[0]].ssp_strigger_bit_mask[0] =
@@ -1264,8 +1274,8 @@ vtpReadConfigFile(char *filename_in)
 			   &argi[10]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 		  vtpConf.gt.trgbits[argi[0]].ssp_strigger_bit_mask[0] =
@@ -1430,9 +1440,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong singles bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1445,9 +1454,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong singles bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1460,9 +1468,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong singles bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1475,9 +1482,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong singles bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1490,9 +1496,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argf[1], &argf[2], &argf[3], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong singles bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1508,9 +1513,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2], &argi[3], &argi[4]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong singles bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1526,9 +1530,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong singles bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1539,9 +1542,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong pair bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1552,9 +1554,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong singles bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1565,9 +1566,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong pair bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1578,9 +1578,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong pair bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1592,9 +1591,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2], &argi[3]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong pair bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1608,9 +1606,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong pair bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1623,9 +1620,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[1], &argi[2]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong pair bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1639,9 +1635,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong pair bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1656,9 +1651,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2], &argi[3], &argi[4]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong singles bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1672,9 +1666,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 4)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong pair bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1685,9 +1678,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 2)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1698,9 +1690,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 2)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1711,9 +1702,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 2)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1725,9 +1715,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2], &argi[3]);
 		  if(argi[0] < 0 || argi[0] >= 2)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1740,9 +1729,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 2)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1753,9 +1741,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 2)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong multiplicity bit  number %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid first argument %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1772,8 +1759,8 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2], &argi[3]);
 		  if(argi[0] < 0 || argi[0] > 6)
 		    {
-		      printf("\nReadConfigFile: Wrong FEE region %d\n\n",
-			     argi[0]);
+		      CFG_ERR("Invalid FEE region %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 		  vtpConf.hps.fee_trig.prescale_xmin[argi[0]] = argi[1];
@@ -1805,8 +1792,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     argi[0]);
+		      CFG_ERR("Invalid number of arguments %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -1835,9 +1822,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 		  if(argi[0] < 0 || argi[0] > 1)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong Streaming EB index %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid Streaming EB index %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 		  streaming_eb = argi[0];
@@ -2016,9 +2002,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 5)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong compton instannce %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid compton instance %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 		  printf("Set FADC_THRESHOLD: %d %d\n", argi[0], argi[1]);
@@ -2035,9 +2020,8 @@ vtpReadConfigFile(char *filename_in)
 			   &msk[14], &msk[15]);
 		  if(argi[0] < 0 || argi[0] >= 5)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong compton instannce %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid compton instance %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -2046,9 +2030,7 @@ vtpReadConfigFile(char *filename_in)
 		    {
 		      if((msk[jj] < 0) || (msk[jj] > 1))
 			{
-			  printf
-			    ("\nReadConfigFile: Wrong mask bit value, %d\n\n",
-			     msk[jj]);
+			  CFG_ERR("Invalid mask bit value, %d\n", msk[jj]);
 			  return (-6);
 			}
 		      ui1 |= (msk[jj] << jj);
@@ -2062,9 +2044,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 5)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong compton instannce %d\n\n",
-			 argi[0]);
+		      CFG_ERR("Invalid compton instance %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 		  printf("Set EPLANE_MULT_MIN: %d %d\n", argi[0], argi[1]);
@@ -2076,8 +2057,7 @@ vtpReadConfigFile(char *filename_in)
 			 &argi[2], &argi[3], &argi[4]);
 		  if(argi[0] < 0 || argi[0] >= 5)
 		    {
-		      printf
-			("\nReadConfigFile: Wrong compton instannce %d\n\n",
+		      CFG_ERR("Invalid compton instance %d\n",
 			 argi[0]);
 		      return (-4);
 		    }
@@ -2098,8 +2078,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     argi[0]);
+		      CFG_ERR("Invalid number of arguments %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 		  printf("Set PRESCALE: %d %d\n", argi[0], argi[1]);
@@ -2118,8 +2098,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     argi[0]);
+		      CFG_ERR("Invalid number of arguments %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 		  printf("Set DELAY: %d %d\n", argi[0], argi[1]);
@@ -2324,8 +2304,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     argi[0]);
+		      CFG_ERR("Invalid number of arguments %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -2336,8 +2316,8 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
 		  if(argi[0] < 0 || argi[0] >= 32)
 		    {
-		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
-			     argi[0]);
+		      CFG_ERR("Invalid number of arguments %d\n",
+			      argi[0]);
 		      return (-4);
 		    }
 
@@ -2491,7 +2471,7 @@ vtpReadConfigFile(char *filename_in)
 	      else
 		{
 		  printf
-		    ("Error: VTP unknown line: fgets returns %s so keyword=%s\n\n",
+		    ("Error: VTP unknown line: fgets returns %s so keyword=%s\n",
 		     str_tmp, keyword);
 		}
 	    }
