@@ -55,7 +55,7 @@ extern pthread_mutex_t   vtpMutex;
  * @return OK if successful, otherwise ERROR:
  */
 int32_t
-vtpNPSSetEcalCluster(uint32_t seed_thr, uint32_t hit_dt, uint32_t cluster_thr, uint32_t readout_thr, uint32_t nhit_min)
+vtpNPSSetEcalCluster(uint32_t seed_thr, uint32_t hit_dt, uint32_t cluster_thr, uint32_t readout_thr, uint32_t nhit_min, uint32_t cluster_pair_thr, uint32_t cluster_pair_width)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_NPS,0);
@@ -84,6 +84,22 @@ vtpNPSSetEcalCluster(uint32_t seed_thr, uint32_t hit_dt, uint32_t cluster_thr, u
       return ERROR;
     }
 
+  if(cluster_pair_thr > NPS_CLUSTER_PAIR_THR_MAX)
+    {
+      printf("%s: ERROR: Invalid cluster_pair_thr 0x%x (%d).  Max = 0x%x (%d)\n",
+	     __func__,
+	     cluster_pair_thr, cluster_pair_thr, NPS_CLUSTER_PAIR_THR_MAX, NPS_CLUSTER_PAIR_THR_MAX);
+      return ERROR;
+    }
+  
+  if(cluster_pair_thr > NPS_CLUSTER_PAIR_WIDTH_MAX)
+    {
+      printf("%s: ERROR: Invalid cluster_pair_width 0x%x (%d).  Max = 0x%x (%d)\n",
+	     __func__,
+	     cluster_pair_width, cluster_pair_width, NPS_CLUSTER_PAIR_THR_MAX, NPS_CLUSTER_PAIR_THR_MAX);
+      return ERROR;
+    }
+
   if(readout_thr > NPS_CLUSTER_THR_MAX)
     {
       printf("%s: ERROR: Invalid readout_thr 0x%x (%d).  Max = 0x%x (%d)\n",
@@ -104,6 +120,7 @@ vtpNPSSetEcalCluster(uint32_t seed_thr, uint32_t hit_dt, uint32_t cluster_thr, u
   VLOCK;
   vtp->v7.npsEcalCluster.ctrl = (seed_thr) | (hit_dt << 16) | (nhit_min << 24);
   vtp->v7.npsEcalCluster.threshold = (cluster_thr) | (readout_thr << 16);
+  vtp->v7.npsEcalCluster.pair = ((cluster_pair_width/4)<<16) | (cluster_pair_thr);
   VUNLOCK;
 
   return OK;
@@ -117,16 +134,17 @@ vtpNPSSetEcalCluster(uint32_t seed_thr, uint32_t hit_dt, uint32_t cluster_thr, u
  * @return OK if successful, otherwise ERROR
  */
 int32_t
-vtpNPSGetEcalCluster(uint32_t *seed_thr, uint32_t *hit_dt, uint32_t *cluster_thr, uint32_t *readout_thr, uint32_t *nhit_min)
+vtpNPSGetEcalCluster(uint32_t *seed_thr, uint32_t *hit_dt, uint32_t *cluster_thr, uint32_t *readout_thr, uint32_t *nhit_min, uint32_t *cluster_pair_thr, uint32_t *cluster_pair_width)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_NPS,0);
 
-  uint32_t ctrl = 0, threshold = 0;
+  uint32_t ctrl = 0, threshold = 0, pair;
 
   VLOCK;
   ctrl = vtp->v7.npsEcalCluster.ctrl;
   threshold = vtp->v7.npsEcalCluster.threshold;
+  pair = vtp->v7.npsEcalCluster.pair;
   VUNLOCK;
 
   *seed_thr = ctrl & NPS_ECALCLUSTER_CTRL_SEED_THR_MASK;
@@ -136,6 +154,8 @@ vtpNPSGetEcalCluster(uint32_t *seed_thr, uint32_t *hit_dt, uint32_t *cluster_thr
   *cluster_thr = threshold & NPS_ECALCLUSTER_THRESHOLD_TRIGGER_MASK;
   *readout_thr = (threshold & NPS_ECALCLUSTER_THRESHOLD_READOUT_MASK) >> 16;
 
+  *cluster_pair_thr = pair & NPS_ECALCLUSTER_THRESHOLD_PAIR_MASK;
+  *cluster_pair_width = ((pair & NPS_ECALCLUSTER_PAIR_WIDTH_MASK)>>16)*4;
   return OK;
 }
 
@@ -273,10 +293,13 @@ vtpNPSGetCosmic(uint32_t *scint_dt, uint32_t *column_dt, uint32_t *column_multmi
  * @return OK if successful, otherwise ERROR:
  */
 int32_t
-vtpNPSSetFadcMask(uint32_t offset, uint32_t width)
+vtpNPSSetFadcMask(uint32_t offset, uint32_t width, uint32_t mode, uint32_t prescale)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_NPS,0);
+
+  offset = offset/4;
+  width = width/4;
 
   if(offset > NPS_FADCMASK_OFFSET_MAX)
     {
@@ -294,8 +317,25 @@ vtpNPSSetFadcMask(uint32_t offset, uint32_t width)
       return ERROR;
     }
 
+  if(prescale > NPS_FADCMASK_ACCEPT_PRESCALE_MASK)
+    {
+      printf("%s: ERROR: Invalid fadc mask prescale factor 0x%x (%d). Max = 0x%x (%d)\n",
+             __func__,
+             prescale, prescale, NPS_FADCMASK_ACCEPT_PRESCALE_MAX, NPS_FADCMASK_ACCEPT_PRESCALE_MAX);
+      return ERROR;
+    }
+
+  if(mode > NPS_FADCMASK_MODE_MAX)
+    {
+      printf("%s: ERROR: Invalid fadc mask mode %d. Max = %d\n",
+             __func__,
+             mode, NPS_FADCMASK_MODE_MAX);
+      return ERROR;
+    }
+
   VLOCK;
-  vtp->v7.npsFadcMask.ctrl = (offset << 16) | width;
+  vtp->v7.npsFadcMask.ctrl = (mode << 28) | (width << 16) | offset;
+  vtp->v7.npsFadcMask.accept_prescale = prescale;
   VUNLOCK;
 
   return OK;
@@ -308,7 +348,7 @@ vtpNPSSetFadcMask(uint32_t offset, uint32_t width)
  * @return OK if successful, otherwise ERROR
  */
 int32_t
-vtpNPSGetFadcMask(uint32_t *offset, uint32_t *width)
+vtpNPSGetFadcMask(uint32_t *offset, uint32_t *width, uint32_t *mode, uint32_t *prescale)
 {
   CHECKINIT;
   CHECKTYPE(VTP_FW_TYPE_NPS,0);
@@ -317,11 +357,16 @@ vtpNPSGetFadcMask(uint32_t *offset, uint32_t *width)
 
   VLOCK;
   regval = vtp->v7.npsFadcMask.ctrl;
-  VUNLOCK;
-
-
   *offset = regval & NPS_FADCMASK_CTRL_MASKOFFSET_MASK;
   *width  = (regval & NPS_FADCMASK_CTRL_MASKWIDTH_MASK) >> 16;
+  *mode   = (regval & NPS_FADCMASK_CTRL_MODE_MASK) >> 28;
+
+  regval = vtp->v7.npsFadcMask.accept_prescale;
+  *prescale = regval & NPS_FADCMASK_ACCEPT_PRESCALE_MASK;
+  VUNLOCK;
+
+  *width = (*width)*4;
+  *offset = (*offset)*4;
 
   return OK;
 }

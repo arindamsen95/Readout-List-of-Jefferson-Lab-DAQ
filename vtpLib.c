@@ -6225,7 +6225,7 @@ vtpSetGt_width(int width)
   CHECKTYPE(VTP_FW_TYPE_COMMON,0);
 
   VLOCK;
-  vtp->v7.trigOut.Width = width;
+  vtp->v7.trigOut.Width = width/4;
   VUNLOCK;
 
   return OK;
@@ -6239,7 +6239,7 @@ vtpGetGt_width()
   CHECKTYPE(VTP_FW_TYPE_COMMON,0);
 
   VLOCK;
-  width = vtp->v7.trigOut.Width;
+  width = vtp->v7.trigOut.Width*4;
   VUNLOCK;
 
   return width;

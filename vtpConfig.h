@@ -138,8 +138,12 @@ typedef struct {
       unsigned int nhit_min;
       unsigned int cluster_trigger_thr;
       unsigned int cluster_readout_thr;
+      unsigned int cluster_pair_thr;
+      unsigned int cluster_pair_width;
       unsigned int fadcmask_offset;
       unsigned int fadcmask_width;
+      unsigned int fadcmask_mode;
+      unsigned int fadcmask_prescale;
       unsigned int cosmic_scint_dt;
       unsigned int cosmic_column_veto_en;
       unsigned int cosmic_column_dt;

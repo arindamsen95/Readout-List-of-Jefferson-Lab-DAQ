@@ -541,8 +541,12 @@ vtpInitGlobals()
   vtpConf.nps.ecal_cluster.nhit_min = 1;
   vtpConf.nps.ecal_cluster.cluster_trigger_thr = 1;
   vtpConf.nps.ecal_cluster.cluster_readout_thr = 1;
+  vtpConf.nps.ecal_cluster.cluster_pair_thr = 1;
+  vtpConf.nps.ecal_cluster.cluster_pair_width = 0;
   vtpConf.nps.ecal_cluster.fadcmask_offset = 0;
   vtpConf.nps.ecal_cluster.fadcmask_width = 0;
+  vtpConf.nps.ecal_cluster.fadcmask_prescale = 0;
+  vtpConf.nps.ecal_cluster.fadcmask_mode = 0;
   vtpConf.nps.ecal_cluster.cosmic_scint_dt = 0;
   vtpConf.nps.ecal_cluster.cosmic_column_veto_en = 0;
   vtpConf.nps.ecal_cluster.cosmic_column_dt = 0;
@@ -2375,6 +2379,24 @@ vtpReadConfigFile(char *filename_in)
 #endif
 		  vtpConf.nps.ecal_cluster.cluster_readout_thr = argi[0];
 		}
+	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_CLUSTER_PAIR_TRIGGER_THR"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_NPS_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.nps.ecal_cluster.cluster_pair_thr = argi[0];
+		}
+	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_CLUSTER_PAIR_TRIGGER_WIDTH"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_NPS_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.nps.ecal_cluster.cluster_pair_width = argi[0];
+		}
 	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_CRATE_ID"))
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
@@ -2410,6 +2432,24 @@ vtpReadConfigFile(char *filename_in)
 			 keyword, argi[0]);
 #endif
 		  vtpConf.nps.ecal_cluster.fadcmask_width = argi[0];
+		}
+	      else if(!strcmp(keyword, "VTP_NPS_FADCMASK_PRESCALE"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_NPS_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.nps.ecal_cluster.fadcmask_prescale = argi[0];
+		}
+	      else if(!strcmp(keyword, "VTP_NPS_FADCMASK_MODE"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+#ifdef DEBUG_NPS_CONFIG
+		  printf("%s = %d\n",
+			 keyword, argi[0]);
+#endif
+		  vtpConf.nps.ecal_cluster.fadcmask_mode = argi[0];
 		}
 
 	      else if(!strcmp(keyword, "VTP_NPS_COSMIC_SCINT_DT"))
@@ -2985,14 +3025,18 @@ vtpDownloadAll()
 			   vtpConf.nps.ecal_cluster.hit_dt,
 			   vtpConf.nps.ecal_cluster.cluster_trigger_thr,
                            vtpConf.nps.ecal_cluster.cluster_readout_thr,
-                           vtpConf.nps.ecal_cluster.nhit_min);
+                           vtpConf.nps.ecal_cluster.nhit_min,
+			   vtpConf.nps.ecal_cluster.cluster_pair_thr,
+			   vtpConf.nps.ecal_cluster.cluster_pair_width);
       vtpNPSSetCrateID(vtpConf.nps.ecal_cluster.crate_id);
       vtpNPSSetCosmic(vtpConf.nps.ecal_cluster.cosmic_scint_dt,
                       vtpConf.nps.ecal_cluster.cosmic_column_dt,
                       vtpConf.nps.ecal_cluster.cosmic_column_multmin,
                       vtpConf.nps.ecal_cluster.cosmic_column_veto_en);
       vtpNPSSetFadcMask(vtpConf.nps.ecal_cluster.fadcmask_offset,
-                        vtpConf.nps.ecal_cluster.fadcmask_width);
+                        vtpConf.nps.ecal_cluster.fadcmask_width,
+                        vtpConf.nps.ecal_cluster.fadcmask_mode,
+                        vtpConf.nps.ecal_cluster.fadcmask_prescale);
     }
 
   vtpUploadAllPrint();
@@ -3412,14 +3456,18 @@ vtpUploadAll(char *string, int length)
 			   &vtpConf.nps.ecal_cluster.hit_dt,
 			   &vtpConf.nps.ecal_cluster.cluster_trigger_thr,
                            &vtpConf.nps.ecal_cluster.cluster_readout_thr,
-                           &vtpConf.nps.ecal_cluster.nhit_min);
+                           &vtpConf.nps.ecal_cluster.nhit_min,
+			   &vtpConf.nps.ecal_cluster.cluster_pair_thr,
+			   &vtpConf.nps.ecal_cluster.cluster_pair_width);
       vtpNPSGetCrateID(&vtpConf.nps.ecal_cluster.crate_id);
       vtpNPSGetCosmic(&vtpConf.nps.ecal_cluster.cosmic_scint_dt,
                       &vtpConf.nps.ecal_cluster.cosmic_column_dt,
                       &vtpConf.nps.ecal_cluster.cosmic_column_multmin,
                       &vtpConf.nps.ecal_cluster.cosmic_column_veto_en);
       vtpNPSGetFadcMask(&vtpConf.nps.ecal_cluster.fadcmask_offset,
-                        &vtpConf.nps.ecal_cluster.fadcmask_width);
+                        &vtpConf.nps.ecal_cluster.fadcmask_width,
+                        &vtpConf.nps.ecal_cluster.fadcmask_mode,
+                        &vtpConf.nps.ecal_cluster.fadcmask_prescale);
     }
 
   if(length)
@@ -4262,6 +4310,12 @@ vtpUploadAll(char *string, int length)
 	  sprintf(sss, "VTP_NPS_ECALCLUSTER_CLUSTER_READOUT_THR %d\n",
 		  vtpConf.nps.ecal_cluster.cluster_readout_thr);
 	  ADD_TO_STRING;
+	  sprintf(sss, "VTP_NPS_ECALCLUSTER_CLUSTER_PAIR_TRIGGER_THR %d\n",
+		  vtpConf.nps.ecal_cluster.cluster_pair_thr);
+	  ADD_TO_STRING;
+	  sprintf(sss, "VTP_NPS_ECALCLUSTER_CLUSTER_PAIR_TRIGGER_WIDTH %d\n",
+		  vtpConf.nps.ecal_cluster.cluster_pair_width);
+	  ADD_TO_STRING;
 	  sprintf(sss, "VTP_NPS_ECALCLUSTER_CRATE_ID %d\n",
 		  vtpConf.nps.ecal_cluster.crate_id);
 	  ADD_TO_STRING;
@@ -4273,6 +4327,12 @@ vtpUploadAll(char *string, int length)
 	  ADD_TO_STRING;
 	  sprintf(sss, "VTP_NPS_ECALCLUSTER_FADCMASK_WIDTH %d\n",
 		  vtpConf.nps.ecal_cluster.fadcmask_width);
+	  ADD_TO_STRING;
+	  sprintf(sss, "VTP_NPS_ECALCLUSTER_FADCMASK_PRESCALE %d\n",
+		  vtpConf.nps.ecal_cluster.fadcmask_prescale);
+	  ADD_TO_STRING;
+	  sprintf(sss, "VTP_NPS_ECALCLUSTER_FADCMASK_MODE %d\n",
+		  vtpConf.nps.ecal_cluster.fadcmask_mode);
 	  ADD_TO_STRING;
 	  sprintf(sss, "VTP_NPS_ECALCLUSTER_COSMIC_SCINT_DT %d\n",
 		  vtpConf.nps.ecal_cluster.cosmic_scint_dt);

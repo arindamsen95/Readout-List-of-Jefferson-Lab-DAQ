@@ -830,20 +830,26 @@ typedef struct MpdRegs_Struct
 } MPD_REGS;
 
 #define NPS_ECALCLUSTER_CTRL_SEED_THR_MASK     0x00001FFF
-#define NPS_ECALCLUSTER_CTRL_HIT_DT_MASK       0x00070000
+#define NPS_ECALCLUSTER_CTRL_HIT_DT_MASK       0x000F0000
 #define NPS_ECALCLUSTER_CTRL_HIT_MIN_MASK      0x0F000000
 
-#define NPS_ECALCLUSTER_THRESHOLD_TRIGGER_MASK  0x00003FFF
-#define NPS_ECALCLUSTER_THRESHOLD_READOUT_MASK  0x3FFF0000
+#define NPS_ECALCLUSTER_THRESHOLD_TRIGGER_MASK 0x00003FFF
+#define NPS_ECALCLUSTER_THRESHOLD_READOUT_MASK 0x3FFF0000
+
+#define NPS_ECALCLUSTER_THRESHOLD_PAIR_MASK    0x00003FFF
 
 #define NPS_ECALCLUSTER_CRATE_ID_MASK          0x00000007
+
+#define NPS_ECALCLUSTER_PAIR_THRESHOLD_MASK    0x00003FFF
+#define NPS_ECALCLUSTER_PAIR_WIDTH_MASK        0x001F0000
 
 typedef struct NpsEcalClusterRegs_Struct
 {
   /** 0x0000 */ volatile uint32_t ctrl;
   /** 0x0004 */ volatile uint32_t threshold;
   /** 0x0008 */ volatile uint32_t crate_id;
-  /** 0x000C */ BLANK[(0x80-0x0C)/4];
+  /** 0x000C */ volatile uint32_t pair;
+  /** 0x0010 */ BLANK[(0x80-0x10)/4];
 } NPS_ECALCLUSTER_REGS;
 
 typedef struct NpsEcalMonRegs_Struct
@@ -864,11 +870,15 @@ typedef struct NpsCosmicRegs_Struct
 
 #define NPS_FADCMASK_CTRL_MASKOFFSET_MASK	0x000007FF
 #define NPS_FADCMASK_CTRL_MASKWIDTH_MASK	0x07FF0000
+#define NPS_FADCMASK_CTRL_MODE_MASK             0x10000000
+
+#define NPS_FADCMASK_ACCEPT_PRESCALE_MASK       0x0000FFFF
 
 typedef struct NpsFadcMaskRegs_Struct
 {
   /** 0x0000 */ volatile uint32_t ctrl;
-  /** 0x0004 */ BLANK[(0x80-0x04)/4];
+  /** 0x0004 */ volatile uint32_t accept_prescale;
+  /** 0x0008 */ BLANK[(0x80-0x08)/4];
 } NPS_FADCMASK_REGS;
 
 
