@@ -1153,55 +1153,58 @@ vtpSerdesCheckLinks()
   CHECKINIT;
 
   for(tries=0; tries<VTP_SERDES_MAX_TRIES; tries++)
-  {
-    printf("Waiting on links:");
-    pass = 1;
-
-    for(i=0; i<20; i++)
     {
-      VLOCK;
-      if(i<16)
-      {
-        ctrl = vtp->v7.vxs[i].Ctrl;
-        status = vtp->v7.vxs[i].Status;
-      }
-      else
-      {
-        ctrl = vtp->v7.qsfp[i-16].Ctrl;
-        status = vtp->v7.qsfp[i-16].Status;
-      }
-      VUNLOCK;
+      printf("Waiting on links:");
+      pass = 1;
 
-      if(!(ctrl & VTP_SERDES_CTRL_GT_RESET))
-      {
-        if(!(status & VTP_SERDES_STATUS_CHUP))
-        {
-          if(i<16)
-            printf(" PP%d", i+1);
-          else
-            printf(" FB%d", i-15);
+      for(i=0; i<20; i++)
+	{
+	  VLOCK;
+	  if(i<16)
+	    {
+	      ctrl = vtp->v7.vxs[i].Ctrl;
+	      status = vtp->v7.vxs[i].Status;
+	    }
+	  else
+	    {
+	      ctrl = vtp->v7.qsfp[i-16].Ctrl;
+	      status = vtp->v7.qsfp[i-16].Status;
+	    }
+	  VUNLOCK;
 
-          pass = 0;
-        }else{
-	  chmask |= (1<<i);
+	  if(!(ctrl & VTP_SERDES_CTRL_GT_RESET))
+	    {
+	      if(!(status & VTP_SERDES_STATUS_CHUP))
+		{
+		  if(i<16)
+		    printf(" PP%d", i+1);
+		  else
+		    printf(" FB%d", i-15);
+
+		  pass = 0;
+		}else{
+		chmask |= (1<<i);
+	      }
+	    }
 	}
-      }
-    }
 
-    if(pass)
-    {
-      printf(" none. All links up!\n");
-      break;
+      if(pass)
+	{
+	  printf(" none. All links up!\n");
+	  break;
+	}
+      else
+	{
+	  printf("\n");
+	  sleep(1);
+	}
     }
-    else
-    {
-      printf("\n");
-      sleep(1);
-    }
-  }
 
   if(tries>=VTP_SERDES_MAX_TRIES)
-    printf("%s: ERROR - all serdes links not up!\n", __func__);
+    {
+      printf("%s: ERROR - all serdes links not up!\n", __func__);
+      return ERROR;
+    }
 
   return chmask;
 }
