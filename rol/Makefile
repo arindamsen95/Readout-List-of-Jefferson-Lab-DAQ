@@ -14,9 +14,9 @@ QUIET	?= 1
 ARCH=armv7l
 
 # Plug in your primary readout lists here..
-VMEROL		= vtp_roc_mpdro.so
+VMEROL		= vtp_list.so
 # Add shared library dependencies here.  (jvme already included)
-ROLLIBS		= -li2c -lmpd -lconfig -lvtp
+ROLLIBS		= -li2c -lvtp
 
 COMPILE_TIME	= \""$(shell date)"\"
 
@@ -89,11 +89,12 @@ clean distclean:
 
 %.d: %.c
 	@echo " DEP    $@"
-	$(Q)set -e; rm -f $@; \
-	$(CC) -MM -shared $(INCS) $(CFLAGS) $< > $@.$$$$; \
+	${Q}set -e; rm -f $@; \
+	$(CC) -MM -shared $(INCS) $(CFLAGS) -DINIT_NAME=$(@:.so=__init) \
+		-DINIT_NAME_POLL=$(@:.so=__poll) $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,\1.so $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 
-#-include $(DEPS)
+-include $(DEPS)
 
 .PHONY: clean distclean

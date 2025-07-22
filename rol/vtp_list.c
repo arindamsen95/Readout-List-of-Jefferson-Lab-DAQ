@@ -44,7 +44,14 @@ int firstEvent;
 void
 rocDownload()
 {
-  /* vtpOpen(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN); */
+  if(vtpInit(VTP_INIT_CLK_VXS_250))
+    {
+      printf("vtpInit() **FAILED**. User should not continue.\n");
+      daLogMsg("ERROR", "Failed to initialize VTP");
+
+      return;
+    }
+
 #ifdef USE_DMA
   if(vtpDmaMemOpen(2, MAXBUFSIZE * 4) == OK)
     {
@@ -335,6 +342,28 @@ rocReset()
 #ifdef USE_DMA
   vtpDmaMemClose();
 #endif
+  vtpClose(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
+}
+
+void
+rocLoad()
+{
+  int stat;
+
+  /* Open VTP library */
+  stat = vtpOpen(VTP_FPGA_OPEN | VTP_I2C_OPEN | VTP_SPI_OPEN);
+  if(stat < 0)
+    {
+      printf(" Unable to Open VTP driver library.\n");
+    }
+
+}
+
+void
+rocCleanup()
+{
+
+  /* Close the VTP Library */
   vtpClose(VTP_FPGA_OPEN|VTP_I2C_OPEN|VTP_SPI_OPEN);
 }
 

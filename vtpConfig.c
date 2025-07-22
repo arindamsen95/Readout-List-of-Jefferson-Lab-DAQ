@@ -180,6 +180,15 @@ vtpInitGlobals()
   vtpConf.payload_en = 0;
   vtpConf.fiber_en = 0;
 
+  vtpConf.trig.latency = 1000;
+  vtpConf.trig.width = 100;
+
+  for(i = 0; i < 32; i++)
+    {
+      vtpConf.trig.delay[i] = 0;
+      vtpConf.trig.prescale[i] = 1;
+    }
+
   // HTCC configuration
   vtpConf.htcc.threshold[0] = 0;
   vtpConf.htcc.threshold[1] = 0;
@@ -282,9 +291,6 @@ vtpInitGlobals()
 
 
   // GT configuration
-  vtpConf.gt.trig_latency = 1000;
-  vtpConf.gt.trig_width = 100;
-
   for(i = 0; i < 32; i++)
     {
       vtpConf.gt.trgbits[i].ssp_strigger_bit_mask[0] = 0;
@@ -296,8 +302,6 @@ vtpInitGlobals()
       vtpConf.gt.trgbits[i].sector_coin_width = 0;
       vtpConf.gt.trgbits[i].ssp_ctrigger_bit_mask = 0;
       vtpConf.gt.trgbits[i].pulser_freq = 0;
-      vtpConf.gt.trgbits[i].delay = 0;
-      vtpConf.gt.trgbits[i].prescale = 1;
     }
 
   // DC configuration
@@ -406,10 +410,6 @@ vtpInitGlobals()
       vtpConf.hps.fee_trig.prescale[i] = 0;
     }
 
-  vtpConf.hps.trig.latency = 0;
-  for(i = 0; i < 32; i++)
-    vtpConf.hps.trig.prescale[i] = 1;
-
   // FADC Streaming configuration
   vtpConf.fadc_streaming.roc_id = 0;
   vtpConf.fadc_streaming.nframe_buf = 1000;
@@ -487,8 +487,6 @@ vtpInitGlobals()
 
 
   // Compton Configuration
-  vtpConf.compton.trig.latency = 1000;
-  vtpConf.compton.trig.width = 100;
   vtpConf.compton.vetroc_width = 2;
   vtpConf.compton.enable_scaler_readout = 0;
   for(i = 0; i < 5; i++)
@@ -497,11 +495,6 @@ vtpInitGlobals()
       vtpConf.compton.fadc_mask[i] = 0;
       vtpConf.compton.eplane_mult_min[i] = 0;
       vtpConf.compton.eplane_mask[i] = 0;
-    }
-  for(i = 0; i < 32; i++)
-    {
-      vtpConf.compton.trig.prescale[i] = 0;
-      vtpConf.compton.trig.delay[i] = 0;
     }
 
   // MPDRO Configuration
@@ -539,13 +532,6 @@ vtpInitGlobals()
   vtpConf.mpdro.eb.mac[5] = 0;
 
   // NPS Configuration
-  vtpConf.nps.trig.latency = 1000;
-  vtpConf.nps.trig.width = 100;
-  for(i = 0; i < 32; i++)
-    {
-      vtpConf.nps.trig.prescale[i] = 0;
-      vtpConf.nps.trig.delay[i] = 0;
-    }
   vtpConf.nps.ecal_cluster.seed_thr = 1;
   vtpConf.nps.ecal_cluster.hit_dt = 0;
   vtpConf.nps.ecal_cluster.nhit_min = 1;
@@ -562,6 +548,11 @@ vtpInitGlobals()
   vtpConf.nps.ecal_cluster.cosmic_column_dt = 0;
   vtpConf.nps.ecal_cluster.cosmic_column_multmin = 0;
   vtpConf.nps.ecal_cluster.crate_id = 0;
+
+  // MollerCnt Configuration
+  vtpConf.mollercnt.mult = 0;
+  vtpConf.mollercnt.trg_ch = 0;
+  vtpConf.mollercnt.trg_pulse = 0;
 }
 
 
@@ -767,6 +758,50 @@ vtpReadConfigFile(char *filename_in)
 		  vtpConf.fiber_en = ui1;
 		  printf("vtpConf.fiber_en = 0x%08X\n", vtpConf.fiber_en);
 		}
+	      else if(!strcmp(keyword, "VTP_TRIG_LATENCY") || 
+                      !strcmp(keyword, "VTP_HPS_LATENCY") ||
+                      !strcmp(keyword, "VTP_COMPTON_LATENCY"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+		  vtpConf.trig.latency = argi[0];
+		}
+	      else if(!strcmp(keyword, "VTP_TRIG_WIDTH") ||
+	              !strcmp(keyword, "VTP_HPS_WIDTH") ||
+	              !strcmp(keyword, "VTP_NPS_WIDTH") ||
+	              !strcmp(keyword, "VTP_COMPTON_WIDTH"))
+		{
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+		  vtpConf.trig.width = argi[0];
+		}
+	      else if(!strcmp(keyword, "VTP_TRIG_PRESCALE") ||
+                      !strcmp(keyword, "VTP_HPS_PRESCALE") ||
+                      !strcmp(keyword, "VTP_NPS_PRESCALE") ||
+                      !strcmp(keyword, "VTP_COMPTON_PRESCALE"))
+		{
+		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+		  if(argi[0] < 0 || argi[0] >= 32)
+		    {
+		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
+			     argi[0]);
+		      return (-4);
+		    }
+
+		  vtpConf.trig.prescale[argi[0]] = argi[1];
+		}
+	      else if(!strcmp(keyword, "VTP_TRIG_DELAY") ||
+	              !strcmp(keyword, "VTP_NPS_DELAY") ||
+	              !strcmp(keyword, "VTP_COMPTON_DELAY"))
+		{
+		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
+		  if(argi[0] < 0 || argi[0] >= 32)
+		    {
+		      printf("\nReadConfigFile: Wrong trg bit  number %d\n\n",
+			     argi[0]);
+		      return (-4);
+		    }
+		  vtpConf.trig.delay[argi[0]] = argi[1];
+		}
+
 	      else if(!strcmp(keyword, "VTP_EC_FADCSUM_CH"))
 		{
 		  sscanf(str_tmp,
@@ -1123,16 +1158,6 @@ vtpReadConfigFile(char *filename_in)
 
 
 
-	      else if(!strcmp(keyword, "VTP_GT_LATENCY"))
-		{
-		  sscanf(str_tmp, "%*s %d", &argi[0]);
-		  vtpConf.gt.trig_latency = argi[0];
-		}
-	      else if(!strcmp(keyword, "VTP_GT_WIDTH"))
-		{
-		  sscanf(str_tmp, "%*s %d", &argi[0]);
-		  vtpConf.gt.trig_width = argi[0];
-		}
 	      else if(!strcmp(keyword, "VTP_GT_TRG"))
 		{
 		  sscanf(str_tmp, "%*s %d", &trg_bit);
@@ -1782,23 +1807,6 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 		  vtpConf.hps.fee_trig.cluster_nmin = argi[0];
 		}
-	      else if(!strcmp(keyword, "VTP_HPS_LATENCY"))
-		{
-		  sscanf(str_tmp, "%*s %d", &argi[0]);
-		  vtpConf.hps.trig.latency = argi[0];
-		}
-	      else if(!strcmp(keyword, "VTP_HPS_PRESCALE"))
-		{
-		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
-		  if(argi[0] < 0 || argi[0] >= 32)
-		    {
-		      CFG_ERR("Invalid first argument %d\n",
-			      argi[0]);
-		      return (-4);
-		    }
-
-		  vtpConf.hps.trig.prescale[argi[0]] = argi[1];
-		}
 
 
 	      // FADC STREAMING PARAMETERS
@@ -1986,17 +1994,6 @@ vtpReadConfigFile(char *filename_in)
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
 		  vtpConf.compton.vetroc_width = argi[0];
 		}
-	      else if(!strcmp(keyword, "VTP_COMPTON_LATENCY"))
-		{
-		  sscanf(str_tmp, "%*s %d", &argi[0]);
-		  vtpConf.compton.trig.latency = argi[0];
-		}
-	      else if(!strcmp(keyword, "VTP_COMPTON_WIDTH"))
-		{
-		  sscanf(str_tmp, "%*s %d", &argi[0]);
-		  vtpConf.compton.trig.width = argi[0];
-		}
-
 	      else if(!strcmp(keyword, "VTP_COMPTON_FADC_THRESHOLD"))
 		{
 		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
@@ -2073,18 +2070,6 @@ vtpReadConfigFile(char *filename_in)
 		  printf("Set EPLANE_MASK: %d %d\n", argi[0],
 			 vtpConf.compton.eplane_mask[argi[0]]);
 		}
-	      else if(!strcmp(keyword, "VTP_COMPTON_PRESCALE"))
-		{
-		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
-		  if(argi[0] < 0 || argi[0] >= 32)
-		    {
-		      CFG_ERR("Invalid first argument %d\n",
-			      argi[0]);
-		      return (-4);
-		    }
-		  printf("Set PRESCALE: %d %d\n", argi[0], argi[1]);
-		  vtpConf.compton.trig.prescale[argi[0]] = argi[1];
-		}
 	      else if(!strcmp(keyword, "VTP_COMPTON_SCALER_READOUT_EN"))
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
@@ -2092,18 +2077,6 @@ vtpReadConfigFile(char *filename_in)
 		    vtpConf.compton.enable_scaler_readout = 1;
 		  else
 		    vtpConf.compton.enable_scaler_readout = 0;
-		}
-	      else if(!strcmp(keyword, "VTP_COMPTON_DELAY"))
-		{
-		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
-		  if(argi[0] < 0 || argi[0] >= 32)
-		    {
-		      CFG_ERR("Invalid first argument %d\n",
-			      argi[0]);
-		      return (-4);
-		    }
-		  printf("Set DELAY: %d %d\n", argi[0], argi[1]);
-		  vtpConf.compton.trig.delay[argi[0]] = argi[1];
 		}
 	      else if(!strcmp(keyword, "VTP_MPDRO_COMMON_MODE_FILENAME"))
 		{
@@ -2281,48 +2254,6 @@ vtpReadConfigFile(char *filename_in)
 #endif
 		  vtpConf.mpdro.eb.destipport = argi[0];
 		}
-	      else if(!strcmp(keyword, "VTP_NPS_TRIG_WIDTH"))
-		{
-		  sscanf(str_tmp, "%*s %d", &argi[0]);
-#ifdef DEBUG_NPS_CONFIG
-		  printf("%s = %d\n",
-			 keyword, argi[0]);
-#endif
-		  vtpConf.nps.trig.width = argi[0];
-		}
-	      else if(!strcmp(keyword, "VTP_NPS_TRIG_LATENCY"))
-		{
-		  sscanf(str_tmp, "%*s %d", &argi[0]);
-#ifdef DEBUG_NPS_CONFIG
-		  printf("%s = %d\n",
-			 keyword, argi[0]);
-#endif
-		  vtpConf.nps.trig.latency = argi[0];
-		}
-	      else if(!strcmp(keyword, "VTP_NPS_TRIG_PRESCALE"))
-		{
-		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
-		  if(argi[0] < 0 || argi[0] >= 32)
-		    {
-		      CFG_ERR("Invalid first argument %d\n",
-			      argi[0]);
-		      return (-4);
-		    }
-
-		  vtpConf.nps.trig.prescale[argi[0]] = argi[1];
-		}
-	      else if(!strcmp(keyword, "VTP_NPS_TRIG_DELAY"))
-		{
-		  sscanf(str_tmp, "%*s %d %d", &argi[0], &argi[1]);
-		  if(argi[0] < 0 || argi[0] >= 32)
-		    {
-		      CFG_ERR("Invalid first argument %d\n",
-			      argi[0]);
-		      return (-4);
-		    }
-
-		  vtpConf.nps.trig.delay[argi[0]] = argi[1];
-		}
 	      else if(!strcmp(keyword, "VTP_NPS_ECALCLUSTER_SEED_THR"))
 		{
 		  sscanf(str_tmp, "%*s %d", &argi[0]);
@@ -2468,6 +2399,23 @@ vtpReadConfigFile(char *filename_in)
 #endif
 		  vtpConf.nps.ecal_cluster.cosmic_column_multmin = argi[0];
 		}
+
+              else if(!strcmp(keyword, "VTP_MOLLERCNT_MULTMIN"))
+                {
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+		  vtpConf.mollercnt.mult = argi[0];
+                }
+              else if(!strcmp(keyword, "VTP_MOLLERCNT_TRG_CH"))
+                {
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+		  vtpConf.mollercnt.trg_ch = argi[0];
+                }
+              else if(!strcmp(keyword, "VTP_MOLLERCNT_TRG_PULSE"))
+                {
+		  sscanf(str_tmp, "%*s %d", &argi[0]);
+		  vtpConf.mollercnt.trg_pulse = argi[0];
+                }
+
 	      else
 		{
 		  printf
@@ -2635,6 +2583,19 @@ vtpDownloadAll()
       vtpSetCND_nframes(vtpConf.cnd.nframes);
     }
 
+  if(vtpConf.fw_type[0] == VTP_FW_TYPE_MOLLERCNT)
+    {
+      vtpSetGt_latency(vtpConf.trig.latency);
+      vtpSetGt_width(vtpConf.trig.width);
+
+      for(ii = 0; ii < 32; ii++)
+	{
+	  vtpSetTriggerBitPrescaler(ii, vtpConf.trig.prescale[ii]);
+	  vtpSetTriggerBitDelay(ii, vtpConf.trig.delay[ii]);
+	}
+      vtpSetMollerCnt_parms(vtpConf.mollercnt.mult, vtpConf.mollercnt.trg_ch, vtpConf.mollercnt.trg_pulse);
+    }
+
   if(vtpConf.fw_type[0] == VTP_FW_TYPE_PCS)
     {
       // PCS configuration
@@ -2681,8 +2642,8 @@ vtpDownloadAll()
   if(vtpConf.fw_type[0] == VTP_FW_TYPE_GT)
     {
       // GT configuration
-      vtpSetGt_latency(vtpConf.gt.trig_latency);
-      vtpSetGt_width(vtpConf.gt.trig_width);
+      vtpSetGt_latency(vtpConf.trig.latency);
+      vtpSetGt_width(vtpConf.trig.width);
 
       for(ii = 0; ii < 32; ii++)
 	{
@@ -2695,9 +2656,9 @@ vtpDownloadAll()
 			     vtpConf.gt.trgbits[ii].sector_mult_min[1],
 			     vtpConf.gt.trgbits[ii].sector_coin_width,
 			     vtpConf.gt.trgbits[ii].ssp_ctrigger_bit_mask,
-			     vtpConf.gt.trgbits[ii].delay,
+			     vtpConf.trig.delay[ii],
 			     vtpConf.gt.trgbits[ii].pulser_freq,
-			     vtpConf.gt.trgbits[ii].prescale);
+			     vtpConf.trig.prescale[ii]);
 	}
     }
 
@@ -2869,8 +2830,8 @@ vtpDownloadAll()
     {
       for(ii = 0; ii < 5; ii++)
 	{
-	  vtpSetTriggerBitPrescaler(ii, vtpConf.compton.trig.prescale[ii]);
-	  vtpSetTriggerBitDelay(ii, vtpConf.compton.trig.delay[ii]);
+	  vtpSetTriggerBitPrescaler(ii, vtpConf.trig.prescale[ii]);
+	  vtpSetTriggerBitDelay(ii, vtpConf.trig.delay[ii]);
 	  vtpSetCompton_Trigger(ii, vtpConf.compton.fadc_threshold[ii],
 				vtpConf.compton.eplane_mult_min[ii],
 				vtpConf.compton.eplane_mask[ii],
@@ -2880,8 +2841,8 @@ vtpDownloadAll()
       vtpSetCompton_EnableScalerReadout(vtpConf.compton.
 					enable_scaler_readout);
       vtpSetCompton_VetrocWidth(vtpConf.compton.vetroc_width);
-      vtpSetGt_latency(vtpConf.compton.trig.latency);
-      vtpSetGt_width(vtpConf.compton.trig.width);
+      vtpSetGt_latency(vtpConf.trig.latency);
+      vtpSetGt_width(vtpConf.trig.width);
     }
 
   if((vtpConf.fw_type[0] == VTP_FW_TYPE_FADCSTREAM))
@@ -2992,13 +2953,13 @@ vtpDownloadAll()
   // NPS Configuration
   if((vtpConf.fw_type[0] == VTP_FW_TYPE_NPS))
     {
-      vtpSetGt_latency(vtpConf.nps.trig.latency);
-      vtpSetGt_width(vtpConf.nps.trig.width);
+      vtpSetGt_latency(vtpConf.trig.latency);
+      vtpSetGt_width(vtpConf.trig.width);
 
       for(ii = 0; ii < NPS_N_TRIGGER_BITS; ii++)
 	{
-	  vtpSetTriggerBitPrescaler(ii, vtpConf.nps.trig.prescale[ii]);
-	  vtpSetTriggerBitDelay(ii, vtpConf.nps.trig.delay[ii]);
+	  vtpSetTriggerBitPrescaler(ii, vtpConf.trig.prescale[ii]);
+	  vtpSetTriggerBitDelay(ii, vtpConf.trig.delay[ii]);
 	}
 
       vtpNPSSetEcalCluster(vtpConf.nps.ecal_cluster.seed_thr,
@@ -3017,6 +2978,25 @@ vtpDownloadAll()
                         vtpConf.nps.ecal_cluster.fadcmask_width,
                         vtpConf.nps.ecal_cluster.fadcmask_mode,
                         vtpConf.nps.ecal_cluster.fadcmask_prescale);
+    }
+
+  // MollerCnt Configuration
+  if((vtpConf.fw_type[0] == VTP_FW_TYPE_MOLLERCNT))
+    {
+      vtpSetGt_latency(vtpConf.trig.latency);
+      vtpSetGt_width(vtpConf.trig.width);
+
+      for(ii = 0; ii < 6; ii++)
+	{
+	  vtpSetTriggerBitPrescaler(ii, vtpConf.trig.prescale[ii]);
+	  vtpSetTriggerBitDelay(ii, vtpConf.trig.delay[ii]);
+	}
+
+      vtpSetMollerCnt_parms(
+          vtpConf.mollercnt.mult,
+          vtpConf.mollercnt.trg_ch,
+          vtpConf.mollercnt.trg_pulse
+        );
     }
 
   vtpUploadAllPrint();
@@ -3041,6 +3021,15 @@ vtpUploadAll(char *string, int length)
 
   vtpConf.payload_en = vtpGetTriggerPayloadMask();
   vtpConf.fiber_en = vtpGetTriggerFiberMask();
+      
+  vtpGetGt_latency(&vtpConf.trig.latency);
+  vtpGetGt_width(&vtpConf.trig.width);
+
+  for(i = 0; i < 32; i++)
+  {
+    vtpConf.trig.prescale[i] = vtpGetTriggerBitPrescaler(i);
+    vtpGetTriggerBitDelay(i, &vtpConf.trig.delay[i]);
+  }
 
   if(vtpConf.fw_type[0] == VTP_FW_TYPE_EC)
     {
@@ -3161,9 +3150,6 @@ vtpUploadAll(char *string, int length)
   if(vtpConf.fw_type[0] == VTP_FW_TYPE_GT)
     {
       // GT configuration
-      vtpConf.gt.trig_latency = vtpGetGt_latency();
-      vtpConf.gt.trig_width = vtpGetGt_width();
-
       for(i = 0; i < 32; i++)
 	{
 	  vtpGetGtTriggerBit(i,
@@ -3175,9 +3161,9 @@ vtpUploadAll(char *string, int length)
 			     &vtpConf.gt.trgbits[i].sector_mult_min[1],
 			     &vtpConf.gt.trgbits[i].sector_coin_width,
 			     &vtpConf.gt.trgbits[i].ssp_ctrigger_bit_mask,
-			     &vtpConf.gt.trgbits[i].delay,
+			     &vtpConf.trig.delay[i],
 			     &vtpConf.gt.trgbits[i].pulser_freq,
-			     &vtpConf.gt.trgbits[i].prescale);
+			     &vtpConf.trig.prescale[i]);
 	}
     }
 
@@ -3377,8 +3363,6 @@ vtpUploadAll(char *string, int length)
     {
       for(i = 0; i < 5; i++)
 	{
-	  vtpConf.compton.trig.prescale[i] = vtpGetTriggerBitPrescaler(i);
-	  vtpGetTriggerBitDelay(i, &vtpConf.compton.trig.delay[i]);
 	  vtpGetCompton_Trigger(i, &vtpConf.compton.fadc_threshold[i],
 				&vtpConf.compton.eplane_mult_min[i],
 				&vtpConf.compton.eplane_mask[i],
@@ -3387,8 +3371,6 @@ vtpUploadAll(char *string, int length)
       vtpGetCompton_EnableScalerReadout(&vtpConf.compton.
 					enable_scaler_readout);
       vtpGetCompton_VetrocWidth(&vtpConf.compton.vetroc_width);
-      vtpGetGt_latency(&vtpConf.compton.trig.latency);
-      vtpGetGt_width(&vtpConf.compton.trig.width);
 
     }
 
@@ -3422,16 +3404,6 @@ vtpUploadAll(char *string, int length)
 
   if(vtpConf.fw_type[0] == VTP_FW_TYPE_NPS)
     {
-      vtpConf.nps.trig.latency = vtpGetGt_latency();
-      vtpConf.nps.trig.width = vtpGetGt_width();
-
-      int32_t ii;
-      for(ii = 0; ii < NPS_N_TRIGGER_BITS; ii++)
-	{
-	  vtpConf.nps.trig.prescale[ii] = vtpGetTriggerBitPrescaler(ii);
-	  vtpGetTriggerBitDelay(ii, &vtpConf.nps.trig.delay[ii]);
-	}
-
       vtpNPSGetEcalCluster(&vtpConf.nps.ecal_cluster.seed_thr,
 			   &vtpConf.nps.ecal_cluster.hit_dt,
 			   &vtpConf.nps.ecal_cluster.cluster_trigger_thr,
@@ -3448,6 +3420,16 @@ vtpUploadAll(char *string, int length)
                         &vtpConf.nps.ecal_cluster.fadcmask_width,
                         &vtpConf.nps.ecal_cluster.fadcmask_mode,
                         &vtpConf.nps.ecal_cluster.fadcmask_prescale);
+    }
+
+  // MollerCnt Configuration
+  if((vtpConf.fw_type[0] == VTP_FW_TYPE_MOLLERCNT))
+    {
+      vtpGetMollerCnt_parms(
+          &vtpConf.mollercnt.mult,
+          &vtpConf.mollercnt.trg_ch,
+          &vtpConf.mollercnt.trg_pulse
+        );
     }
 
   if(length)
@@ -3486,8 +3468,17 @@ vtpUploadAll(char *string, int length)
 	      (vtpConf.fiber_en >> 0) & 0x1, (vtpConf.fiber_en >> 1) & 0x1,
 	      (vtpConf.fiber_en >> 2) & 0x1, (vtpConf.fiber_en >> 3) & 0x1);
       ADD_TO_STRING;
-
-
+      sprintf(sss, "VTP_TRIG_LATENCY %d\n", vtpConf.trig.latency);
+      ADD_TO_STRING;
+      sprintf(sss, "VTP_TRIG_WIDTH %d\n", vtpConf.trig.width);
+      ADD_TO_STRING;
+      for(i=0;i<32;i++)
+      {
+        printf(sss, "VTP_TRIG_DELAY %d %d\n", i, vtpConf.trig.delay[i]);
+        ADD_TO_STRING;
+        sprintf(sss, "VTP_TRIG_PRESCALE %d %d\n", i, vtpConf.trig.prescale[i]);
+        ADD_TO_STRING;
+      }
 
       if(vtpConf.fw_type[0] == VTP_FW_TYPE_EC)
 	{
@@ -3711,11 +3702,6 @@ vtpUploadAll(char *string, int length)
 
       if(vtpConf.fw_type[0] == VTP_FW_TYPE_GT)
 	{
-	  sprintf(sss, "VTP_GT_LATENCY %d\n", vtpConf.gt.trig_latency);
-	  ADD_TO_STRING;
-	  sprintf(sss, "VTP_GT_WIDTH %d\n", vtpConf.gt.trig_width);
-	  ADD_TO_STRING;
-
 	  for(i = 0; i < 32; i++)
 	    {
 	      sprintf(sss, "VTP_GT_TRG %d\n", i);
@@ -3740,12 +3726,6 @@ vtpUploadAll(char *string, int length)
 	      ADD_TO_STRING;
 	      sprintf(sss, "VTP_GT_TRG_PULSER_FREQ %.3f\n",
 		      vtpConf.gt.trgbits[i].pulser_freq);
-	      ADD_TO_STRING;
-	      sprintf(sss, "VTP_GT_TRG_DELAY %d\n",
-		      vtpConf.gt.trgbits[i].delay);
-	      ADD_TO_STRING;
-	      sprintf(sss, "VTP_GT_TRG_PRESCALE %d\n",
-		      vtpConf.gt.trgbits[i].prescale);
 	      ADD_TO_STRING;
 	    }
 	}
@@ -4027,28 +4007,12 @@ vtpUploadAll(char *string, int length)
 		      vtpConf.hps.fee_trig.prescale[i]);
 	      ADD_TO_STRING;
 	    }
-
-	  sprintf(sss, "VTP_HPS_LATENCY %d\n", vtpConf.hps.trig.latency);
-	  ADD_TO_STRING;
-	  for(i = 0; i < 32; i++)
-	    {
-	      sprintf(sss, "VTP_HPS_PRESCALE %d %d\n", i,
-		      vtpConf.hps.trig.prescale[i]);
-	      ADD_TO_STRING;
-	    }
 	}
 
       if(vtpConf.fw_type[0] == VTP_FW_TYPE_COMPTON)
 	{
 	  sprintf(sss, "VTP_COMTPON_VETROC_WIDTH %d\n",
 		  vtpConf.compton.vetroc_width);
-	  ADD_TO_STRING;
-
-	  sprintf(sss, "VTP_COMPTON_LATENCY %d\n",
-		  vtpConf.compton.trig.latency);
-	  ADD_TO_STRING;
-
-	  sprintf(sss, "VTP_COMPTON_WIDTH %d\n", vtpConf.compton.trig.width);
 	  ADD_TO_STRING;
 
 	  sprintf(sss, "VTP_COMPTON_SCALER_READOUT_EN %d\n",
@@ -4063,14 +4027,6 @@ vtpUploadAll(char *string, int length)
 
 	      sprintf(sss, "VTP_COMPTON_EPLANE_MULT_MIN %d %d\n",
 		      i, vtpConf.compton.eplane_mult_min[i]);
-	      ADD_TO_STRING;
-
-	      sprintf(sss, "VTP_COMPTON_PRESCALE %d %d\n",
-		      i, vtpConf.compton.trig.prescale[i]);
-	      ADD_TO_STRING;
-
-	      sprintf(sss, "VTP_COMPTON_DELAY %d %d\n",
-		      i, vtpConf.compton.trig.delay[i]);
 	      ADD_TO_STRING;
 
 	      sprintf(sss, "VTP_COMPTON_EPLANE_MASK %d %d %d %d %d\n",
@@ -4257,27 +4213,6 @@ vtpUploadAll(char *string, int length)
 
       if((vtpConf.fw_type[0] == VTP_FW_TYPE_NPS))
 	{
-	  sprintf(sss, "VTP_NPS_TRIG_WIDTH %d\n",
-		  vtpConf.nps.trig.width);
-	  ADD_TO_STRING;
-
-	  sprintf(sss, "VTP_NPS_TRIG_LATENCY %d\n",
-		  vtpConf.nps.trig.latency);
-	  ADD_TO_STRING;
-
-
-	  for(i = 0; i < NPS_N_TRIGGER_BITS; i++)
-	    {
-	      sprintf(sss, "VTP_NPS_TRIG_PRESCALE %d %d\n",
-		      i, vtpConf.nps.trig.prescale[i]);
-	      ADD_TO_STRING;
-
-	      sprintf(sss, "VTP_NPS_TRIG_DELAY %d %d\n",
-		      i, vtpConf.nps.trig.delay[i]);
-	      ADD_TO_STRING;
-
-	    }
-
 	  sprintf(sss, "VTP_NPS_ECALCLUSTER_SEED_THR %d\n",
 		  vtpConf.nps.ecal_cluster.seed_thr);
 	  ADD_TO_STRING;
@@ -4325,6 +4260,16 @@ vtpUploadAll(char *string, int length)
 	  ADD_TO_STRING;
 	  sprintf(sss, "VTP_NPS_ECALCLUSTER_COSMIC_COLUMN_MULTMIN %d\n",
 		  vtpConf.nps.ecal_cluster.cosmic_column_multmin);
+	  ADD_TO_STRING;
+	}
+
+      if((vtpConf.fw_type[0] == VTP_FW_TYPE_MOLLERCNT))
+        {
+	  sprintf(sss, "VTP_MOLLERCNT_MULTMIN %d\n", vtpConf.mollercnt.mult);
+	  ADD_TO_STRING;
+	  sprintf(sss, "VTP_MOLLERCNT_TRG_CH %d\n", vtpConf.mollercnt.trg_ch);
+	  ADD_TO_STRING;
+	  sprintf(sss, "VTP_MOLLERCNT_TRG_PULSE %d\n", vtpConf.mollercnt.trg_pulse);
 	  ADD_TO_STRING;
 	}
 

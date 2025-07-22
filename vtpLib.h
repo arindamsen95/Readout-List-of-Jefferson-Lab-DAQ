@@ -881,6 +881,11 @@ typedef struct NpsFadcMaskRegs_Struct
   /** 0x0008 */ BLANK[(0x80-0x08)/4];
 } NPS_FADCMASK_REGS;
 
+typedef struct MollerCntRegs_Struct 
+{
+  /** 0x0000 */ volatile uint32_t Ctrl;
+  /** 0x0004 */ BLANK[(0x80-0x04)/4];
+} MOLLERCNT_REGS;
 
 typedef struct v7_bridge_struct
 {
@@ -1010,7 +1015,11 @@ typedef struct v7_bridge_struct
 
   /** 0x43C1B200 */ NPS_FADCMASK_REGS npsFadcMask;
 
-  /** 0x43C1Bxxx */ BLANK[(0xFFF4 - 0xB200-sizeof(NPS_FADCMASK_REGS))/4];
+  /** 0x43C1B280 */ BLANK[(0xB800 - 0xB280)/4];
+
+  /** 0x43C1B800 */ MOLLERCNT_REGS mollerCnt;
+
+  /** 0x43C1Bxxx */ BLANK[(0xFFF4 - 0xB880)/4];
 
   /** 0x43C1FFF4 */ volatile uint32_t Status;
   /** 0x43C1FFF8 */ volatile uint32_t Ctrl;
@@ -1140,6 +1149,7 @@ typedef struct zync_reg_struct
 #define VTP_FW_TYPE_VCODAROC          17
 #define VTP_FW_TYPE_MPDRO             18
 #define VTP_FW_TYPE_NPS               20
+#define VTP_FW_TYPE_MOLLERCNT         22
 
 /* These are created in the Zync VHDL files */
 #define ZYNC_FW_TYPE_COMMON           0
@@ -1390,6 +1400,10 @@ int  vtpSetCND_thresholds(int thr0, int thr1, int thr2);
 int  vtpGetCND_thresholds(int *thr0, int *thr1, int *thr2);
 int  vtpSetCND_nframes(int nframes);
 int  vtpGetCND_nframes(int *nframes);
+
+// VTP_FW_TYPE_COMMON functions
+int  vtpSetMollerCnt_parms(int mult, int trg_ch, int trg_pulse);
+int  vtpGetMollerCnt_parms(int *mult, int *trg_ch, int *trg_pulse);
 
 // VTP_FW_TYPE_COMMON functions
 int  vtpSetFPBO(unsigned int val);

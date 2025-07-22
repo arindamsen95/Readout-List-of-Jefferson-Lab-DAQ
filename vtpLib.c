@@ -55,7 +55,7 @@ struct shared_memory_struct
   pthread_mutex_t mutex;
   pthread_mutexattr_t m_attr;
   VTPSHMDATA vtp;
-  VTP_CONF conf;
+//  VTP_CONF conf;
   uint32_t shmSize;
 };
 struct shared_memory_struct *p_sync=NULL;
@@ -335,6 +335,7 @@ vtpInit(int iFlag)
     case VTP_FW_TYPE_HPS:
     case VTP_FW_TYPE_DC:
     case VTP_FW_TYPE_COMPTON:
+    case VTP_FW_TYPE_MOLLERCNT:
     case VTP_FW_TYPE_NPS:
       vtpSetTrig1Source(trig1Src);
       vtpSetSyncSource(syncSrc);
@@ -2089,6 +2090,7 @@ vtpEnableTriggerPayloadMask(int pp_mask)
     case VTP_FW_TYPE_FTHODO:
     case VTP_FW_TYPE_HPS:
     case VTP_FW_TYPE_COMPTON:
+    case VTP_FW_TYPE_MOLLERCNT:
     case VTP_FW_TYPE_MPDRO:
     case VTP_FW_TYPE_VCODAROC:
     case VTP_FW_TYPE_NPS:
@@ -2134,6 +2136,7 @@ vtpGetTriggerPayloadMask()
     case VTP_FW_TYPE_FTHODO:
     case VTP_FW_TYPE_HPS:
     case VTP_FW_TYPE_COMPTON:
+    case VTP_FW_TYPE_MOLLERCNT:
     case VTP_FW_TYPE_MPDRO:
     case VTP_FW_TYPE_VCODAROC:
     case VTP_FW_TYPE_NPS:
@@ -5605,6 +5608,42 @@ vtpCndSendScalers(char *host)
 
 
 
+/* MollerCnt functions */
+
+int
+vtpSetMollerCnt_parms(int mult, int trg_ch, int trg_pulse)
+{
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_MOLLERCNT,0);
+
+  CHECKRANGE_INT(mult,      0, 256);
+  CHECKRANGE_INT(trg_ch,    0,  15);
+  CHECKRANGE_INT(trg_pulse, 0, 255);
+
+  VLOCK;
+  vtp->v7.mollerCnt.Ctrl = mult | (trg_ch<<16) | (trg_pulse<<24);
+  VUNLOCK;
+
+  return OK;
+}
+
+int
+vtpGetMollerCnt_parms(int *mult, int *trg_ch, int *trg_pulse)
+{
+  int val;
+  CHECKINIT;
+  CHECKTYPE(VTP_FW_TYPE_MOLLERCNT,0);
+
+  VLOCK;
+  val = vtp->v7.mollerCnt.Ctrl;
+  VUNLOCK;
+
+  *mult      = (val>> 0) & 0x1FF;
+  *trg_ch    = (val>>16) & 0xF;
+  *trg_pulse = (val>>24) & 0xFF;
+
+  return OK;
+}
 
 
 
@@ -8572,12 +8611,13 @@ vtpCheckMutexHealth(int time_seconds)
 }
 
 /* Return a pointer to the VTP_CONF data in shared memory */
+/*
 VTP_CONF*
 vtpShmGetVTP_CONF()
 {
   return &p_sync->conf;
 }
-
+*/
 #define MEMALLOC_BUFFER_MAX_NUMBER 16
 
 #define MEMALLOC_IOCTL_BASE 1

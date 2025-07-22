@@ -123,14 +123,14 @@ typedef struct {
 
   struct
   {
-    struct
-    {
       int latency;
       int width;
       int prescale[32];
       int delay[32];
-    } trig;
+  } trig;
 
+  struct
+  {
     struct
     {
       unsigned int seed_thr;
@@ -151,6 +151,13 @@ typedef struct {
       unsigned int crate_id;
     } ecal_cluster;
   } nps;
+
+  struct
+  {
+    int mult;
+    int trg_ch;
+    int trg_pulse;
+  } mollercnt;
 
   struct
   {
@@ -287,8 +294,6 @@ typedef struct {
 
   struct
   {
-    int trig_latency;
-    int trig_width;
     trgbit trgbits[32];
   } gt;
 
@@ -364,12 +369,6 @@ typedef struct {
       int prescale[7];
       int en;
     } fee_trig;
-
-    struct
-    {
-      int latency;
-      int prescale[32];
-    } trig;
   } hps;
 
   struct
@@ -380,15 +379,6 @@ typedef struct {
     int eplane_mult_min[5];
     int eplane_mask[5];
     int fadc_mask[5];
-
-    struct
-    {
-      int latency;
-      int width;
-      int prescale[32];
-      int delay[32];
-    } trig;
-
   } compton;
 
 } VTP_CONF;

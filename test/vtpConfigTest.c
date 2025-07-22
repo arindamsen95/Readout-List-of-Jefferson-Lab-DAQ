@@ -27,7 +27,9 @@ main(int argc, char *argv[])
 
   vtpInitGlobals();
   if(strncasecmp(rol_usrConfig,"none",4))
-    vtpReadConfigFile(rol_usrConfig);
+    vtpConfig(rol_usrConfig);
+  else
+    vtpConfig("");
 
   exit(0);
 }
