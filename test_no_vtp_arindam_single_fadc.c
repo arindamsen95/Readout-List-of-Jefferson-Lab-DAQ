@@ -7,7 +7,7 @@
  *                In this example, clock, syncreset, and trigger are      
  *                output from the TI then distributed using a  
  *                switch slot SD module 
- *                                                                     
+ * Author : Arindam Sen (asen@jlab.org)                                                                     
  */
 
 /* Event Buffer definitions */
